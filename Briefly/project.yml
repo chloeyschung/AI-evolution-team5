@@ -1,0 +1,82 @@
+name: Briefly
+options:
+  bundleIdPrefix: com.briefly
+  deploymentTarget:
+    iOS: "16.0"
+  xcodeVersion: "15.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+
+targets:
+
+  # ── 메인 앱 타겟 ──────────────────────────────────────────────────
+  Briefly:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: Briefly
+        excludes:
+          - "**/*.entitlements"
+    info:
+      path: Briefly/Info.plist
+      properties:
+        CFBundleDisplayName: Briefly
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        UILaunchScreen: {}
+    entitlements:
+      path: Briefly/Briefly.entitlements
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.briefly.app
+        TARGETED_DEVICE_FAMILY: "1"   # iPhone only
+        INFOPLIST_FILE: Briefly/Info.plist
+
+  # ── Share Extension 타겟 ─────────────────────────────────────────
+  BrieflyShareExtension:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: BrieflyShareExtension
+        excludes:
+          - "**/*.entitlements"
+      # SavedItem.swift와 StorageService.swift는 양쪽 타겟 공유
+      - path: Briefly/Models/SavedItem.swift
+      - path: Briefly/Services/StorageService.swift
+    info:
+      path: BrieflyShareExtension/Info.plist
+    entitlements:
+      path: BrieflyShareExtension/BrieflyShareExtension.entitlements
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.briefly.app.shareextension
+        INFOPLIST_FILE: BrieflyShareExtension/Info.plist
+
+  # ── 테스트 타겟 ───────────────────────────────────────────────────
+  BrieflyTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: BrieflyTests
+    dependencies:
+      - target: Briefly
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.briefly.app.tests
+
+schemes:
+  Briefly:
+    build:
+      targets:
+        Briefly: all
+        BrieflyShareExtension: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - BrieflyTests
