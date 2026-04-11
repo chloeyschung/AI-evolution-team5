@@ -97,7 +97,6 @@ private struct ConfirmationView: View {
             Image(systemName: success ? "checkmark.circle.fill" : "xmark.circle.fill")
                 .font(.system(size: 48))
                 .foregroundStyle(success ? .green : .red)
-                .symbolEffect(.bounce, value: true)
 
             if success {
                 Text("Briefly에 저장됐어요")
