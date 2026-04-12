@@ -5,8 +5,8 @@ from typing import Union
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from src.ai.metadata_extractor import ContentMetadata
 
@@ -84,9 +84,9 @@ def create_content(
 
 
 @router.get("/content", response_model=list[ContentResponse])
-def list_content(
+async def list_content(
     limit: int = 50,
-    db: SessionType = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> list[ContentResponse]:
     """List all content."""
     result = db.execute(
@@ -109,7 +109,7 @@ def list_content(
 
 
 @router.post("/swipe", status_code=201, response_model=Union[SwipeResponse, SwipeBatchResponse])
-async def record_swipe(
+def record_swipe(
     data: Union[SwipeCreate, SwipeBatchRequest],
     db: SessionType = Depends(get_db),
 ) -> Union[SwipeResponse, SwipeBatchResponse]:
@@ -117,10 +117,11 @@ async def record_swipe(
     if _is_async_session(db):
         repo = SwipeRepository(db)
 
-        # Detect batch vs single by checking type
         if isinstance(data, SwipeBatchRequest):
+            import asyncio
+
             actions = [(a.content_id, a.action) for a in data.actions]
-            histories = await repo.record_swipes_batch(actions)
+            histories = asyncio.get_event_loop().run_until_complete(repo.record_swipes_batch(actions))
             return SwipeBatchResponse(
                 recorded=len(histories),
                 results=[
@@ -129,14 +130,14 @@ async def record_swipe(
                 ],
             )
         else:
-            history = await repo.record_swipe(data.content_id, data.action)
+            history = asyncio.get_event_loop().run_until_complete(repo.record_swipe(data.content_id, data.action))
             return SwipeResponse(
                 id=history.id,
                 content_id=history.content_id,
                 action=history.action.value,
             )
     else:
-        # For sync session, use direct insertion
+        # Sync session handling
         if isinstance(data, SwipeBatchRequest):
             histories = []
             for action_batch in data.actions:
@@ -182,7 +183,7 @@ def list_pending_content(
 
     Returns content ordered by recency (newest first).
     """
-    from sqlalchemy import outerjoin
+    from sqlalchemy.orm import outerjoin
 
     result = db.execute(
         select(Content)
@@ -208,7 +209,7 @@ def list_pending_content(
 
 
 @router.get("/content/kept", response_model=list[ContentResponse])
-async def list_kept_content(
+def list_kept_content(
     limit: int = Query(50, gt=0, le=100),
     offset: int = Query(0, ge=0),
     db: SessionType = Depends(get_db),
@@ -217,20 +218,16 @@ async def list_kept_content(
 
     Returns kept content ordered by swipe recency (newest first).
     """
+    repo = ContentRepository(db)
+
     if _is_async_session(db):
-        repo = ContentRepository(db)
-        contents = await repo.get_kept(limit=limit, offset=offset)
-    else:
-        # For sync session, use direct query
-        result = db.execute(
-            select(Content)
-            .join(SwipeHistory, Content.id == SwipeHistory.content_id)
-            .where(SwipeHistory.action == SwipeAction.KEEP)
-            .order_by(SwipeHistory.swiped_at.desc())
-            .offset(offset)
-            .limit(limit)
+        import asyncio
+
+        contents = asyncio.get_event_loop().run_until_complete(
+            repo.async_get_kept(limit=limit, offset=offset)
         )
-        contents = list(result.scalars().unique().all())
+    else:
+        contents = repo.get_kept(limit=limit, offset=offset)
 
     return [
         ContentResponse(
@@ -247,7 +244,7 @@ async def list_kept_content(
 
 
 @router.get("/content/discarded", response_model=list[ContentResponse])
-async def list_discarded_content(
+def list_discarded_content(
     limit: int = Query(50, gt=0, le=100),
     offset: int = Query(0, ge=0),
     db: SessionType = Depends(get_db),
@@ -256,20 +253,16 @@ async def list_discarded_content(
 
     Returns discarded content ordered by swipe recency (newest first).
     """
+    repo = ContentRepository(db)
+
     if _is_async_session(db):
-        repo = ContentRepository(db)
-        contents = await repo.get_discarded(limit=limit, offset=offset)
-    else:
-        # For sync session, use direct query
-        result = db.execute(
-            select(Content)
-            .join(SwipeHistory, Content.id == SwipeHistory.content_id)
-            .where(SwipeHistory.action == SwipeAction.DISCARD)
-            .order_by(SwipeHistory.swiped_at.desc())
-            .offset(offset)
-            .limit(limit)
+        import asyncio
+
+        contents = asyncio.get_event_loop().run_until_complete(
+            repo.async_get_discarded(limit=limit, offset=offset)
         )
-        contents = list(result.scalars().unique().all())
+    else:
+        contents = repo.get_discarded(limit=limit, offset=offset)
 
     return [
         ContentResponse(
@@ -286,34 +279,19 @@ async def list_discarded_content(
 
 
 @router.get("/stats", response_model=StatsResponse)
-async def get_content_stats(db: SessionType = Depends(get_db)) -> StatsResponse:
+def get_content_stats(db: SessionType = Depends(get_db)) -> StatsResponse:
     """Get content statistics.
 
     Returns counts of pending, kept, and discarded content.
     """
+    repo = ContentRepository(db)
+
     if _is_async_session(db):
-        repo = ContentRepository(db)
-        stats = await repo.get_stats()
+        import asyncio
+
+        stats = asyncio.get_event_loop().run_until_complete(repo.async_get_stats())
     else:
-        # For sync session, use direct queries
-        all_result = db.execute(select(Content.id))
-        all_count = len(all_result.scalars().all())
-
-        kept_result = db.execute(
-            select(SwipeHistory.content_id).where(SwipeHistory.action == SwipeAction.KEEP)
-        )
-        kept_count = len(kept_result.scalars().all())
-
-        discarded_result = db.execute(
-            select(SwipeHistory.content_id).where(SwipeHistory.action == SwipeAction.DISCARD)
-        )
-        discarded_count = len(discarded_result.scalars().all())
-
-        stats = {
-            "pending": all_count - kept_count - discarded_count,
-            "kept": kept_count,
-            "discarded": discarded_count,
-        }
+        stats = repo.get_stats()
 
     return StatsResponse(
         pending=stats["pending"],
