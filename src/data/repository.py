@@ -124,6 +124,76 @@ class ContentRepository:
         )
         return list(result.scalars().all())
 
+    async def get_kept(self, limit: int = 50, offset: int = 0) -> List[Content]:
+        """Get content that was swiped Keep.
+
+        Args:
+            limit: Maximum number of results.
+            offset: Pagination offset.
+
+        Returns:
+            List of Content objects that were kept, ordered by recency.
+        """
+        result = await self.session.execute(
+            select(Content)
+            .join(SwipeHistory, Content.id == SwipeHistory.content_id)
+            .where(SwipeHistory.action == SwipeAction.KEEP)
+            .order_by(SwipeHistory.swiped_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        return list(result.scalars().unique().all())
+
+    async def get_discarded(self, limit: int = 50, offset: int = 0) -> List[Content]:
+        """Get content that was swiped Discard.
+
+        Args:
+            limit: Maximum number of results.
+            offset: Pagination offset.
+
+        Returns:
+            List of Content objects that were discarded, ordered by recency.
+        """
+        result = await self.session.execute(
+            select(Content)
+            .join(SwipeHistory, Content.id == SwipeHistory.content_id)
+            .where(SwipeHistory.action == SwipeAction.DISCARD)
+            .order_by(SwipeHistory.swiped_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        return list(result.scalars().unique().all())
+
+    async def get_stats(self) -> dict:
+        """Get content statistics.
+
+        Returns:
+            Dictionary with pending, kept, discarded counts.
+        """
+        from sqlalchemy import func
+
+        # Count all content
+        all_result = await self.session.execute(select(Content.id))
+        all_count = len(all_result.scalars().all())
+
+        # Count kept
+        kept_result = await self.session.execute(
+            select(SwipeHistory.content_id).where(SwipeHistory.action == SwipeAction.KEEP)
+        )
+        kept_count = len(kept_result.scalars().all())
+
+        # Count discarded
+        discarded_result = await self.session.execute(
+            select(SwipeHistory.content_id).where(SwipeHistory.action == SwipeAction.DISCARD)
+        )
+        discarded_count = len(discarded_result.scalars().all())
+
+        return {
+            "pending": all_count - kept_count - discarded_count,
+            "kept": kept_count,
+            "discarded": discarded_count,
+        }
+
 
 class SwipeRepository:
     """Repository for SwipeHistory operations."""
@@ -166,3 +236,29 @@ class SwipeRepository:
             select(SwipeHistory).where(SwipeHistory.content_id == content_id)
         )
         return list(result.scalars().all())
+
+    async def record_swipes_batch(
+        self, actions: List[tuple[int, SwipeAction]]
+    ) -> List[SwipeHistory]:
+        """Record multiple swipe actions atomically.
+
+        Args:
+            actions: List of (content_id, action) tuples.
+
+        Returns:
+            List of created SwipeHistory objects.
+        """
+        histories = []
+        for content_id, action in actions:
+            history = SwipeHistory(
+                content_id=content_id,
+                action=action,
+                swiped_at=datetime.now(timezone.utc),
+            )
+            self.session.add(history)
+            histories.append(history)
+
+        await self.session.commit()
+        for history in histories:
+            await self.session.refresh(history)
+        return histories

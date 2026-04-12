@@ -90,13 +90,13 @@ ING-001 → ING-002 → AI-001 → UX-001 → UX-002
    AI-002 → DAT-001 → DAT-002
 ```
 
-## Next Recommended: UX-002
+## Next Recommended: UX-003
 
 **Rationale:**
 - UX-001 backend support complete (pending content API implemented)
-- DAT-001 (storage) complete - swipe recording ready
-- UX-002 (Swipe Actions) depends on UX-001 + DAT-001, both ready
-- Unlocks Keep/Discard action persistence for swipe card stack
+- UX-002 (Swipe Actions) complete - all CRUD operations for swipe decisions
+- UX-003 (Detail View) depends on UX-001 + AI-002, both ready
+- Unlocks source content viewing after swipe decisions
 
 ## Current Status
 
@@ -108,6 +108,6 @@ ING-001 → ING-002 → AI-001 → UX-001 → UX-002
 | ING-002 | ⏸️ Pending | ✅ Implemented | `src/ingestion/extractor.py` |
 | DAT-001 | ✅ [`docs/specs/DAT-001.md`](specs/DAT-001.md) | ✅ Implemented | `src/data/models.py`, `src/data/repository.py`, `src/api/app.py` |
 | UX-001 | ✅ [`docs/specs/UX-001.md`](specs/UX-001.md) | ⚠️ Backend Only | `src/data/repository.py` (get_pending), `src/api/routes.py` (/content/pending) |
-| UX-002 | ⏸️ Pending | ⏸️ Pending | - |
+| UX-002 | ✅ [`docs/specs/UX-002.md`](specs/UX-002.md) | ✅ Implemented | `src/api/schemas.py`, `src/data/repository.py`, `src/api/routes.py` |
 | UX-003 | ⏸️ Pending | ⏸️ Pending | - |
 | DAT-002 | ⏸️ Pending | ⏸️ Pending | - |
