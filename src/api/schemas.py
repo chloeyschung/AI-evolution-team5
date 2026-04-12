@@ -1,8 +1,8 @@
 """Pydantic schemas for API request/response validation."""
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.ai.metadata_extractor import ContentType
 from src.data.models import SwipeAction
@@ -73,3 +73,26 @@ class StatsResponse(BaseModel):
     pending: int
     kept: int
     discarded: int
+
+
+class ShareRequest(BaseModel):
+    """Schema for sharing content via mobile share sheet."""
+
+    content: str = Field(..., min_length=1, description="Content to share (URL, text, etc.)")
+    platform: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class ShareResponse(BaseModel):
+    """Schema for share response with summary."""
+
+    model_config = {"from_attributes": True}
+
+    id: int
+    platform: str
+    content_type: str
+    url: str
+    title: Optional[str] = None
+    author: Optional[str] = None
+    summary: Optional[str] = None
+    created_at: str

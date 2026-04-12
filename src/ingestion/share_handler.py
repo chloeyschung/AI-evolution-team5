@@ -3,6 +3,7 @@
 from typing import Dict
 
 from src.ai.metadata_extractor import ContentMetadata, MetadataExtractor
+
 from src.ingestion.extractor import ContentExtractor
 
 from .share_types import ShareDataType, ShareData
@@ -26,12 +27,21 @@ class ShareHandler:
 
     IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
 
-    def __init__(self, content_extractor: ContentExtractor, metadata_extractor: MetadataExtractor):
+    def __init__(
+        self,
+        content_extractor: ContentExtractor,
+        metadata_extractor: MetadataExtractor | None = None,
+        summarizer = None,
+    ):
         """Initialize ShareHandler with required services."""
         self._content_extractor = content_extractor
-        self._metadata_extractor = metadata_extractor
+        # Create metadata extractor if not provided
+        self._metadata_extractor = metadata_extractor or MetadataExtractor()
+        self._summarizer = summarizer
         self._processors: Dict[ShareDataType, BaseShareProcessor] = {
-            ShareDataType.URL: URLShareProcessor(content_extractor, metadata_extractor),
+            ShareDataType.URL: URLShareProcessor(
+                content_extractor, self._metadata_extractor, summarizer
+            ),
             ShareDataType.PLAIN_TEXT: PlainTextProcessor(),
             ShareDataType.DEEP_LINK: DeepLinkProcessor(),
             ShareDataType.IMAGE: ImageProcessor(),

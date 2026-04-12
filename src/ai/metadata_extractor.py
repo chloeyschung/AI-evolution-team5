@@ -33,6 +33,7 @@ class ContentMetadata:
         timestamp: Optional[datetime] = None,
         author: Optional[str] = None,
         title: Optional[str] = None,
+        summary: Optional[str] = None,
     ):
         self.platform = platform
         self.content_type = content_type
@@ -40,6 +41,7 @@ class ContentMetadata:
         self.timestamp = timestamp
         self.author = author
         self.title = title
+        self.summary = summary
 
     def __repr__(self) -> str:
         return (
@@ -56,6 +58,7 @@ class ContentMetadata:
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,
             "author": self.author,
             "title": self.title,
+            "summary": self.summary,
         }
 
 

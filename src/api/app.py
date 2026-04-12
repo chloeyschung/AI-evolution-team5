@@ -1,17 +1,35 @@
 """FastAPI application entry point."""
 
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from ..ai.summarizer import Summarizer
 from ..data.database import init_db
-from .routes import router
+from ..ingestion.extractor import ContentExtractor
+from ..ingestion.share_handler import ShareHandler
+from .routes import router, _set_share_handler, get_share_handler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifecycle."""
     await init_db()
+
+    # Initialize ShareHandler with dependencies
+    summarizer_api_key = os.getenv("ANTHROPIC_API_KEY")
+    summarizer: Summarizer | None = None
+    if summarizer_api_key:
+        summarizer = Summarizer(api_key=summarizer_api_key)
+
+    content_extractor = ContentExtractor()
+    share_handler = ShareHandler(
+        content_extractor=content_extractor,
+        summarizer=summarizer,
+    )
+    _set_share_handler(share_handler)
+
     yield
 
 

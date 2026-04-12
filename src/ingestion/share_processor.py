@@ -38,9 +38,15 @@ class BaseShareProcessor(ABC):
 class URLShareProcessor(BaseShareProcessor):
     """Process URL share data using ContentExtractor and MetadataExtractor."""
 
-    def __init__(self, content_extractor, metadata_extractor: MetadataExtractor):
+    def __init__(
+        self,
+        content_extractor,
+        metadata_extractor: MetadataExtractor,
+        summarizer = None,
+    ):
         self._content_extractor = content_extractor
         self._metadata_extractor = metadata_extractor
+        self._summarizer = summarizer
 
     @property
     def supported_types(self) -> List[ShareDataType]:
@@ -48,7 +54,28 @@ class URLShareProcessor(BaseShareProcessor):
 
     async def process(self, share_data: ShareData) -> ContentMetadata:
         url = validate_non_empty(share_data.content, "URL content is empty.")
-        return await self._metadata_extractor.extract_metadata(url)
+
+        # Extract text content
+        try:
+            text_content = await self._content_extractor.extract_text(url)
+        except Exception:
+            text_content = None
+
+        # Extract metadata with HTML content for richer metadata
+        metadata = await self._metadata_extractor.extract_metadata(url, html_content=text_content)
+
+        # Generate summary if summarizer is available and text was extracted
+        summary = None
+        if self._summarizer and text_content:
+            try:
+                summary = await self._summarizer.summarize(text_content)
+            except Exception:
+                pass  # Summary generation failed, continue without summary
+
+        # Update metadata with summary
+        metadata.summary = summary
+
+        return metadata
 
 
 class PlainTextProcessor(BaseShareProcessor):
