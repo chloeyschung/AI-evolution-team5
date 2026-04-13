@@ -36,7 +36,7 @@ This document tracks all identified features for the **Briefly** project, catego
 ## Phase 2: Ecosystem Expansion
 
 ### Desktop/Web
-- [ ] **[EXT-001] Browser Extension (MVP)**: A lightweight extension for Chrome/Whale to allow one-click saving from the desktop.
+- [x] **[EXT-001] Browser Extension (MVP)**: A lightweight extension for Chrome/Whale to allow one-click saving from the desktop. ✅ Implemented
 - [ ] **[EXT-002] Web Dashboard**: A web-based view for users to manage their "Knowledge Library" on a larger screen.
 
 ### Integrations
