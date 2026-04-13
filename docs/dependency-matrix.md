@@ -32,26 +32,26 @@ Feature dependency mapping for optimal implementation order.
 
 | Feature | Depends On | Blocked By | Notes | F-xxx Mapping |
 |---------|------------|------------|-------|---------------|
-| **AI-001** Core Summarizer | ING-002 | - | Needs extracted text | F-005 |
-| **AI-002** Metadata Extraction | ING-001 | - | Works with URL directly | F-007 |
-| **AI-003** AI Categorization | ING-002 | - | LLM-based auto-tagging (max 3 tags) | F-006 |
+| **AI-001** Core Summarizer | ING-002 | - | Needs extracted text. ⚠️ Spec requires 300-char limit update for F-005 compliance. | F-005 |
+| **AI-002** Metadata Extraction | ING-001 | - | Works with URL directly. ⚠️ OG image thumbnail crawling not implemented (F-007). | F-007 |
+| **AI-003** AI Categorization | ING-002 | - | LLM-based auto-tagging (max 3 tags). ⏸️ Spec pending. | F-006 |
 
 ### UX Layer
 
 | Feature | Depends On | Blocked By | Notes | F-xxx Mapping |
 |---------|------------|------------|-------|---------------|
-| **UX-001** Swipe Card Stack | AI-001, AI-002 | - | Needs summary + metadata | F-008, F-009, F-010 |
-| **UX-002** Swipe Actions | UX-001, DAT-001 | - | Persists Keep/Discard | F-009, F-011 |
-| **UX-003** Detail View | UX-001, AI-002 | - | Shows source content, "읽었어요" transition | F-012 |
+| **UX-001** Swipe Card Stack | AI-001, AI-002 | - | Needs summary + metadata. Provides F-008/F-009/F-010. | F-008, F-009, F-010 |
+| **UX-002** Swipe Actions | UX-001, DAT-001 | - | Persists Keep/Discard. ⚠️ Requires `status` field update (INBOX/ARCHIVED). | F-009, F-011 |
+| **UX-003** Detail View | UX-001, AI-002 | - | Shows source content. ⚠️ Requires F-012 state transition logic ("읽었어요" button, INBOX→ARCHIVED). | F-012 |
 
 ### Data Layer
 
 | Feature | Depends On | Blocked By | Notes | F-xxx Mapping |
 |---------|------------|------------|-------|---------------|
-| **DAT-001** Hybrid Storage | AI-002 | - | Stores metadata + summary | F-018 |
-| **DAT-002** User Profile | DAT-001 | - | Preferences, stats, interest tags | F-017, F-014*, F-015* |
+| **DAT-001** Hybrid Storage | AI-002 | - | Stores metadata + summary. ⚠️ Requires `status` field for INBOX/ARCHIVED (F-012). | F-018 |
+| **DAT-002** User Profile | DAT-001 | - | Preferences, stats, interest tags. ⚠️ `InterestTag` is for user-created tags, not AI-generated tags (F-014 gap). | F-017, F-015 |
 
-*DAT-002 provides data models for F-014/F-015, but API integration pending.
+*DAT-002 provides data models for F-015 (default_sort preference). F-014 AI category filtering requires AI-003 first.
 
 ## Implementation Order
 
@@ -97,24 +97,22 @@ ING-001 → ING-002 → AI-001 → UX-001 → UX-002
 
 ## Current Status
 
-| Feature | Spec | Record | Implementation | Files | F-xxx |
-|---------|------|--------|----------------|-------|-------|
-| AUTH-001 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-000 |
-| AUTH-002 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-001 |
-| AUTH-003 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-002 |
-| AUTH-004 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-003 |
-| AI-001 | ✅ [`AI-001.md`](specs/AI-001.md) | ✅ [`AI-001-record.md`](records/AI-001-record.md) | ✅ Implemented | `src/ai/summarizer.py` | F-005 |
-| AI-002 | ✅ [`AI-002.md`](specs/AI-002.md) | ✅ [`AI-002-record.md`](records/AI-002-record.md) | ✅ Implemented | `src/ai/metadata_extractor.py` | F-007 |
-| AI-003 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-006 |
-| ING-001 | ✅ [`ING-001.md`](specs/ING-001.md) | ✅ [`ING-001-record.md`](records/ING-001-record.md) | ✅ Implemented | `src/ingestion/share_handler.py` | F-004 |
-| ING-002 | ✅ [`ING-002.md`](specs/ING-002.md) | ✅ [`ING-002-record.md`](records/ING-002-record.md) | ✅ Implemented | `src/ingestion/extractor.py` | F-005 |
-| DAT-001 | ✅ [`DAT-001.md`](specs/DAT-001.md) | ✅ [`DAT-001-record.md`](records/DAT-001-record.md) | ✅ Implemented | `src/data/models.py`, `src/data/repository.py` | F-018 |
-| DAT-002 | ✅ [`DAT-002.md`](specs/DAT-002.md) | ✅ [`DAT-002-record.md`](records/DAT-002-record.md) | ✅ Implemented | `src/data/models.py`, `src/data/repository.py`, `src/api/routes.py` | F-017, F-014*, F-015* |
-| UX-001 | ✅ [`UX-001.md`](specs/UX-001.md) | ✅ [`UX-001-record.md`](records/UX-001-record.md) | ✅ Backend | `src/api/routes.py` (/content/pending) | F-008, F-009, F-010 |
-| UX-002 | ✅ [`UX-002.md`](specs/UX-002.md) | ✅ [`UX-002-record.md`](records/UX-002-record.md) | ✅ Implemented | `src/api/routes.py` (/swipe, /content/kept, /content/discarded, /stats) | F-009, F-011 |
-| UX-003 | ✅ [`UX-003.md`](specs/UX-003.md) | ⏸️ Pending | ⏸️ Pending | - | F-012 |
-
-*DAT-002 provides data models (InterestTag, default_sort) but API filter/sort endpoints not yet integrated.
+| Feature | Spec | Record | Implementation | Files | F-xxx | Status Notes |
+|---------|------|--------|----------------|-------|-------|--------------|
+| AUTH-001 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-000 | Authentication layer not implemented |
+| AUTH-002 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-001 | Google social login not implemented |
+| AUTH-003 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-002 | Logout not implemented |
+| AUTH-004 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-003 | Account delete not implemented |
+| AI-001 | ✅ [`AI-001.md`](specs/AI-001.md) | ✅ [`AI-001-record.md`](records/AI-001-record.md) | ✅ Implemented | `src/ai/summarizer.py` | F-005 | ⚠️ Spec requires 300-char limit update |
+| AI-002 | ✅ [`AI-002.md`](specs/AI-002.md) | ✅ [`AI-002-record.md`](records/AI-002-record.md) | ✅ Implemented | `src/ai/metadata_extractor.py` | F-007 | ⚠️ OG image thumbnail not implemented |
+| AI-003 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-006 | Spec not created |
+| ING-001 | ✅ [`ING-001.md`](specs/ING-001.md) | ✅ [`ING-001-record.md`](records/ING-001-record.md) | ✅ Implemented | `src/ingestion/share_handler.py` | F-004 | - |
+| ING-002 | ✅ [`ING-002.md`](specs/ING-002.md) | ✅ [`ING-002-record.md`](records/ING-002-record.md) | ✅ Implemented | `src/ingestion/extractor.py` | F-005 | - |
+| DAT-001 | ✅ [`DAT-001.md`](specs/DAT-001.md) | ✅ [`DAT-001-record.md`](records/DAT-001-record.md) | ✅ Implemented | `src/data/models.py`, `src/data/repository.py` | F-018 | ⚠️ Requires `status` field for INBOX/ARCHIVED (F-012) |
+| DAT-002 | ✅ [`DAT-002.md`](specs/DAT-002.md) | ✅ [`DAT-002-record.md`](records/DAT-002-record.md) | ✅ Implemented | `src/data/models.py`, `src/data/repository.py`, `src/api/routes.py` | F-017, F-015 | ⚠️ `InterestTag` is user-created, not AI-generated (F-014 gap) |
+| UX-001 | ✅ [`UX-001.md`](specs/UX-001.md) | ✅ [`UX-001-record.md`](records/UX-001-record.md) | ✅ Backend | `src/api/routes.py` (/content/pending) | F-008, F-009, F-010 | - |
+| UX-002 | ✅ [`UX-002.md`](specs/UX-002.md) | ✅ [`UX-002-record.md`](records/UX-002-record.md) | ✅ Implemented | `src/api/routes.py` (/swipe, /content/kept, /content/discarded, /stats) | F-009, F-011 | ⚠️ Requires status field integration |
+| UX-003 | ✅ [`UX-003.md`](specs/UX-003.md) | ⏸️ Pending | ⏸️ Pending | - | F-012 | ⚠️ Requires F-012 state transition logic |
 
 ## Next: AUTH-001 (App Entry & Login State)
 
@@ -123,3 +121,29 @@ ING-001 → ING-002 → AI-001 → UX-001 → UX-002
 - AUTH-001 is prerequisite for AUTH-002/003/004
 - Enables user-specific data access (DAT-001, DAT-002)
 - Blocker for F-000 (no login → no INBOX/Archive access)
+
+## Spec Updates Required
+
+The following specs require updates to align with F-xxx requirements:
+
+1. **AI-001**: Add 300-character limit constraint (F-005)
+2. **AI-002**: Add OG image thumbnail crawling logic (F-007)
+3. **DAT-001**: Add `status` field for INBOX/ARCHIVED states (F-012)
+4. **UX-003**: Integrate F-012 state transition logic ("읽었어요" button, INBOX→ARCHIVED)
+5. **Create AI-003**: AI Categorization spec for F-006
+
+## Implementation Priority
+
+1. **Phase 1A: Spec Alignment** (Documentation updates)
+   - Update AI-001, AI-002 specs with F-xxx constraints
+   - Create AI-003 spec
+   - Update UX-003 with F-012 logic
+
+2. **Phase 1B: Core Features** (Implementation)
+   - AUTH-001 → AUTH-004 (Authentication layer)
+   - DAT-001 update (status field for INBOX/ARCHIVED)
+   - UX-003 implementation with state transitions
+
+3. **Phase 1C: AI Enhancements**
+   - AI-003 implementation (AI-generated tags)
+   - AI-001/002 updates (300-char limit, OG images)
