@@ -1,0 +1,30 @@
+/* Content Script Styles - Minimal, only for injected elements */
+
+.briefly-save-button {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 12px 20px;
+  background: #6366f1;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  z-index: 999999;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  transition: background 0.2s, transform 0.1s;
+}
+
+.briefly-save-button:hover {
+  background: #4f46e5;
+}
+
+.briefly-save-button:active {
+  transform: scale(0.95);
+}
+
+.briefly-save-button.saved {
+  background: #10b981;
+}
