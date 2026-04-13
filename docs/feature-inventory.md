@@ -2,24 +2,33 @@
 
 This document tracks all identified features for the **Briefly** project, categorized by their implementation phase.
 
+**Note:** This inventory uses engineering IDs (ING-xxx, AI-xxx, UX-xxx, DAT-xxx, AUTH-xxx) for implementation tracking. Product requirements are defined in `Briefly_FeatureList.md` with F-xxx IDs. Cross-references are provided where applicable.
+
 ## Phase 1: MVP (Mobile Focus)
 
+### Authentication (AUTH)
+- [ ] **[AUTH-001] App Entry & Login State** (F-000): Check login state on app launch. If unauthenticated, show login screen immediately. Maintain login state across app restarts with token auto-refresh.
+- [ ] **[AUTH-002] Social Login — Google** (F-001): One-tap Google sign-in. Auto-create account on first login. Rejection of re-registration for deleted accounts within 30 days.
+- [ ] **[AUTH-003] Logout** (F-002): End current session. Local data retained, syncs on re-login.
+- [ ] **[AUTH-004] Account Delete** (F-003): Permanent deletion of account and all data. 2-step confirmation. 30-day re-registration block. Full server + local data deletion.
+
 ### Ingestion
-- [ ] **[ING-001] Mobile Share Sheet Integration**: Implement the ability for users to trigger "Save to Briefly" via the native OS share menu on iOS/Android.
-- [ ] **[ING-002] URL Extraction & Cleaning**: A backend service to extract clean text/content from various shared URLs (News, Blogs, etc.).
+- [x] **[ING-001] Mobile Share Sheet Integration** (F-004): Implement the ability for users to trigger "Save to Briefly" via the native OS share menu on iOS/Android. ✅ Implemented
+- [x] **[ING-002] URL Extraction & Cleaning** (F-005): A backend service to extract clean text/content from various shared URLs (News, Blogs, etc.). ✅ Implemented
 
 ### AI & Processing
-- [x] **[AI-001] Core 3-Line Summarizer**: An AI-powered service that takes raw content and generates a high-density, 3-line summary. ✅ Implemented
-- [x] **[AI-002] Multi-Modal Metadata Extraction**: Extract source platform, content type (video/text/image), and timestamp. ✅ Implemented
+- [x] **[AI-001] Core 3-Line Summarizer** (F-005): An AI-powered service that takes raw content and generates a high-density, 3-line summary (max 300 chars). ✅ Implemented
+- [x] **[AI-002] Multi-Modal Metadata Extraction** (F-007): Extract source platform, content type (video/text/image), OG images for thumbnails, and timestamp. ✅ Implemented
+- [ ] **[AI-003] AI Categorization** (F-006): Auto-classify content into AI-generated category tags (max 3 tags per content) using LLM. Free-form tags, no predefined category list.
 
 ### User Experience (UX)
-- [x] **[UX-001] Swipe Card Stack**: A mobile UI component that presents content as a deck of cards for rapid interaction. ✅ Backend (`/content/pending`)
-- [x] **[UX-002] Swipe Actions (Keep/Discard)**: Implementation of the Right-Swipe (Keep/Tag) and Left-Swipe (Discard/Archive) logic. ✅ Implemented
-- [ ] **[UX-003] Summary Detail View**: An "On-Demand" expansion view to see more details if the user wants to dive deeper.
+- [x] **[UX-001] Swipe Card Stack** (F-008, F-009, F-010): A mobile UI component that presents content as a deck of cards for rapid interaction. Provides both swipe view (F-009) and list view (F-010). ✅ Backend (`/content/pending`)
+- [x] **[UX-002] Swipe Actions (Keep/Discard)** (F-009, F-011): Implementation of the Right-Swipe (Keep → INBOX) and Left-Swipe (Archive → ARCHIVED) logic. ✅ Implemented
+- [ ] **[UX-003] Summary Detail View** (F-012): An "On-Demand" expansion view to see more details. Includes "읽었어요" button for INBOX → ARCHIVED transition, webapp restrictions, and entry-source-based button states.
 
 ### Data & Sync
-- [x] **[DAT-001] Hybrid Storage Engine**: Implementation of local on-device storage with background synchronization to the cloud. ✅ Implemented
-- [ ] **[DAT-002] User Profile & Preferences**: Basic storage for user settings and swipe history.
+- [x] **[DAT-001] Hybrid Storage Engine** (F-018): Implementation of local on-device storage with background synchronization to the cloud. ✅ Implemented
+- [x] **[DAT-002] User Profile & Preferences** (F-017, F-014, F-015): Storage for user settings, preferences, statistics, interest tags, and swipe history. Supports filtering by AI category (F-014) and date-based sorting (F-015). ✅ Implemented
 
 ## Phase 2: Ecosystem Expansion
 

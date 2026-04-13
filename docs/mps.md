@@ -25,11 +25,14 @@
     - **Cloud**: Centralized DB for seamless cross-device synchronization (Mobile $\leftrightarrow$ Extension).
 
 ### 3.2. Core Workflow
-1.  **Ingestion**: 
+1. **Authentication**:
+    - App launch checks login state (AUTH-001).
+    - Google social login (AUTH-002), logout (AUTH-003), account delete (AUTH-004).
+2. **Ingestion**:
     - **Mobile**: OS-level "Share" sheet integration (e.g., user clicks 'Share' $\rightarrow$ 'Save to Briefly').
-    - **Desktop**: Browser extension one-click save.
-2.  **Processing**: Content is sent to the backend $\rightarrow$ AI generates a 3-line summary $\rightarrow$ Metadata (source, type, date) is extracted.
-3.  **Consumption (The Swipe UX)**:
+    - **Desktop**: Browser extension one-click save (Phase 2).
+3. **Processing**: Content is sent to the backend $\rightarrow$ AI generates a 3-line summary $\rightarrow$ Metadata (source, type, date) is extracted.
+4. **Consumption (The Swipe UX)**:
     - Users interact with a "Card Stack" of summaries.
     - **Right Swipe (Keep)**: Categorize/Tag for later.
     - **Left Swipe (Discard)**: Archive/Clear.
@@ -37,10 +40,12 @@
 ## 4. Roadmap
 
 ### Phase 1: MVP (Mobile Focus)
+- [ ] **Authentication**: App entry, Google login, logout, account delete (AUTH-001 to AUTH-004).
 - [ ] Core Ingestion (Mobile Share Sheet).
-- [ ] AI Summarization Engine (3-line core).
+- [ ] AI Summarization Engine (3-line core) + AI Categorization.
 - [ ] Swipe-based Card Stack UI.
 - [ ] Basic Local/Cloud Sync.
+- [ ] User Profile & Preferences.
 
 ### Phase 2: Ecosystem Expansion
 - [ ] Browser Extension (Chrome/Whale).
@@ -52,6 +57,11 @@
 
 ## 5. Development Process (Spec-Driven Development)
 Briefly follows a strict **Spec-Driven Development** workflow to eliminate "vibe coding" and technical debt.
+
+### ID System
+- **Engineering IDs** (AUTH-xxx, ING-xxx, AI-xxx, UX-xxx, DAT-xxx): Track implementation in specs, records, and code.
+- **Product IDs** (F-xxx): High-level product requirements from `Briefly_FeatureList.md`.
+- Cross-references maintained in `docs/feature-inventory.md` and `docs/dependency-matrix.md`.
 
 ### The Workflow Cycle
 1. **Kickoff**: Define project vision in `docs/mps.md`.
