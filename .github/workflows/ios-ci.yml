@@ -33,6 +33,13 @@ jobs:
           mkdir -p BrieflyTests
           xcodegen generate
 
+      - name: Resolve Swift packages
+        working-directory: Briefly
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project Briefly.xcodeproj \
+            -scheme Briefly
+
       - name: Build (no code signing)
         working-directory: Briefly
         run: |

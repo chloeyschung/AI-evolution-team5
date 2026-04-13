@@ -12,6 +12,7 @@ enum LibraryFilter: String, CaseIterable {
 struct LibraryView: View {
     @StateObject private var viewModel = SavedItemsViewModel()
     @State private var selectedFilter: LibraryFilter = .inbox
+    @Environment(\.scenePhase) private var scenePhase
 
     private var filteredItems: [SavedItem] {
         switch selectedFilter {
@@ -81,6 +82,9 @@ struct LibraryView: View {
         .navigationTitle(navigationTitle)
         .navigationBarTitleDisplayMode(.large)
         .onAppear { viewModel.reload() }
+        .onChange(of: scenePhase) { newPhase in
+            if newPhase == .active { viewModel.reload() }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .fetchCoordinatorDidUpdate)) { _ in
             viewModel.reload()
         }
