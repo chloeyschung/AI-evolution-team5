@@ -56,6 +56,7 @@ class ContentRepository:
             existing.title = metadata.title
             existing.author = metadata.author
             existing.timestamp = metadata.timestamp
+            existing.thumbnail_url = metadata.thumbnail_url
             if summary is not None:
                 existing.summary = summary
             existing.updated_at = utc_now()
@@ -71,6 +72,7 @@ class ContentRepository:
                 title=metadata.title,
                 author=metadata.author,
                 timestamp=metadata.timestamp,
+                thumbnail_url=metadata.thumbnail_url,
                 status=status,
                 summary=summary,
             )

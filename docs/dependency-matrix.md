@@ -2,7 +2,7 @@
 
 Feature dependency mapping for optimal implementation order.
 
-**Note:** Engineering IDs (ING-xxx, AI-xxx, UX-xxx, DAT-xxx, AUTH-xxx) track implementation. Product requirements use F-xxx IDs from `Briefly_FeatureList.md`. Cross-references provided where applicable.
+**Note:** Engineering IDs (ING-xxx, AI-xxx, UX-xxx, DAT-xxx, AUTH-xxx) track implementation. Product requirements use F-xxx IDs from `docs/Briefly_FeatureList.md`. Cross-references provided where applicable.
 
 ## Legend
 

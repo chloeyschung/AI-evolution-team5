@@ -34,6 +34,7 @@ class ContentMetadata:
         author: Optional[str] = None,
         title: Optional[str] = None,
         summary: Optional[str] = None,
+        thumbnail_url: Optional[str] = None,
     ):
         self.platform = platform
         self.content_type = content_type
@@ -42,6 +43,7 @@ class ContentMetadata:
         self.author = author
         self.title = title
         self.summary = summary
+        self.thumbnail_url = thumbnail_url
 
     def __repr__(self) -> str:
         return (
@@ -59,6 +61,7 @@ class ContentMetadata:
             "author": self.author,
             "title": self.title,
             "summary": self.summary,
+            "thumbnail_url": self.thumbnail_url,
         }
 
 
@@ -81,6 +84,7 @@ class MetadataExtractor:
 
     TIMESTAMP_META_TAGS = ("article:published_time", "og:article:published_time", "pubdate", "dateModified", "datePublished")
     AUTHOR_META_TAGS = ("article:author", "og:author", "author")
+    THUMBNAIL_META_TAGS = ("og:image", "og:image:url", "twitter:image", "twitter:image:src")
 
     def _parse_url(self, url: str) -> ParseResult:
         """Parse and validate URL."""
@@ -114,11 +118,12 @@ class MetadataExtractor:
         """Parse datetime string using dateutil."""
         return date_parser.parse(datetime_str)
 
-    def _extract_from_soup(self, soup: BeautifulSoup) -> tuple[Optional[datetime], Optional[str], Optional[str]]:
-        """Extract timestamp, author, and title from a single soup instance."""
+    def _extract_from_soup(self, soup: BeautifulSoup) -> tuple[Optional[datetime], Optional[str], Optional[str], Optional[str]]:
+        """Extract timestamp, author, title, and thumbnail from a single soup instance."""
         timestamp = None
         author = None
         title = None
+        thumbnail_url = None
 
         # Extract timestamp from <time> tags
         for time_tag in soup.find_all("time", attrs={"datetime": True}):
@@ -167,7 +172,14 @@ class MetadataExtractor:
                 if title_tag:
                     title = title_tag.get_text(strip=True)
 
-        return timestamp, author, title
+        # Extract thumbnail from OG/twitter meta tags
+        for meta_tag in self.THUMBNAIL_META_TAGS:
+            meta = self._find_meta_tag(soup, meta_tag)
+            if meta and meta.get("content"):
+                thumbnail_url = meta["content"].strip()
+                break
+
+        return timestamp, author, title, thumbnail_url
 
     async def extract_metadata(self, url: str, html_content: Optional[str] = None) -> ContentMetadata:
         """
@@ -190,11 +202,11 @@ class MetadataExtractor:
         parsed_url = self._parse_url(url)
         platform, content_type = self._identify_platform_and_type(parsed_url)
 
-        timestamp, author, title = None, None, None
+        timestamp, author, title, thumbnail_url = None, None, None, None
         if html_content:
             try:
                 soup = BeautifulSoup(html_content, "html.parser")
-                timestamp, author, title = self._extract_from_soup(soup)
+                timestamp, author, title, thumbnail_url = self._extract_from_soup(soup)
             except Exception:
                 pass
 
@@ -205,4 +217,5 @@ class MetadataExtractor:
             timestamp=timestamp,
             author=author,
             title=title,
+            thumbnail_url=thumbnail_url,
         )

@@ -56,6 +56,7 @@ class Content(Base):
     author = Column(String(200))
     timestamp = Column(DateTime)
     summary = Column(Text, nullable=True)
+    thumbnail_url = Column(String(1000), nullable=True)
     status = Column(SQLEnum(ContentStatus), nullable=False, default=ContentStatus.INBOX, index=True)
     created_at = Column(DateTime, default=utc_now, index=True)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, index=True)

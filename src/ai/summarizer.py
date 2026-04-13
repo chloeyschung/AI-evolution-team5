@@ -83,6 +83,10 @@ class Summarizer:
                     if len(lines) > max_lines:
                         summary = "\n".join(lines[:max_lines])
 
+                    # Enforce 300-character limit (AI-001 spec)
+                    if len(summary) > 300:
+                        summary = summary[:297] + "..."
+
                     return summary
 
                 except (APIConnectionError, InvalidResponseError):

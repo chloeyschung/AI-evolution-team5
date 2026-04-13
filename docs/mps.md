@@ -60,7 +60,7 @@ Briefly follows a strict **Spec-Driven Development** workflow to eliminate "vibe
 
 ### ID System
 - **Engineering IDs** (AUTH-xxx, ING-xxx, AI-xxx, UX-xxx, DAT-xxx): Track implementation in specs, records, and code.
-- **Product IDs** (F-xxx): High-level product requirements from `Briefly_FeatureList.md`.
+- **Product IDs** (F-xxx): High-level product requirements from `docs/Briefly_FeatureList.md`.
 - Cross-references maintained in `docs/feature-inventory.md` and `docs/dependency-matrix.md`.
 
 ### The Workflow Cycle

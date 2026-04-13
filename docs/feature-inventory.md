@@ -2,7 +2,7 @@
 
 This document tracks all identified features for the **Briefly** project, categorized by their implementation phase.
 
-**Note:** This inventory uses engineering IDs (ING-xxx, AI-xxx, UX-xxx, DAT-xxx, AUTH-xxx) for implementation tracking. Product requirements are defined in `Briefly_FeatureList.md` with F-xxx IDs. Cross-references are provided where applicable.
+**Note:** This inventory uses engineering IDs (ING-xxx, AI-xxx, UX-xxx, DAT-xxx, AUTH-xxx) for implementation tracking. Product requirements are defined in `docs/Briefly_FeatureList.md` with F-xxx IDs. Cross-references are provided where applicable.
 
 ## Phase 1: MVP (Mobile Focus)
 
