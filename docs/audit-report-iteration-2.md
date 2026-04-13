@@ -199,10 +199,12 @@ docs/records/
 - Documented that AI-generated tags are stored in `ContentTag` model
 - Explained intentional design decision to not implement F-014 filtering
 
-### Priority 3: Background Sync Scheduler
+### Priority 3: Background Sync Scheduler ✅ COMPLETED (Iteration 3)
 - INT-001 spec mentions APScheduler/Celery for background sync
-- Currently only manual trigger implemented
-- Consider implementing or documenting as "Phase 2 enhancement"
+- Currently only manual trigger implemented (MVP)
+- Updated spec to document background sync as "Phase 2 Enhancement"
+- Clarified that manual sync trigger satisfies core MVP use case
+- Deferred automated background sync to reduce operational complexity
 
 ### Priority 4: Test Coverage Gaps
 - Consider adding integration tests for full share flow (ING-001 → AI-001/002 → DAT-001)
@@ -222,8 +224,8 @@ The Briefly codebase demonstrates:
 **Action Items for Next Iteration**:
 1. ✅ Update MPS.md Phase 1/2 checkboxes (COMPLETED)
 2. ✅ Clarify F-014 AI category filtering gap (COMPLETED)
-3. Consider background sync scheduler implementation
-4. Add integration tests for full flows
+3. ✅ Document background sync scheduler as Phase 2 enhancement (COMPLETED)
+4. Consider adding integration tests for full flows
 
 ---
 
