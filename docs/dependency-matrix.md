@@ -102,13 +102,13 @@ ING-001 → ING-002 → AI-001 → UX-001 → UX-002
 
 | Feature | Spec | Record | Implementation | Files | F-xxx | Status Notes |
 |---------|------|--------|----------------|-------|-------|--------------|
-| AUTH-001 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-000 | Authentication layer not implemented |
-| AUTH-002 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-001 | Google social login not implemented |
-| AUTH-003 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-002 | Logout not implemented |
-| AUTH-004 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-003 | Account delete not implemented |
+| AUTH-001 | ✅ [`AUTH-001.md`](specs/AUTH-001.md) | ✅ [`AUTH-001-record.md`](records/AUTH-001-record.md) | ✅ Implemented | `src/auth/tokens.py`, `src/data/auth_repository.py` | F-000 | ✅ JWT auth, token refresh |
+| AUTH-002 | ✅ [`AUTH-002.md`](specs/AUTH-002.md) | ✅ [`AUTH-002-record.md`](records/AUTH-002-record.md) | ✅ Implemented | `src/auth/google_oauth.py`, `src/api/routes.py` | F-001 | ✅ Google OAuth, 30-day block |
+| AUTH-003 | ✅ [`AUTH-003.md`](specs/AUTH-003.md) | ✅ [`AUTH-003-record.md`](records/AUTH-003-record.md) | ✅ Implemented | `src/api/routes.py` | F-002 | ✅ Token revocation |
+| AUTH-004 | ✅ [`AUTH-004.md`](specs/AUTH-004.md) | ✅ [`AUTH-004-record.md`](records/AUTH-004-record.md) | ✅ Implemented | `src/api/routes.py` | F-003 | ✅ 2-step delete, cascade |
 | AI-001 | ✅ [`AI-001.md`](specs/AI-001.md) | ✅ [`AI-001-record.md`](records/AI-001-record.md) | ✅ Implemented | `src/ai/summarizer.py` | F-005 | ✅ 300-char limit enforced |
 | AI-002 | ✅ [`AI-002.md`](specs/AI-002.md) | ✅ [`AI-002-record.md`](records/AI-002-record.md) | ✅ Implemented | `src/ai/metadata_extractor.py` | F-007 | ✅ OG image thumbnail extraction added |
-| AI-003 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-006 | Spec not created |
+| AI-003 | ✅ [`AI-003.md`](specs/AI-003.md) | ✅ [`AI-003-record.md`](records/AI-003-record.md) | ✅ Implemented | `src/ai/categorizer.py` | F-006 | ✅ LLM-based auto-tagging (max 3 tags) |
 | ING-001 | ✅ [`ING-001.md`](specs/ING-001.md) | ✅ [`ING-001-record.md`](records/ING-001-record.md) | ✅ Implemented | `src/ingestion/share_handler.py` | F-004 | - |
 | ING-002 | ✅ [`ING-002.md`](specs/ING-002.md) | ✅ [`ING-002-record.md`](records/ING-002-record.md) | ✅ Implemented | `src/ingestion/extractor.py` | F-005 | - |
 | DAT-001 | ✅ [`DAT-001.md`](specs/DAT-001.md) | ✅ [`DAT-001-record.md`](records/DAT-001-record.md) | ✅ Implemented | `src/data/models.py`, `src/data/repository.py` | F-018 | ⚠️ Requires `status` field for INBOX/ARCHIVED (F-012) |
@@ -116,9 +116,10 @@ ING-001 → ING-002 → AI-001 → UX-001 → UX-002
 | UX-001 | ✅ [`UX-001.md`](specs/UX-001.md) | ✅ [`UX-001-record.md`](records/UX-001-record.md) | ✅ Backend | `src/api/routes.py` (/content/pending) | F-008, F-009, F-010 | - |
 | UX-002 | ✅ [`UX-002.md`](specs/UX-002.md) | ✅ [`UX-002-record.md`](records/UX-002-record.md) | ✅ Implemented | `src/api/routes.py` (/swipe, /content/kept, /content/discarded, /stats) | F-009, F-011 | ⚠️ Requires status field integration |
 | UX-003 | ✅ [`UX-003.md`](specs/UX-003.md) | ✅ [`UX-003-record.md`](records/UX-003-record.md) | ✅ Implemented | `src/api/routes.py` (GET /content/{id}) | F-012 | ✅ Content detail with swipe history |
-| UX-004 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-013 | Filter by platform (dynamic list) |
-| UX-005 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-016 | Search by title/tag |
-| UX-006 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-019 | Delete content |
+| UX-004 | ✅ [`UX-004.md`](specs/UX-004.md) | ✅ [`UX-004-record.md`](records/UX-004-record.md) | ✅ Implemented | `src/api/routes.py`, `src/data/repository.py` | F-013 | ✅ Filter by platform |
+| UX-005 | ✅ [`UX-005.md`](specs/UX-005.md) | ✅ [`UX-005-record.md`](records/UX-005-record.md) | ✅ Implemented | `src/api/routes.py`, `src/data/repository.py` | F-016 | ✅ Search by title/author |
+| UX-006 | ✅ [`UX-006.md`](specs/UX-006.md) | ✅ [`UX-006-record.md`](records/UX-006-record.md) | ✅ Implemented | `src/api/routes.py` | F-019 | ✅ Delete content |
+| EXT-001 | ✅ [`EXT-001.md`](specs/EXT-001.md) | ✅ [`EXT-001-record.md`](records/EXT-001-record.md) | ✅ Implemented | `browser-extension/` | F-020 | ✅ Chrome/Whale extension |
 
 ## Next: AUTH-001 (App Entry & Login State)
 
