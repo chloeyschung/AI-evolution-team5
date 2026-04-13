@@ -41,6 +41,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.briefly-ai.app
         TARGETED_DEVICE_FAMILY: "1"   # iPhone only
         INFOPLIST_FILE: Briefly/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Briefly/Briefly.entitlements
 
   # ── Share Extension 타겟 ─────────────────────────────────────────
   BrieflyShareExtension:
@@ -71,6 +72,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.briefly-ai.app.shareextension
         INFOPLIST_FILE: BrieflyShareExtension/Info.plist
+        CODE_SIGN_ENTITLEMENTS: BrieflyShareExtension/BrieflyShareExtension.entitlements
 
   # ── 테스트 타겟 ───────────────────────────────────────────────────
   BrieflyTests:
