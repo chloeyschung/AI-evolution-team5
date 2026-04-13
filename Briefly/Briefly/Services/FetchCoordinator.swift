@@ -13,33 +13,28 @@ final class FetchCoordinator {
     private var inProgress = false
 
     func fetchIfNeeded(for items: [SavedItem]) async {
-        guard !inProgress else { return }
+        guard !inProgress else {
+            print("[Fetch] 이미 진행 중, 스킵")
+            return
+        }
         inProgress = true
         defer { inProgress = false }
 
         let pending = items.filter { $0.fetchStatus == .pending }
+        print("[Fetch] 대기 중인 항목: \(pending.count)개 / 전체: \(items.count)개")
         guard !pending.isEmpty else { return }
 
-        await withTaskGroup(of: Void.self) { group in
-            var running = 0
-            for item in pending {
-                // 최대 3개 동시 실행
-                if running >= 3 {
-                    await group.next()
-                    running -= 1
-                }
-                running += 1
-                group.addTask { [weak self] in
-                    await self?.fetchOne(item: item)
-                }
-            }
+        for item in pending {
+            await fetchOne(item: item)
         }
     }
 
     private func fetchOne(item: SavedItem) async {
+        print("[Fetch] 시작: \(item.url)")
         var updated = item
         updated.fetchStatus = .fetching
         StorageService.shared.updateItem(updated)
+        NotificationCenter.default.post(name: .fetchCoordinatorDidUpdate, object: nil)
 
         do {
             // 1단계: OG 메타데이터 (URLSession)
@@ -48,14 +43,16 @@ final class FetchCoordinator {
             updated.ogImageURL = meta.ogImageURL
             updated.ogDescription = meta.ogDescription
             updated.siteName = meta.siteName
+            print("[Fetch] OG 완료: title=\(meta.ogTitle ?? "nil"), image=\(meta.ogImageURL?.absoluteString ?? "nil")")
 
             // 2단계: 본문 텍스트
             let articleText = try await fetchArticleText(for: item.url)
             updated.articleText = articleText
             updated.fetchStatus = (articleText != nil) ? .done : .partial
+            print("[Fetch] 본문 완료: \(articleText?.count ?? 0)자, status=\(updated.fetchStatus)")
 
         } catch {
-            // OG도 실패하면 failed, OG만 있으면 partial
+            print("[Fetch] 에러: \(error)")
             if updated.ogTitle != nil {
                 updated.fetchStatus = .partial
             } else {

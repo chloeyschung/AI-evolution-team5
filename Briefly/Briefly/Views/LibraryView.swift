@@ -126,15 +126,13 @@ struct LibraryCardView: View {
                 .frame(width: 16, height: 16)
                 .clipShape(RoundedRectangle(cornerRadius: 3))
 
-                Text(item.domain.uppercased())
+                Text(item.siteName?.uppercased() ?? item.domain.uppercased())
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
 
                 Spacer()
 
-                Image(systemName: "ellipsis")
-                    .foregroundStyle(.secondary)
-                    .font(.subheadline)
+                fetchStatusBadge
             }
 
             // ── 제목 + 썸네일 ─────────────────────────────────
@@ -181,6 +179,26 @@ struct LibraryCardView: View {
 
     var faviconURL: URL? {
         URL(string: "https://www.google.com/s2/favicons?domain=\(item.domain)&sz=64")
+    }
+
+    @ViewBuilder
+    var fetchStatusBadge: some View {
+        switch item.fetchStatus {
+        case .fetching:
+            ProgressView().scaleEffect(0.7)
+        case .failed:
+            Image(systemName: "exclamationmark.circle")
+                .font(.caption)
+                .foregroundStyle(.red.opacity(0.6))
+        case .partial:
+            Image(systemName: "exclamationmark.circle")
+                .font(.caption)
+                .foregroundStyle(.orange.opacity(0.6))
+        default:
+            Image(systemName: "ellipsis")
+                .foregroundStyle(.secondary)
+                .font(.subheadline)
+        }
     }
 
     var thumbnailPlaceholder: some View {
