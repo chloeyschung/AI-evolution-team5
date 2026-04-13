@@ -5,18 +5,46 @@ struct ContentView: View {
     @StateObject private var viewModel = SavedItemsViewModel()
 
     var body: some View {
-        NavigationStack {
-            SavedItemsView(viewModel: viewModel)
+        TabView {
+            // MARK: Home
+            NavigationStack {
+                SavedItemsView(viewModel: viewModel)
+            }
+            .tabItem {
+                Label("Home", systemImage: "house.fill")
+            }
+
+            // MARK: Library
+            NavigationStack {
+                LibraryView()
+            }
+            .tabItem {
+                Label("Library", systemImage: "books.vertical.fill")
+            }
+
+            // MARK: Search
+            NavigationStack {
+                SearchView()
+            }
+            .tabItem {
+                Label("Search", systemImage: "magnifyingglass")
+            }
+
+            // MARK: Account
+            NavigationStack {
+                AccountView()
+            }
+            .tabItem {
+                Label("Account", systemImage: "person.fill")
+            }
         }
         .onChange(of: scenePhase) { newPhase in
-            // 앱이 포그라운드로 올 때마다 inbox drain + 목록 갱신
             if newPhase == .active {
                 viewModel.reload()
             }
         }
         .onOpenURL { url in
-            // briefly://open?url=<articleURL> 처리
-            viewModel.reload() // inbox drain
+            viewModel.reload()
             guard
                 url.scheme == "briefly",
                 url.host == "open",
