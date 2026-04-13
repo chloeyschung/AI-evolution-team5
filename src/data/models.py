@@ -151,3 +151,22 @@ class AccountDeletion(Base):
     google_sub = Column(String(100), unique=True, nullable=True, index=True)
     deleted_at = Column(DateTime, default=utc_now, nullable=False, index=True)
     block_expires_at = Column(DateTime, nullable=False, index=True)  # deleted_at + 30 days
+
+
+class ContentTag(Base):
+    """AI-generated category tags for content (AI-003)."""
+
+    __tablename__ = "content_tags"
+
+    id = Column(Integer, primary_key=True, index=True)
+    content_id = Column(Integer, ForeignKey("content.id"), nullable=False, index=True)
+    tag = Column(String(50), nullable=False, index=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+    # Relationship
+    content = relationship("Content", backref="tags")
+
+    # Unique constraint for content_id + tag combination
+    __table_args__ = (
+        sqlalchemy.UniqueConstraint("content_id", "tag", name="unique_content_tag"),
+    )

@@ -34,6 +34,7 @@ from .schemas import (
     InterestTagResponse,
     DeleteContentResponse,
     PlatformCount,
+    ContentTagsResponse,
     AuthStatusResponse,
     TokenRefreshRequest,
     TokenRefreshResponse,
@@ -294,6 +295,89 @@ async def update_content_status(
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+# AI-003: Content Categorization endpoints
+
+
+@router.get("/content/{content_id}/tags", response_model=ContentTagsResponse)
+async def get_content_tags(
+    content_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> ContentTagsResponse:
+    """Get AI-generated tags for content.
+
+    Args:
+        content_id: The content ID.
+        db: Database session.
+
+    Returns:
+        Content tags response.
+
+    Raises:
+        404: Content not found.
+    """
+    from src.data.repository import ContentTagRepository, ContentRepository
+
+    # Check if content exists
+    content_repo = ContentRepository(db)
+    content = await content_repo.get_by_id(content_id)
+
+    if not content:
+        raise HTTPException(status_code=404, detail="content_not_found")
+
+    # Get tags
+    tag_repo = ContentTagRepository(db)
+    tags = await tag_repo.get_tags(content_id)
+
+    return ContentTagsResponse(content_id=content_id, tags=tags)
+
+
+@router.post("/content/{content_id}/categorize", response_model=ContentTagsResponse)
+async def categorize_content(
+    content_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> ContentTagsResponse:
+    """Trigger AI categorization for content.
+
+    Generates 1-3 category tags using LLM.
+
+    Args:
+        content_id: The content ID to categorize.
+        db: Database session.
+
+    Returns:
+        Content tags response.
+
+    Raises:
+        404: Content not found.
+    """
+    from src.ai.categorizer import Categorizer
+    from src.data.repository import ContentTagRepository, ContentRepository
+
+    # Check if content exists and get title/summary
+    content_repo = ContentRepository(db)
+    content = await content_repo.get_by_id(content_id)
+
+    if not content:
+        raise HTTPException(status_code=404, detail="content_not_found")
+
+    # Initialize categorizer
+    from src.ai.summarizer import Summarizer
+    summarizer = Summarizer()
+    categorizer = Categorizer(summarizer)
+
+    # Generate tags
+    tags = await categorizer.generate_tags(
+        title=content.title or "",
+        summary=content.summary
+    )
+
+    # Save tags to database
+    tag_repo = ContentTagRepository(db)
+    await tag_repo.add_tags(content_id, tags)
+
+    return ContentTagsResponse(content_id=content_id, tags=tags)
 
 
 # UX-006: Delete Content endpoint

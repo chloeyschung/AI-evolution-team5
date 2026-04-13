@@ -216,6 +216,13 @@ class PlatformCount(BaseModel):
     count: int
 
 
+class ContentTagsResponse(BaseModel):
+    """Schema for content tags response (AI-003)."""
+
+    content_id: int
+    tags: List[str]
+
+
 # AUTH-001: Authentication schemas
 
 

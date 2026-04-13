@@ -20,6 +20,7 @@ from .models import (
     DefaultSort,
     utc_now,
     AccountDeletion,
+    ContentTag,
 )
 
 
@@ -796,3 +797,78 @@ class AccountDeletionRepository:
         await self.session.commit()
         await self.session.refresh(deletion)
         return deletion
+
+
+class ContentTagRepository:
+    """Repository for content tag operations (AI-003)."""
+
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def add_tags(self, content_id: int, tags: List[str]) -> List[ContentTag]:
+        """Add tags to content.
+
+        Args:
+            content_id: Content ID to add tags to.
+            tags: List of tag strings.
+
+        Returns:
+            List of created ContentTag objects.
+        """
+        created_tags = []
+
+        for tag in tags:
+            # Check if tag already exists for this content
+            result = await self.session.execute(
+                select(ContentTag).where(
+                    ContentTag.content_id == content_id,
+                    ContentTag.tag.ilike(tag)
+                )
+            )
+            existing = result.scalar_one_or_none()
+
+            if existing:
+                created_tags.append(existing)
+            else:
+                # Create new tag
+                content_tag = ContentTag(
+                    content_id=content_id,
+                    tag=tag.lower()
+                )
+                self.session.add(content_tag)
+                created_tags.append(content_tag)
+
+        await self.session.commit()
+
+        # Refresh all tags
+        for tag in created_tags:
+            await self.session.refresh(tag)
+
+        return created_tags
+
+    async def get_tags(self, content_id: int) -> List[str]:
+        """Get all tags for content.
+
+        Args:
+            content_id: Content ID.
+
+        Returns:
+            List of tag strings.
+        """
+        result = await self.session.execute(
+            select(ContentTag.tag)
+            .where(ContentTag.content_id == content_id)
+            .order_by(ContentTag.tag)
+        )
+        return [row[0] for row in result.fetchall()]
+
+    async def delete_tags(self, content_id: int) -> None:
+        """Delete all tags for content.
+
+        Args:
+            content_id: Content ID.
+        """
+        await self.session.execute(
+            delete(ContentTag).where(ContentTag.content_id == content_id)
+        )
+        await self.session.commit()
