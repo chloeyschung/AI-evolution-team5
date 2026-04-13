@@ -12,7 +12,6 @@ enum LibraryFilter: String, CaseIterable {
 struct LibraryView: View {
     @StateObject private var viewModel = SavedItemsViewModel()
     @State private var selectedFilter: LibraryFilter = .inbox
-    @State private var browserURL: URL?
 
     private var filteredItems: [SavedItem] {
         switch selectedFilter {
@@ -39,9 +38,11 @@ struct LibraryView: View {
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(filteredItems) { item in
-                            LibraryCardView(item: item) {
-                                browserURL = item.url
+                            NavigationLink(destination: ItemDetailView(item: item)) {
+                                LibraryCardView(item: item)
                             }
+                            .buttonStyle(.plain)
+
                             Divider()
                                 .padding(.leading, 16)
                         }
@@ -80,14 +81,6 @@ struct LibraryView: View {
         .navigationTitle(navigationTitle)
         .navigationBarTitleDisplayMode(.large)
         .onAppear { viewModel.reload() }
-        .sheet(isPresented: Binding(
-            get: { browserURL != nil },
-            set: { if !$0 { browserURL = nil } }
-        )) {
-            if let url = browserURL {
-                SafariBrowserView(url: url)
-            }
-        }
     }
 
     private var emptyView: some View {
@@ -109,9 +102,8 @@ struct LibraryView: View {
 
 // MARK: - Card
 
-private struct LibraryCardView: View {
+struct LibraryCardView: View {
     let item: SavedItem
-    let onOpenURL: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -150,14 +142,14 @@ private struct LibraryCardView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    // AI 요약 (Phase 2에서 채워질 예정)
                     Text("AI 요약이 준비 중입니다")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .lineLimit(3)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-                // 썸네일 (Phase 2에서 OG Image로 교체 예정)
+                // 썸네일 — 우측 고정 (Phase 2에서 OG Image로 교체 예정)
                 RoundedRectangle(cornerRadius: 8)
                     .fill(Color.secondary.opacity(0.12))
                     .overlay {
@@ -166,37 +158,20 @@ private struct LibraryCardView: View {
                             .font(.title3)
                     }
                     .frame(width: 80, height: 80)
-                    .flexibleFrame()
-            }
-
-            // ── 바로가기 버튼 ─────────────────────────────────
-            Button(action: onOpenURL) {
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.up.right.square")
-                    Text("바로가기")
-                }
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.blue)
             }
         }
         .padding(16)
         .contentShape(Rectangle())
     }
 
-    private var faviconURL: URL? {
+    var faviconURL: URL? {
         URL(string: "https://www.google.com/s2/favicons?domain=\(item.domain)&sz=64")
     }
 }
 
-// MARK: - Helpers
+// MARK: - Date Helper
 
-private extension View {
-    func flexibleFrame() -> some View {
-        self.frame(width: 80, height: 80)
-    }
-}
-
-private extension Date {
+extension Date {
     var libraryDateString: String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US")
