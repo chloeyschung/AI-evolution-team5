@@ -32,6 +32,7 @@ from .schemas import (
     UserStatisticsResponse,
     InterestTagRequest,
     InterestTagResponse,
+    DeleteContentResponse,
     AuthStatusResponse,
     TokenRefreshRequest,
     TokenRefreshResponse,
@@ -286,6 +287,48 @@ async def update_content_status(
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+# UX-006: Delete Content endpoint
+
+
+@router.delete("/content/{content_id}", response_model=DeleteContentResponse)
+async def delete_content(
+    content_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> DeleteContentResponse:
+    """Permanently delete content and associated swipe history.
+
+    This action is irreversible.
+
+    Args:
+        content_id: The content ID to delete.
+        db: Database session.
+
+    Returns:
+        Deletion confirmation.
+
+    Raises:
+        404: Content not found.
+    """
+    from sqlalchemy import delete
+
+    # Check if content exists
+    content_repo = ContentRepository(db)
+    content = await content_repo.get_by_id(content_id)
+
+    if not content:
+        raise HTTPException(status_code=404, detail="content_not_found")
+
+    # Delete swipe history first (foreign key constraint)
+    await db.execute(delete(SwipeHistory).where(SwipeHistory.content_id == content_id))
+
+    # Delete content
+    await db.execute(delete(Content).where(Content.id == content_id))
+
+    await db.commit()
+
+    return DeleteContentResponse(message="Content deleted successfully")
 
 
 @router.get("/stats", response_model=StatsResponse)

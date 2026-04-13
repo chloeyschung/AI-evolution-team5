@@ -201,6 +201,12 @@ class InterestTagResponse(BaseModel):
     tag: str
 
 
+class DeleteContentResponse(BaseModel):
+    """Schema for content deletion response."""
+
+    message: str
+
+
 # AUTH-001: Authentication schemas
 
 
