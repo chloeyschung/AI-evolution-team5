@@ -1,9 +1,10 @@
 """API route handlers for content and swipe operations."""
 
+from datetime import datetime, timezone
 from typing import Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.metadata_extractor import ContentMetadata
@@ -43,8 +44,15 @@ from .schemas import (
     LogoutResponse,
     AccountDeleteRequest,
     AccountDeleteResponse,
+    YouTubePlaylistResponse,
+    YouTubeConnectionStatus,
+    YouTubeSyncConfigCreate,
+    YouTubeSyncConfigResponse,
+    YouTubeSyncConfigUpdate,
+    YouTubeSyncLogResponse,
+    YouTubeDisconnectResponse,
 )
-from src.data.models import ContentStatus
+from src.data.models import ContentStatus, IntegrationTokens, IntegrationSyncConfig, IntegrationSyncLog
 
 router = APIRouter()
 
@@ -1013,3 +1021,752 @@ async def delete_account(
         message="Account deleted successfully",
         block_expires_at=block_expires_at.isoformat(),
     )
+
+
+# INT-001: YouTube Integration endpoints
+
+
+@router.get("/integrations/youtube/status", response_model=YouTubeConnectionStatus)
+async def get_youtube_connection_status(
+    user_id: int = 1,  # TODO: Get from auth token
+    db: AsyncSession = Depends(get_db),
+) -> YouTubeConnectionStatus:
+    """Check YouTube connection status.
+
+    Args:
+        user_id: User ID (from auth).
+        db: Database session.
+
+    Returns:
+        Connection status with last sync time.
+    """
+    from src.integrations.repositories.integration import IntegrationRepository
+
+    repo = IntegrationRepository(db)
+    tokens = await repo.get_tokens(user_id, "youtube")
+
+    if not tokens:
+        return YouTubeConnectionStatus(is_connected=False)
+
+    # Get last sync time
+    configs = await repo.get_sync_configs(user_id, "youtube")
+    last_sync_at = None
+    for config in configs:
+        # Check database for last_sync_at
+        result = await db.execute(
+            select(IntegrationSyncConfig).where(
+                IntegrationSyncConfig.user_id == user_id,
+                IntegrationSyncConfig.provider == "youtube",
+                IntegrationSyncConfig.resource_id == config.playlist_id,
+            )
+        )
+        db_config = result.scalar_one_or_none()
+        if db_config and db_config.last_sync_at:
+            if last_sync_at is None or db_config.last_sync_at > last_sync_at:
+                last_sync_at = db_config.last_sync_at
+
+    return YouTubeConnectionStatus(
+        is_connected=True,
+        last_sync_at=last_sync_at.isoformat() if last_sync_at else None,
+    )
+
+
+@router.get("/integrations/youtube/playlists", response_model=list[YouTubePlaylistResponse])
+async def list_youtube_playlists(
+    db: AsyncSession = Depends(get_db),
+    authorization: str | None = None,
+) -> list[YouTubePlaylistResponse]:
+    """List user's YouTube playlists.
+
+    Args:
+        db: Database session.
+        authorization: Authorization header with Bearer token.
+
+    Returns:
+        List of YouTube playlists.
+
+    Raises:
+        401: Not connected to YouTube.
+    """
+    from src.integrations.repositories.integration import IntegrationRepository
+    from src.integrations.youtube.client import YouTubeClient, YouTubeAuthError
+
+    # Get user_id from token
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    token = authorization[7:]
+    auth_repo = AuthenticationRepository(db)
+    token_record = await auth_repo.get_token_by_access_token(token)
+
+    if not token_record:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    user_id = token_record.user_id
+
+    # Get YouTube tokens
+    repo = IntegrationRepository(db)
+    youtube_tokens = await repo.get_tokens(user_id, "youtube")
+
+    if not youtube_tokens:
+        raise HTTPException(status_code=401, detail="not_connected_to_youtube")
+
+    # Create YouTube client and fetch playlists
+    client = YouTubeClient(
+        access_token=youtube_tokens.access_token,
+        refresh_token=youtube_tokens.refresh_token,
+        token_expires_at=youtube_tokens.expires_at,
+    )
+
+    try:
+        playlists = await client.get_playlists()
+    except YouTubeAuthError as e:
+        # Token expired, delete it
+        await repo.delete_tokens(user_id, "youtube")
+        raise HTTPException(status_code=401, detail="youtube_auth_expired")
+
+    return [
+        YouTubePlaylistResponse(
+            playlist_id=p.playlist_id,
+            title=p.title,
+            description=p.description,
+            thumbnail_url=p.thumbnail_url,
+            video_count=p.video_count,
+            is_watch_later=p.is_watch_later,
+        )
+        for p in playlists
+    ]
+
+
+@router.post("/integrations/youtube/configs", status_code=201, response_model=YouTubeSyncConfigResponse)
+async def create_youtube_sync_config(
+    data: YouTubeSyncConfigCreate,
+    db: AsyncSession = Depends(get_db),
+    authorization: str | None = None,
+) -> YouTubeSyncConfigResponse:
+    """Create a YouTube playlist sync configuration.
+
+    Args:
+        data: Sync configuration request.
+        db: Database session.
+        authorization: Authorization header with Bearer token.
+
+    Returns:
+        Created sync configuration.
+
+    Raises:
+        401: Not connected to YouTube.
+        409: Config already exists.
+    """
+    from src.integrations.repositories.integration import IntegrationRepository
+
+    # Get user_id from token
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    token = authorization[7:]
+    auth_repo = AuthenticationRepository(db)
+    token_record = await auth_repo.get_token_by_access_token(token)
+
+    if not token_record:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    user_id = token_record.user_id
+
+    # Check if YouTube is connected
+    repo = IntegrationRepository(db)
+    youtube_tokens = await repo.get_tokens(user_id, "youtube")
+
+    if not youtube_tokens:
+        raise HTTPException(status_code=401, detail="not_connected_to_youtube")
+
+    # Create sync config
+    config = await repo.save_sync_config(
+        user_id=user_id,
+        provider="youtube",
+        playlist_id=data.playlist_id,
+        playlist_name=data.playlist_name,
+        sync_frequency=data.sync_frequency,
+        is_active=True,
+    )
+
+    # Check if this was an update (config already exists)
+    result = await db.execute(
+        select(IntegrationSyncConfig).where(
+            IntegrationSyncConfig.id == config.id,
+        )
+    )
+    db_config = result.scalar_one()
+
+    return YouTubeSyncConfigResponse(
+        playlist_id=db_config.resource_id,
+        playlist_name=db_config.resource_name,
+        sync_frequency=db_config.sync_frequency,
+        is_active=bool(db_config.is_active),
+        last_sync_at=db_config.last_sync_at.isoformat() if db_config.last_sync_at else None,
+    )
+
+
+@router.get("/integrations/youtube/configs", response_model=list[YouTubeSyncConfigResponse])
+async def list_youtube_sync_configs(
+    db: AsyncSession = Depends(get_db),
+    authorization: str | None = None,
+) -> list[YouTubeSyncConfigResponse]:
+    """List all YouTube sync configurations.
+
+    Args:
+        db: Database session.
+        authorization: Authorization header with Bearer token.
+
+    Returns:
+        List of sync configurations.
+
+    Raises:
+        401: Not authenticated.
+    """
+    from src.integrations.repositories.integration import IntegrationRepository
+
+    # Get user_id from token
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    token = authorization[7:]
+    auth_repo = AuthenticationRepository(db)
+    token_record = await auth_repo.get_token_by_access_token(token)
+
+    if not token_record:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    user_id = token_record.user_id
+
+    # Get sync configs
+    repo = IntegrationRepository(db)
+    configs = await repo.get_sync_configs(user_id, "youtube")
+
+    # Get last_sync_at from database
+    result = await db.execute(
+        select(IntegrationSyncConfig).where(
+            IntegrationSyncConfig.user_id == user_id,
+            IntegrationSyncConfig.provider == "youtube",
+        )
+    )
+    db_configs = result.scalars().all()
+
+    # Build a map for quick lookup
+    db_config_map = {c.resource_id: c for c in db_configs}
+
+    return [
+        YouTubeSyncConfigResponse(
+            playlist_id=c.playlist_id,
+            playlist_name=c.playlist_name,
+            sync_frequency=c.sync_frequency,
+            is_active=c.is_active,
+            last_sync_at=db_config_map.get(c.playlist_id, {}).last_sync_at.isoformat()
+            if db_config_map.get(c.playlist_id) and db_config_map[c.playlist_id].last_sync_at
+            else None,
+        )
+        for c in configs
+    ]
+
+
+@router.patch("/integrations/youtube/configs/{playlist_id}", response_model=YouTubeSyncConfigResponse)
+async def update_youtube_sync_config(
+    playlist_id: str,
+    data: YouTubeSyncConfigUpdate,
+    db: AsyncSession = Depends(get_db),
+    authorization: str | None = None,
+) -> YouTubeSyncConfigResponse:
+    """Update a YouTube sync configuration.
+
+    Args:
+        playlist_id: Playlist ID to update.
+        data: Update request.
+        db: Database session.
+        authorization: Authorization header with Bearer token.
+
+    Returns:
+        Updated sync configuration.
+
+    Raises:
+        401: Not authenticated.
+        404: Config not found.
+    """
+    from src.integrations.repositories.integration import IntegrationRepository
+
+    # Get user_id from token
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    token = authorization[7:]
+    auth_repo = AuthenticationRepository(db)
+    token_record = await auth_repo.get_token_by_access_token(token)
+
+    if not token_record:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    user_id = token_record.user_id
+
+    # Check if config exists
+    repo = IntegrationRepository(db)
+    configs = await repo.get_sync_configs(user_id, "youtube")
+
+    existing = None
+    for c in configs:
+        if c.playlist_id == playlist_id:
+            existing = c
+            break
+
+    if not existing:
+        raise HTTPException(status_code=404, detail="sync_config_not_found")
+
+    # Update config
+    new_name = data.playlist_name if data.playlist_name is not None else existing.playlist_name
+    new_frequency = data.sync_frequency if data.sync_frequency is not None else existing.sync_frequency
+    new_active = data.is_active if data.is_active is not None else existing.is_active
+
+    updated = await repo.save_sync_config(
+        user_id=user_id,
+        provider="youtube",
+        playlist_id=playlist_id,
+        playlist_name=new_name,
+        sync_frequency=new_frequency,
+        is_active=new_active,
+    )
+
+    # Get last_sync_at from database
+    result = await db.execute(
+        select(IntegrationSyncConfig).where(
+            IntegrationSyncConfig.user_id == user_id,
+            IntegrationSyncConfig.provider == "youtube",
+            IntegrationSyncConfig.resource_id == playlist_id,
+        )
+    )
+    db_config = result.scalar_one_or_none()
+
+    return YouTubeSyncConfigResponse(
+        playlist_id=updated.resource_id,
+        playlist_name=updated.resource_name,
+        sync_frequency=updated.sync_frequency,
+        is_active=bool(updated.is_active),
+        last_sync_at=db_config.last_sync_at.isoformat() if db_config and db_config.last_sync_at else None,
+    )
+
+
+@router.delete("/integrations/youtube/configs/{playlist_id}")
+async def delete_youtube_sync_config(
+    playlist_id: str,
+    db: AsyncSession = Depends(get_db),
+    authorization: str | None = None,
+) -> dict:
+    """Delete a YouTube sync configuration.
+
+    Args:
+        playlist_id: Playlist ID to delete.
+        db: Database session.
+        authorization: Authorization header with Bearer token.
+
+    Returns:
+        Deletion confirmation.
+
+    Raises:
+        401: Not authenticated.
+        404: Config not found.
+    """
+    from src.integrations.repositories.integration import IntegrationRepository
+
+    # Get user_id from token
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    token = authorization[7:]
+    auth_repo = AuthenticationRepository(db)
+    token_record = await auth_repo.get_token_by_access_token(token)
+
+    if not token_record:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    user_id = token_record.user_id
+
+    # Delete config
+    repo = IntegrationRepository(db)
+    deleted = await repo.delete_sync_config(user_id, "youtube", playlist_id)
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail="sync_config_not_found")
+
+    return {"message": "Sync configuration deleted successfully"}
+
+
+@router.get("/integrations/youtube/logs", response_model=list[YouTubeSyncLogResponse])
+async def list_youtube_sync_logs(
+    limit: int = Query(50, gt=0, le=100),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    authorization: str | None = None,
+) -> list[YouTubeSyncLogResponse]:
+    """List YouTube sync logs.
+
+    Args:
+        limit: Maximum number of logs to return.
+        offset: Pagination offset.
+        db: Database session.
+        authorization: Authorization header with Bearer token.
+
+    Returns:
+        List of sync logs.
+
+    Raises:
+        401: Not authenticated.
+    """
+    from src.integrations.repositories.integration import IntegrationRepository
+
+    # Get user_id from token
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    token = authorization[7:]
+    auth_repo = AuthenticationRepository(db)
+    token_record = await auth_repo.get_token_by_access_token(token)
+
+    if not token_record:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    user_id = token_record.user_id
+
+    # Get sync logs
+    repo = IntegrationRepository(db)
+    logs = await repo.get_sync_logs(user_id, "youtube", limit=limit, offset=offset)
+
+    return [
+        YouTubeSyncLogResponse(
+            id=log.id,
+            playlist_id=log.playlist_id,
+            status=log.status,
+            ingested_count=log.ingested_count,
+            skipped_count=log.skipped_count,
+            error_message=log.error_message,
+            executed_at=log.executed_at.isoformat(),
+        )
+        for log in logs
+    ]
+
+
+@router.post("/integrations/youtube/sync")
+async def trigger_youtube_sync(
+    playlist_id: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    authorization: str | None = None,
+) -> dict:
+    """Trigger a YouTube playlist sync immediately.
+
+    Args:
+        playlist_id: Optional playlist ID to sync. If not provided, syncs all configured playlists.
+        db: Database session.
+        authorization: Authorization header with Bearer token.
+
+    Returns:
+        Sync trigger confirmation.
+
+    Raises:
+        401: Not authenticated or not connected to YouTube.
+    """
+    from src.integrations.repositories.integration import IntegrationRepository
+    from src.integrations.youtube.client import YouTubeClient
+    from src.integrations.youtube.sync import YouTubeSyncService
+    from src.ai.summarizer import Summarizer
+    from src.data.repository import ContentRepository
+
+    # Get user_id from token
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    token = authorization[7:]
+    auth_repo = AuthenticationRepository(db)
+    token_record = await auth_repo.get_token_by_access_token(token)
+
+    if not token_record:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    user_id = token_record.user_id
+
+    # Get YouTube tokens
+    integration_repo = IntegrationRepository(db)
+    youtube_tokens = await integration_repo.get_tokens(user_id, "youtube")
+
+    if not youtube_tokens:
+        raise HTTPException(status_code=401, detail="not_connected_to_youtube")
+
+    # Create clients
+    youtube_client = YouTubeClient(
+        access_token=youtube_tokens.access_token,
+        refresh_token=youtube_tokens.refresh_token,
+        token_expires_at=youtube_tokens.expires_at,
+    )
+
+    content_repo = ContentRepository(db)
+    summarizer = Summarizer()
+    sync_service = YouTubeSyncService(
+        youtube_client=youtube_client,
+        content_repo=content_repo,
+        integration_repo=integration_repo,
+        summarizer=summarizer,
+    )
+
+    # Trigger sync (run in background to avoid blocking)
+    async def do_sync():
+        try:
+            if playlist_id:
+                result = await sync_service.sync_playlist(user_id, playlist_id)
+                status = "success" if not result.errors else "partial"
+                await integration_repo.log_sync(
+                    user_id=user_id,
+                    provider="youtube",
+                    resource_id=playlist_id,
+                    status=status,
+                    ingested_count=result.ingested,
+                    skipped_count=result.skipped,
+                    error_message=None if not result.errors else str(result.errors),
+                )
+            else:
+                results = await sync_service.sync_all_playlists(user_id)
+                for pid, result in results.items():
+                    status = "success" if not result.errors else "partial"
+                    await integration_repo.log_sync(
+                        user_id=user_id,
+                        provider="youtube",
+                        resource_id=pid,
+                        status=status,
+                        ingested_count=result.ingested,
+                        skipped_count=result.skipped,
+                        error_message=None if not result.errors else str(result.errors),
+                    )
+        except Exception as e:
+            resource = playlist_id or "all"
+            await integration_repo.log_sync(
+                user_id=user_id,
+                provider="youtube",
+                resource_id=resource,
+                status="failed",
+                ingested_count=0,
+                skipped_count=0,
+                error_message=str(e),
+            )
+
+    # Schedule background task
+    import asyncio
+
+    asyncio.create_task(do_sync())
+
+    return {
+        "message": "Sync triggered",
+        "playlist_id": playlist_id,
+    }
+
+
+@router.post("/integrations/youtube/connect")
+async def connect_youtube(
+    db: AsyncSession = Depends(get_db),
+    authorization: str | None = None,
+) -> dict:
+    """Initiate YouTube OAuth connection.
+
+    Returns OAuth authorization URL for user to complete consent flow.
+
+    Args:
+        db: Database session.
+        authorization: Authorization header with Bearer token.
+
+    Returns:
+        OAuth authorization URL.
+
+    Raises:
+        401: Not authenticated.
+    """
+    import os
+    from urllib.parse import urlencode
+
+    # Get user_id from token
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    token = authorization[7:]
+    auth_repo = AuthenticationRepository(db)
+    token_record = await auth_repo.get_token_by_access_token(token)
+
+    if not token_record:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    user_id = token_record.user_id
+
+    # Get OAuth credentials
+    client_id = os.getenv("YOUTUBE_CLIENT_ID")
+    if not client_id:
+        raise HTTPException(status_code=500, detail="youtube_oauth_not_configured")
+
+    # Build OAuth URL
+    scope = "https://www.googleapis.com/auth/youtube.readonly"
+    redirect_uri = os.getenv("YOUTUBE_REDIRECT_URI", "http://localhost:8000/api/v1/integrations/youtube/callback")
+
+    auth_url = (
+        "https://accounts.google.com/o/oauth2/v2/auth?"
+        + urlencode(
+            {
+                "client_id": client_id,
+                "redirect_uri": redirect_uri,
+                "response_type": "code",
+                "scope": scope,
+                "access_type": "offline",
+                "prompt": "consent",
+                "state": str(user_id),  # Use user_id as state
+            }
+        )
+    )
+
+    return {"auth_url": auth_url}
+
+
+@router.get("/integrations/youtube/callback")
+async def youtube_callback(
+    code: str = Query(...),
+    state: str = Query(..., description="User ID"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Handle YouTube OAuth callback.
+
+    Exchanges authorization code for tokens and stores them.
+
+    Args:
+        code: Authorization code from YouTube.
+        state: User ID (passed from connect endpoint).
+        db: Database session.
+
+    Returns:
+        Connection confirmation.
+
+    Raises:
+        400: Invalid code or state.
+    """
+    import os
+    from datetime import timedelta
+
+    import httpx
+
+    from src.integrations.repositories.integration import IntegrationRepository
+
+    # Validate state (user_id)
+    try:
+        user_id = int(state)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid_state")
+
+    # Get OAuth credentials
+    client_id = os.getenv("YOUTUBE_CLIENT_ID")
+    client_secret = os.getenv("YOUTUBE_CLIENT_SECRET")
+
+    if not client_id or not client_secret:
+        raise HTTPException(status_code=500, detail="youtube_oauth_not_configured")
+
+    redirect_uri = os.getenv(
+        "YOUTUBE_REDIRECT_URI", "http://localhost:8000/api/v1/integrations/youtube/callback"
+    )
+
+    # Exchange code for tokens
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "code": code,
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "redirect_uri": redirect_uri,
+                "grant_type": "authorization_code",
+            },
+        )
+
+    if response.status_code != 200:
+        raise HTTPException(status_code=400, detail="youtube_auth_failed")
+
+    token_data = response.json()
+
+    # Store tokens
+    repo = IntegrationRepository(db)
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=token_data.get("expires_in", 3600))
+
+    await repo.save_tokens(
+        user_id=user_id,
+        provider="youtube",
+        access_token=token_data["access_token"],
+        refresh_token=token_data["refresh_token"],
+        expires_at=expires_at,
+    )
+
+    return {
+        "message": "Connected to YouTube successfully",
+        "user_id": user_id,
+    }
+
+
+@router.post("/integrations/youtube/disconnect")
+async def disconnect_youtube(
+    db: AsyncSession = Depends(get_db),
+    authorization: str | None = None,
+) -> YouTubeDisconnectResponse:
+    """Disconnect YouTube integration.
+
+    Revokes OAuth tokens and deletes all sync configurations.
+
+    Args:
+        db: Database session.
+        authorization: Authorization header with Bearer token.
+
+    Returns:
+        Disconnection confirmation.
+
+    Raises:
+        401: Not authenticated.
+    """
+    from sqlalchemy import delete
+
+    from src.integrations.repositories.integration import IntegrationRepository
+    from src.integrations.youtube.client import YouTubeClient
+
+    # Get user_id from token
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    token = authorization[7:]
+    auth_repo = AuthenticationRepository(db)
+    token_record = await auth_repo.get_token_by_access_token(token)
+
+    if not token_record:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    user_id = token_record.user_id
+
+    # Get YouTube tokens
+    repo = IntegrationRepository(db)
+    youtube_tokens = await repo.get_tokens(user_id, "youtube")
+
+    if youtube_tokens:
+        # Revoke tokens with YouTube
+        client = YouTubeClient(
+            access_token=youtube_tokens.access_token,
+            refresh_token=youtube_tokens.refresh_token,
+            token_expires_at=youtube_tokens.expires_at,
+        )
+        await client.disconnect()
+
+        # Delete tokens from database
+        await repo.delete_tokens(user_id, "youtube")
+
+    # Delete all sync configs
+    await db.execute(
+        delete(IntegrationSyncConfig).where(
+            IntegrationSyncConfig.user_id == user_id,
+            IntegrationSyncConfig.provider == "youtube",
+        )
+    )
+
+    await db.commit()
+
+    return YouTubeDisconnectResponse(message="Disconnected from YouTube successfully")

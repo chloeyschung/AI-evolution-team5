@@ -40,7 +40,7 @@ This document tracks all identified features for the **Briefly** project, catego
 - [x] **[EXT-002] Web Dashboard**: A web-based view for users to manage their "Knowledge Library" on a larger screen. ✅ Implemented
 
 ### Integrations
-- [ ] **[INT-001] YouTube Auto-Sync**: Automatically ingest "Watch Later" or specific playlists via API.
+- [x] **[INT-001] YouTube Auto-Sync**: Automatically ingest "Watch Later" or specific playlists via API. ✅ Implemented
 - [ ] **[INT-002] LinkedIn/Social Sync**: Integration to pull saved posts from major professional networks.
 
 ## Phase 3: Advanced Features

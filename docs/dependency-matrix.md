@@ -121,6 +121,7 @@ ING-001 → ING-002 → AI-001 → UX-001 → UX-002
 | UX-006 | ✅ [`UX-006.md`](specs/UX-006.md) | ✅ [`UX-006-record.md`](records/UX-006-record.md) | ✅ Implemented | `src/api/routes.py` | F-019 | ✅ Delete content |
 | EXT-001 | ✅ [`EXT-001.md`](specs/EXT-001.md) | ✅ [`EXT-001-record.md`](records/EXT-001-record.md) | ✅ Implemented | `browser-extension/` | F-020 | ✅ Chrome/Whale extension |
 | EXT-002 | ✅ [`EXT-002.md`](specs/EXT-002.md) | ✅ [`EXT-002-record.md`](records/EXT-002-record.md) | ✅ Implemented | `web-dashboard/` | F-021 | ✅ Vue 3 web dashboard |
+| INT-001 | ✅ [`INT-001.md`](specs/INT-001.md) | ✅ [`INT-001-record.md`](records/INT-001-record.md) | ✅ Implemented | `src/integrations/youtube/`, `src/integrations/repositories/` | - | ✅ OAuth, sync configs, manual trigger |
 
 ## Next: AUTH-001 (App Entry & Login State)
 

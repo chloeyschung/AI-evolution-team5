@@ -301,3 +301,74 @@ class AccountDeleteResponse(BaseModel):
 
     message: str
     block_expires_at: str
+
+
+# INT-001: YouTube Integration schemas
+
+
+class YouTubePlaylistResponse(BaseModel):
+    """Schema for YouTube playlist response."""
+
+    model_config = {"from_attributes": True}
+
+    playlist_id: str
+    title: str
+    description: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    video_count: int = 0
+    is_watch_later: bool = False
+
+
+class YouTubeConnectionStatus(BaseModel):
+    """Schema for YouTube connection status."""
+
+    is_connected: bool
+    last_sync_at: Optional[str] = None
+
+
+class YouTubeSyncConfigCreate(BaseModel):
+    """Schema for creating sync configuration."""
+
+    playlist_id: str = Field(..., min_length=1, max_length=200)
+    playlist_name: str = Field(..., min_length=1, max_length=500)
+    sync_frequency: str = Field(..., pattern="^(hourly|daily|weekly)$")
+
+
+class YouTubeSyncConfigResponse(BaseModel):
+    """Schema for sync configuration response."""
+
+    model_config = {"from_attributes": True}
+
+    playlist_id: str
+    playlist_name: str
+    sync_frequency: str
+    is_active: bool
+    last_sync_at: Optional[str] = None
+
+
+class YouTubeSyncConfigUpdate(BaseModel):
+    """Schema for updating sync configuration."""
+
+    playlist_name: Optional[str] = Field(None, min_length=1, max_length=500)
+    sync_frequency: Optional[str] = Field(None, pattern="^(hourly|daily|weekly)$")
+    is_active: Optional[bool] = None
+
+
+class YouTubeSyncLogResponse(BaseModel):
+    """Schema for sync log response."""
+
+    model_config = {"from_attributes": True}
+
+    id: int
+    playlist_id: str
+    status: str
+    ingested_count: int
+    skipped_count: int
+    error_message: Optional[str] = None
+    executed_at: str
+
+
+class YouTubeDisconnectResponse(BaseModel):
+    """Schema for YouTube disconnect response."""
+
+    message: str

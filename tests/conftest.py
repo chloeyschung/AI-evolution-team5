@@ -18,6 +18,9 @@ from src.data.models import (
     UserProfile,
     UserPreferences,
     InterestTag,
+    IntegrationTokens,
+    IntegrationSyncConfig,
+    IntegrationSyncLog,
 )
 from src.data import database as db_module
 
@@ -70,12 +73,34 @@ async def setup_test_database():
 
     # Cleanup: drop all data after test (keep tables for next test)
     async with AsyncTestingSessionLocal() as session:
+        await session.execute(delete(IntegrationSyncLog))
+        await session.execute(delete(IntegrationSyncConfig))
+        await session.execute(delete(IntegrationTokens))
         await session.execute(delete(InterestTag))
         await session.execute(delete(UserPreferences))
         await session.execute(delete(UserProfile))
         await session.execute(delete(SwipeHistory))
         await session.execute(delete(Content))
         await session.commit()
+
+
+@pytest.fixture(scope="function", name="db_session")
+async def test_db_session():
+    """Provide an async database session for tests.
+
+    Use this fixture when you need direct database access via a session.
+    Example: async def test_xxx(db_session: AsyncSession): ...
+    """
+    # Create tables if they don't exist
+    async with test_async_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    async with AsyncTestingSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.rollback()
+            await session.close()
 
 
 @pytest.fixture(scope="session", autouse=True)
