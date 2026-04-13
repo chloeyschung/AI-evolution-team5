@@ -18,9 +18,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Xcode version
-        run: xcodebuild -version
-
       - name: Select Xcode 16.2
         run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
 
@@ -33,12 +30,21 @@ jobs:
           mkdir -p BrieflyTests
           xcodegen generate
 
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: Briefly/SourcePackages
+          key: ${{ runner.os }}-spm-${{ hashFiles('Briefly/Briefly.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
       - name: Resolve Swift packages
         working-directory: Briefly
         run: |
           xcodebuild -resolvePackageDependencies \
             -project Briefly.xcodeproj \
-            -scheme Briefly
+            -scheme Briefly \
+            -clonedSourcePackagesDirPath SourcePackages
 
       - name: Build (no code signing)
         working-directory: Briefly
@@ -47,6 +53,7 @@ jobs:
             -project Briefly.xcodeproj \
             -scheme Briefly \
             -destination 'generic/platform=iOS Simulator' \
+            -clonedSourcePackagesDirPath SourcePackages \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_ENTITLEMENTS="" \
             ONLY_ACTIVE_ARCH=NO
