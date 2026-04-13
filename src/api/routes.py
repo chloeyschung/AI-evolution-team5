@@ -12,7 +12,7 @@ from src.ingestion.share_handler import ShareHandler
 
 from ..data.database import get_db
 from ..data.models import Content, SwipeHistory
-from ..data.repository import ContentRepository, SwipeRepository
+from ..data.repository import ContentRepository, SwipeRepository, UserProfileRepository
 from .schemas import (
     ContentCreate,
     ContentResponse,
@@ -23,7 +23,15 @@ from .schemas import (
     StatsResponse,
     ShareRequest,
     ShareResponse,
+    UserProfileResponse,
+    UserProfileUpdate,
+    UserPreferencesResponse,
+    UserPreferencesUpdate,
+    UserStatisticsResponse,
+    InterestTagRequest,
+    InterestTagResponse,
 )
+from src.data.models import ContentStatus
 
 router = APIRouter()
 
@@ -216,6 +224,50 @@ async def list_discarded_content(
     ]
 
 
+@router.patch("/content/{content_id}/status", response_model=ContentResponse)
+async def update_content_status(
+    content_id: int,
+    data: dict,
+    db: AsyncSession = Depends(get_db),
+) -> ContentResponse:
+    """Update content status (INBOX → ARCHIVED transition).
+
+    Args:
+        content_id: The content ID to update.
+        data: Dictionary with "status" field (must be "archived").
+        db: Database session.
+
+    Returns:
+        Updated Content object.
+
+    Raises:
+        404: Content not found.
+        400: Invalid status transition.
+    """
+    repo = ContentRepository(db)
+    new_status = ContentStatus(data.get("status", "archived"))
+
+    try:
+        content = await repo.update_status(content_id, new_status)
+        return ContentResponse(
+            id=content.id,
+            platform=content.platform,
+            content_type=content.content_type,
+            url=content.url,
+            title=content.title,
+            author=content.author,
+            status=content.status,
+            created_at=content.created_at.isoformat(),
+            updated_at=content.updated_at.isoformat(),
+        )
+    except ValueError as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 @router.get("/stats", response_model=StatsResponse)
 async def get_content_stats(db: AsyncSession = Depends(get_db)) -> StatsResponse:
     """Get content statistics.
@@ -308,3 +360,138 @@ async def share_content(
         summary=content.summary,
         created_at=content.created_at.isoformat(),
     )
+
+
+# DAT-002: User Profile & Preferences endpoints
+
+
+@router.get("/profile", response_model=UserProfileResponse)
+async def get_profile(db: AsyncSession = Depends(get_db)) -> UserProfileResponse:
+    """Get user profile.
+
+    Auto-creates profile if it doesn't exist.
+    """
+    repo = UserProfileRepository(db)
+    profile = await repo.get_or_create_profile()
+
+    return UserProfileResponse(
+        id=profile.id,
+        display_name=profile.display_name,
+        avatar_url=profile.avatar_url,
+        bio=profile.bio,
+        created_at=profile.created_at.isoformat(),
+        updated_at=profile.updated_at.isoformat(),
+    )
+
+
+@router.patch("/profile", response_model=UserProfileResponse)
+async def update_profile(
+    data: UserProfileUpdate,
+    db: AsyncSession = Depends(get_db),
+) -> UserProfileResponse:
+    """Update user profile."""
+    repo = UserProfileRepository(db)
+    profile = await repo.update_profile(
+        display_name=data.display_name,
+        avatar_url=data.avatar_url,
+        bio=data.bio,
+    )
+
+    return UserProfileResponse(
+        id=profile.id,
+        display_name=profile.display_name,
+        avatar_url=profile.avatar_url,
+        bio=profile.bio,
+        created_at=profile.created_at.isoformat(),
+        updated_at=profile.updated_at.isoformat(),
+    )
+
+
+@router.get("/preferences", response_model=UserPreferencesResponse)
+async def get_preferences(db: AsyncSession = Depends(get_db)) -> UserPreferencesResponse:
+    """Get user preferences.
+
+    Auto-creates preferences with defaults if they don't exist.
+    """
+    repo = UserProfileRepository(db)
+    preferences = await repo.get_preferences()
+
+    return UserPreferencesResponse(
+        theme=preferences.theme,
+        notifications_enabled=bool(preferences.notifications_enabled),
+        daily_goal=preferences.daily_goal,
+        default_sort=preferences.default_sort,
+    )
+
+
+@router.patch("/preferences", response_model=UserPreferencesResponse)
+async def update_preferences(
+    data: UserPreferencesUpdate,
+    db: AsyncSession = Depends(get_db),
+) -> UserPreferencesResponse:
+    """Update user preferences."""
+    repo = UserProfileRepository(db)
+    preferences = await repo.update_preferences(
+        theme=data.theme,
+        notifications_enabled=data.notifications_enabled,
+        daily_goal=data.daily_goal,
+        default_sort=data.default_sort,
+    )
+
+    return UserPreferencesResponse(
+        theme=preferences.theme,
+        notifications_enabled=bool(preferences.notifications_enabled),
+        daily_goal=preferences.daily_goal,
+        default_sort=preferences.default_sort,
+    )
+
+
+@router.get("/user/statistics", response_model=UserStatisticsResponse)
+async def get_user_statistics(db: AsyncSession = Depends(get_db)) -> UserStatisticsResponse:
+    """Get user statistics from swipe history.
+
+    Returns aggregated metrics including swipe counts, retention rate, and streak.
+    """
+    repo = UserProfileRepository(db)
+    stats = await repo.get_statistics()
+
+    return UserStatisticsResponse(
+        total_swipes=stats["total_swipes"],
+        total_kept=stats["total_kept"],
+        total_discarded=stats["total_discarded"],
+        retention_rate=stats["retention_rate"],
+        streak_days=stats["streak_days"],
+        first_swipe_at=stats["first_swipe_at"].isoformat() if stats["first_swipe_at"] else None,
+        last_swipe_at=stats["last_swipe_at"].isoformat() if stats["last_swipe_at"] else None,
+    )
+
+
+@router.get("/interests", response_model=list[str])
+async def get_interests(db: AsyncSession = Depends(get_db)) -> list[str]:
+    """Get all user interest tags."""
+    repo = UserProfileRepository(db)
+    return await repo.get_interest_tags()
+
+
+@router.post("/interests", status_code=201, response_model=InterestTagResponse)
+async def add_interest(
+    data: InterestTagRequest,
+    db: AsyncSession = Depends(get_db),
+) -> InterestTagResponse:
+    """Add an interest tag.
+
+    Tags are case-insensitive and unique per user.
+    """
+    repo = UserProfileRepository(db)
+    tag = await repo.add_interest_tag(data.tag)
+
+    return InterestTagResponse(id=tag.id, tag=tag.tag)
+
+
+@router.delete("/interests/{tag}")
+async def remove_interest(tag: str, db: AsyncSession = Depends(get_db)) -> dict:
+    """Remove an interest tag."""
+    repo = UserProfileRepository(db)
+    await repo.remove_interest_tag(tag)
+
+    return {"message": f"Interest tag '{tag}' removed successfully"}

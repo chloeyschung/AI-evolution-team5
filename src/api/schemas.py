@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from src.ai.metadata_extractor import ContentType
-from src.data.models import SwipeAction
+from src.data.models import SwipeAction, Theme, DefaultSort, ContentStatus
 
 
 class ContentCreate(BaseModel):
@@ -29,7 +29,9 @@ class ContentResponse(BaseModel):
     url: str
     title: Optional[str] = None
     author: Optional[str] = None
+    status: ContentStatus = ContentStatus.INBOX
     created_at: str
+    updated_at: Optional[str] = None
 
 
 class SwipeCreate(BaseModel):
@@ -96,3 +98,74 @@ class ShareResponse(BaseModel):
     author: Optional[str] = None
     summary: Optional[str] = None
     created_at: str
+
+
+# DAT-002: User Profile & Preferences schemas
+
+
+class UserProfileResponse(BaseModel):
+    """Schema for user profile response."""
+
+    model_config = {"from_attributes": True}
+
+    id: int
+    display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    bio: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
+class UserProfileUpdate(BaseModel):
+    """Schema for updating user profile."""
+
+    display_name: Optional[str] = Field(None, max_length=100)
+    avatar_url: Optional[str] = Field(None, max_length=500)
+    bio: Optional[str] = Field(None, max_length=500)
+
+
+class UserPreferencesResponse(BaseModel):
+    """Schema for user preferences response."""
+
+    model_config = {"from_attributes": True}
+
+    theme: Theme
+    notifications_enabled: bool
+    daily_goal: int
+    default_sort: DefaultSort
+
+
+class UserPreferencesUpdate(BaseModel):
+    """Schema for updating user preferences."""
+
+    theme: Optional[Theme] = None
+    notifications_enabled: Optional[bool] = None
+    daily_goal: Optional[int] = Field(None, gt=0, le=1000)
+    default_sort: Optional[DefaultSort] = None
+
+
+class UserStatisticsResponse(BaseModel):
+    """Schema for user statistics response."""
+
+    total_swipes: int
+    total_kept: int
+    total_discarded: int
+    retention_rate: float
+    streak_days: int
+    first_swipe_at: Optional[str] = None
+    last_swipe_at: Optional[str] = None
+
+
+class InterestTagRequest(BaseModel):
+    """Schema for adding an interest tag."""
+
+    tag: str = Field(..., min_length=1, max_length=100)
+
+
+class InterestTagResponse(BaseModel):
+    """Schema for interest tag response."""
+
+    model_config = {"from_attributes": True}
+
+    id: int
+    tag: str
