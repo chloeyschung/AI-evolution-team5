@@ -37,7 +37,7 @@ This document tracks all identified features for the **Briefly** project, catego
 
 ### Desktop/Web
 - [x] **[EXT-001] Browser Extension (MVP)**: A lightweight extension for Chrome/Whale to allow one-click saving from the desktop. ✅ Implemented
-- [ ] **[EXT-002] Web Dashboard**: A web-based view for users to manage their "Knowledge Library" on a larger screen.
+- [x] **[EXT-002] Web Dashboard**: A web-based view for users to manage their "Knowledge Library" on a larger screen. ✅ Implemented
 
 ### Integrations
 - [ ] **[INT-001] YouTube Auto-Sync**: Automatically ingest "Watch Later" or specific playlists via API.
