@@ -40,16 +40,18 @@
 ## 4. Roadmap
 
 ### Phase 1: MVP (Mobile Focus)
-- [ ] **Authentication**: App entry, Google login, logout, account delete (AUTH-001 to AUTH-004).
-- [ ] Core Ingestion (Mobile Share Sheet).
-- [ ] AI Summarization Engine (3-line core) + AI Categorization.
-- [ ] Swipe-based Card Stack UI.
-- [ ] Basic Local/Cloud Sync.
-- [ ] User Profile & Preferences.
+- [x] **Authentication**: App entry, Google login, logout, account delete (AUTH-001 to AUTH-004).
+- [x] Core Ingestion (Mobile Share Sheet).
+- [x] AI Summarization Engine (3-line core) + AI Categorization.
+- [x] Swipe-based Card Stack UI.
+- [x] Basic Local/Cloud Sync.
+- [x] User Profile & Preferences.
 
 ### Phase 2: Ecosystem Expansion
-- [ ] Browser Extension (Chrome/Whale).
-- [ ] API-based auto-sync for LinkedIn/YouTube.
+- [x] Browser Extension (Chrome/Whale).
+- [x] Web Dashboard.
+- [x] YouTube Auto-Sync (INT-001).
+- [ ] LinkedIn/Social Sync (INT-002).
 
 ### Phase 3: Community & Personalization
 - [ ] Interest-based "Trend Summary" community feeds.
