@@ -35,6 +35,8 @@ from .schemas import (
     AuthStatusResponse,
     TokenRefreshRequest,
     TokenRefreshResponse,
+    GoogleLoginRequest,
+    GoogleLoginResponse,
 )
 from src.data.models import ContentStatus
 
@@ -555,4 +557,101 @@ async def refresh_auth_token(
     return TokenRefreshResponse(
         access_token=token_record.access_token,
         expires_at=token_record.expires_at.isoformat(),
+    )
+
+
+# AUTH-002: Google OAuth endpoint
+
+
+@router.post("/auth/google", status_code=200, response_model=GoogleLoginResponse)
+async def google_login(
+    data: GoogleLoginRequest,
+    db: AsyncSession = Depends(get_db),
+) -> GoogleLoginResponse:
+    """Authenticate with Google and get access tokens.
+
+    Handles:
+    - New user registration (auto-create account)
+    - Existing user login (issue new tokens)
+    - 30-day re-registration block enforcement
+
+    Args:
+        data: Google login request with ID token and user info.
+        db: Database session.
+
+    Returns:
+        Access tokens and user info.
+
+    Raises:
+        401: Invalid Google ID token.
+        403: Account within 30-day re-registration block.
+    """
+    from src.auth.google_oauth import verify_google_id_token, extract_user_info_from_token, GoogleTokenVerificationError
+    from src.data.repository import UserProfileRepository, AccountDeletionRepository
+
+    # Verify Google ID token
+    try:
+        token_info = await verify_google_id_token(data.google_id_token)
+    except GoogleTokenVerificationError as e:
+        raise HTTPException(status_code=401, detail=f"invalid_google_token: {str(e)}")
+
+    # Extract user info
+    user_info = extract_user_info_from_token(token_info)
+    email = data.google_user_info.email
+    google_sub = data.google_user_info.id
+
+    # Check for 30-day re-registration block
+    deletion_repo = AccountDeletionRepository(db)
+    is_blocked, block_expires_at = await deletion_repo.is_account_blocked(
+        email=email, google_sub=google_sub
+    )
+
+    if is_blocked:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "account_restriction",
+                "message": "Account recently deleted. Please wait 30 days before re-registering.",
+                "available_at": block_expires_at.isoformat(),
+            },
+        )
+
+    # Check if user already exists
+    user_repo = UserProfileRepository(db)
+    existing_user = await user_repo.get_user_by_email(email)
+
+    if not existing_user:
+        # Check by google_sub as fallback
+        existing_user = await user_repo.get_user_by_google_sub(google_sub)
+
+    auth_repo = AuthenticationRepository(db)
+    is_new_user = False
+
+    if existing_user:
+        # Existing user: update last login
+        await user_repo.update_last_login(existing_user.id)
+    else:
+        # New user: create account
+        existing_user = await user_repo.create_user(
+            email=email,
+            google_sub=google_sub,
+            display_name=data.google_user_info.name,
+            avatar_url=data.google_user_info.picture,
+        )
+        is_new_user = True
+
+    # Create authentication tokens
+    token_record = await auth_repo.create_tokens(existing_user.id)
+
+    return GoogleLoginResponse(
+        access_token=token_record.access_token,
+        refresh_token=token_record.refresh_token,
+        expires_at=token_record.expires_at.isoformat(),
+        user={
+            "id": existing_user.id,
+            "email": existing_user.email,
+            "display_name": existing_user.display_name,
+            "avatar_url": existing_user.avatar_url,
+        },
+        is_new_user=is_new_user,
     )

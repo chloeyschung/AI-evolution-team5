@@ -230,3 +230,32 @@ class AuthError(BaseModel):
     """Schema for authentication error response."""
 
     error: str
+
+
+# AUTH-002: Google OAuth schemas
+
+
+class GoogleUserInfo(BaseModel):
+    """Google user info from OAuth."""
+
+    id: str
+    email: str
+    name: Optional[str] = None
+    picture: Optional[str] = None
+
+
+class GoogleLoginRequest(BaseModel):
+    """Schema for Google login request."""
+
+    google_id_token: str
+    google_user_info: GoogleUserInfo
+
+
+class GoogleLoginResponse(BaseModel):
+    """Schema for Google login response."""
+
+    access_token: str
+    refresh_token: str
+    expires_at: str
+    user: dict  # User info
+    is_new_user: bool

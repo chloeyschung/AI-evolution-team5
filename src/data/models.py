@@ -85,9 +85,12 @@ class UserProfile(Base):
     __tablename__ = "user_profile"
 
     id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(320), unique=True, nullable=True, index=True)  # AUTH-002 (nullable for backward compatibility)
+    google_sub = Column(String(100), unique=True, nullable=True, index=True)  # AUTH-002
     display_name = Column(String(100))
     avatar_url = Column(String(500))
     bio = Column(String(500))
+    last_login_at = Column(DateTime, nullable=True, index=True)  # AUTH-002
     created_at = Column(DateTime, default=utc_now, index=True)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, index=True)
 
@@ -136,3 +139,15 @@ class AuthenticationToken(Base):
 
     # Relationship to user profile
     user = relationship("UserProfile", backref="auth_token")
+
+
+class AccountDeletion(Base):
+    """Track deleted accounts for 30-day re-registration block (AUTH-002)."""
+
+    __tablename__ = "account_deletions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(320), unique=True, nullable=False, index=True)
+    google_sub = Column(String(100), unique=True, nullable=True, index=True)
+    deleted_at = Column(DateTime, default=utc_now, nullable=False, index=True)
+    block_expires_at = Column(DateTime, nullable=False, index=True)  # deleted_at + 30 days

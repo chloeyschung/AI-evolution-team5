@@ -19,6 +19,7 @@ from .models import (
     Theme,
     DefaultSort,
     utc_now,
+    AccountDeletion,
 )
 
 
@@ -572,3 +573,161 @@ class UserProfileRepository:
             select(InterestTag.tag).where(InterestTag.user_id == 1).order_by(InterestTag.tag)
         )
         return [row[0] for row in result.fetchall()]
+
+    async def get_user_by_email(self, email: str) -> UserProfile | None:
+        """Get user profile by email (AUTH-002).
+
+        Args:
+            email: User email address.
+
+        Returns:
+            UserProfile if found, None otherwise.
+        """
+        result = await self.session.execute(
+            select(UserProfile).where(UserProfile.email == email)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_user_by_google_sub(self, google_sub: str) -> UserProfile | None:
+        """Get user profile by Google sub (AUTH-002).
+
+        Args:
+            google_sub: Google user ID.
+
+        Returns:
+            UserProfile if found, None otherwise.
+        """
+        result = await self.session.execute(
+            select(UserProfile).where(UserProfile.google_sub == google_sub)
+        )
+        return result.scalar_one_or_none()
+
+    async def create_user(
+        self,
+        email: str,
+        google_sub: str,
+        display_name: str | None = None,
+        avatar_url: str | None = None,
+    ) -> UserProfile:
+        """Create new user profile (AUTH-002).
+
+        Args:
+            email: User email address.
+            google_sub: Google user ID.
+            display_name: Optional display name.
+            avatar_url: Optional avatar URL.
+
+        Returns:
+            Created UserProfile.
+        """
+        now = utc_now()
+        profile = UserProfile(
+            email=email,
+            google_sub=google_sub,
+            display_name=display_name,
+            avatar_url=avatar_url,
+            last_login_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        self.session.add(profile)
+        await self.session.commit()
+        await self.session.refresh(profile)
+        return profile
+
+    async def update_last_login(self, user_id: int) -> UserProfile:
+        """Update user's last login timestamp (AUTH-002).
+
+        Args:
+            user_id: User ID to update.
+
+        Returns:
+            Updated UserProfile.
+        """
+        result = await self.session.execute(
+            select(UserProfile).where(UserProfile.id == user_id)
+        )
+        profile = result.scalar_one_or_none()
+
+        if profile:
+            profile.last_login_at = utc_now()
+            await self.session.commit()
+            await self.session.refresh(profile)
+
+        return profile
+
+
+class AccountDeletionRepository:
+    """Repository for account deletion tracking (AUTH-002, AUTH-004)."""
+
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def is_account_blocked(
+        self, email: str | None = None, google_sub: str | None = None
+    ) -> tuple[bool, datetime | None]:
+        """Check if account is blocked from re-registration (AUTH-002).
+
+        Args:
+            email: User email to check.
+            google_sub: Google user ID to check.
+
+        Returns:
+            Tuple of (is_blocked, block_expires_at).
+            is_blocked: True if account is within 30-day block period.
+            block_expires_at: When the block expires (None if not blocked).
+        """
+        now = utc_now()
+
+        # Build query conditions
+        conditions = []
+        if email:
+            conditions.append(AccountDeletion.email == email)
+        if google_sub:
+            conditions.append(AccountDeletion.google_sub == google_sub)
+
+        if not conditions:
+            return False, None
+
+        query = select(AccountDeletion).where(func.or_(*conditions))
+        result = await self.session.execute(query)
+        deletion = result.scalar_one_or_none()
+
+        if not deletion:
+            return False, None
+
+        # Check if block has expired
+        if deletion.block_expires_at < now:
+            return False, None
+
+        return True, deletion.block_expires_at
+
+    async def record_account_deletion(
+        self,
+        email: str,
+        google_sub: str | None = None,
+        block_days: int = 30,
+    ) -> AccountDeletion:
+        """Record account deletion for 30-day re-registration block (AUTH-004).
+
+        Args:
+            email: User email address.
+            google_sub: Optional Google user ID.
+            block_days: Number of days to block re-registration (default: 30).
+
+        Returns:
+            Created AccountDeletion record.
+        """
+        now = utc_now()
+        block_expires_at = now + timedelta(days=block_days)
+
+        deletion = AccountDeletion(
+            email=email,
+            google_sub=google_sub,
+            deleted_at=now,
+            block_expires_at=block_expires_at,
+        )
+        self.session.add(deletion)
+        await self.session.commit()
+        await self.session.refresh(deletion)
+        return deletion
