@@ -2,7 +2,7 @@ import Foundation
 
 // SavedItem.swift는 Briefly 타겟과 BrieflyShareExtension 타겟
 // 양쪽 모두 Target Membership에 추가해야 합니다.
-struct SavedItem: Codable, Identifiable {
+struct SavedItem: Codable, Identifiable, Hashable {
     let id: UUID
     let url: URL
     var title: String?

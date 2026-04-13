@@ -3,6 +3,7 @@ import SwiftUI
 struct ItemDetailView: View {
     let item: SavedItem
     @State private var showBrowser = false
+    @State private var isArticleExpanded = false
 
     var body: some View {
         ScrollView {
@@ -40,7 +41,7 @@ struct ItemDetailView: View {
                         .frame(width: 20, height: 20)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
 
-                        Text(item.domain.uppercased())
+                        Text(item.siteName?.uppercased() ?? item.domain.uppercased())
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
                     }
@@ -62,7 +63,7 @@ struct ItemDetailView: View {
                         Label("AI 요약", systemImage: "sparkles")
                             .font(.subheadline.weight(.semibold))
 
-                        Text("AI 요약은 Phase 2에서 추가될 예정입니다.\nClaude API를 통해 본문 핵심 내용을 최대 300자로 요약해 드립니다.")
+                        Text("AI 요약은 Phase 2b에서 추가될 예정입니다.\nClaude API를 통해 본문 핵심 내용을 최대 300자로 요약해 드립니다.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -70,6 +71,9 @@ struct ItemDetailView: View {
                     .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
+
+                    // ── 본문 텍스트 ───────────────────────────────
+                    articleSection
 
                     Divider()
 
@@ -103,6 +107,57 @@ struct ItemDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showBrowser) {
             SafariBrowserView(url: item.url)
+        }
+    }
+
+    // MARK: - 본문 섹션
+
+    @ViewBuilder
+    private var articleSection: some View {
+        switch item.fetchStatus {
+        case .pending, .fetching:
+            HStack(spacing: 10) {
+                ProgressView()
+                Text("본문을 불러오는 중...")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
+
+        case .failed:
+            EmptyView()
+
+        case .done, .partial:
+            if let text = item.articleText, !text.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Label("본문", systemImage: "doc.text")
+                            .font(.subheadline.weight(.semibold))
+                        Spacer()
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                isArticleExpanded.toggle()
+                            }
+                        } label: {
+                            Text(isArticleExpanded ? "접기" : "펼치기")
+                                .font(.caption)
+                                .foregroundStyle(.blue)
+                        }
+                    }
+
+                    Text(text)
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                        .lineLimit(isArticleExpanded ? nil : 6)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .animation(.easeInOut(duration: 0.2), value: isArticleExpanded)
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
+            }
         }
     }
 

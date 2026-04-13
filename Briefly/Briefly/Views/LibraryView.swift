@@ -12,6 +12,8 @@ enum LibraryFilter: String, CaseIterable {
 struct LibraryView: View {
     @StateObject private var viewModel = SavedItemsViewModel()
     @State private var selectedFilter: LibraryFilter = .inbox
+    @State private var path = NavigationPath()
+    @State private var pendingDeepLinkURL: URL?
     @Environment(\.scenePhase) private var scenePhase
 
     private var filteredItems: [SavedItem] {
@@ -31,62 +33,86 @@ struct LibraryView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            // MARK: Content
-            if filteredItems.isEmpty {
-                emptyView
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(filteredItems) { item in
-                            NavigationLink(destination: ItemDetailView(item: item)) {
-                                LibraryCardView(item: item)
+        NavigationStack(path: $path) {
+            ZStack(alignment: .bottom) {
+
+                // MARK: Content
+                if filteredItems.isEmpty {
+                    emptyView
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(filteredItems) { item in
+                                NavigationLink(value: item) {
+                                    LibraryCardView(item: item)
+                                }
+                                .buttonStyle(.plain)
+
+                                Divider()
+                                    .padding(.leading, 16)
                             }
-                            .buttonStyle(.plain)
-
-                            Divider()
-                                .padding(.leading, 16)
                         }
-                    }
-                    .padding(.bottom, 80)
-                }
-            }
-
-            // MARK: Floating Filter Tab
-            HStack(spacing: 2) {
-                ForEach(LibraryFilter.allCases, id: \.self) { filter in
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            selectedFilter = filter
-                        }
-                    } label: {
-                        Text(filter.rawValue)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(selectedFilter == filter ? .primary : .secondary)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 9)
-                            .background(
-                                selectedFilter == filter
-                                    ? Color(.systemBackground)
-                                    : Color.clear
-                            )
-                            .clipShape(Capsule())
+                        .padding(.bottom, 80)
                     }
                 }
+
+                // MARK: Floating Filter Tab
+                HStack(spacing: 2) {
+                    ForEach(LibraryFilter.allCases, id: \.self) { filter in
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectedFilter = filter
+                            }
+                        } label: {
+                            Text(filter.rawValue)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(selectedFilter == filter ? .primary : .secondary)
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 9)
+                                .background(
+                                    selectedFilter == filter
+                                        ? Color(.systemBackground)
+                                        : Color.clear
+                                )
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
+                .padding(4)
+                .background(.regularMaterial, in: Capsule())
+                .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
+                .padding(.bottom, 20)
             }
-            .padding(4)
-            .background(.regularMaterial, in: Capsule())
-            .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
-            .padding(.bottom, 20)
-        }
-        .navigationTitle(navigationTitle)
-        .navigationBarTitleDisplayMode(.large)
-        .onAppear { viewModel.reload() }
-        .onChange(of: scenePhase) { newPhase in
-            if newPhase == .active { viewModel.reload() }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .fetchCoordinatorDidUpdate)) { _ in
-            viewModel.reload()
+            .navigationTitle(navigationTitle)
+            .navigationBarTitleDisplayMode(.large)
+            .navigationDestination(for: SavedItem.self) { item in
+                ItemDetailView(item: item)
+            }
+            .onAppear { viewModel.reload() }
+            .onChange(of: scenePhase) { newPhase in
+                if newPhase == .active { viewModel.reload() }
+            }
+            .onChange(of: viewModel.items) { items in
+                // 딥링크로 열려야 할 아이템이 아직 로드 안됐다가 이제 로드된 경우
+                if let url = pendingDeepLinkURL,
+                   let item = items.first(where: { $0.url == url }) {
+                    path.append(item)
+                    pendingDeepLinkURL = nil
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .fetchCoordinatorDidUpdate)) { _ in
+                viewModel.reload()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .brieflyOpenItem)) { notification in
+                guard let url = notification.object as? URL else { return }
+                viewModel.reload()
+                if let item = viewModel.items.first(where: { $0.url == url }) {
+                    path.append(item)
+                } else {
+                    // 아직 items에 없으면 (drainInbox 완료 전) 대기
+                    pendingDeepLinkURL = url
+                }
+            }
         }
     }
 
@@ -226,5 +252,5 @@ extension Date {
 // MARK: - Preview
 
 #Preview {
-    NavigationStack { LibraryView() }
+    LibraryView()
 }

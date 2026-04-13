@@ -9,7 +9,7 @@ import SwiftUI
 /// 1. 첨부파일에서 URL 추출 (public.url → public.plain-text 순서로 시도)
 /// 2. App Group UserDefaults inbox에 SavedItem 추가 + synchronize()
 /// 3. 확인 UI 표시 ("닫기" / "지금 읽기" 버튼, 3초 후 자동 닫기)
-/// 4. "지금 읽기" → briefly://open?url=… 로 메인 앱 오픈
+/// 4. "지금 읽기" → briefly://item?url=… 로 메인 앱 오픈 (Library 탭 + 해당 아이템 상세)
 final class ShareViewController: UIViewController {
 
     private var autoDismissTimer: DispatchWorkItem?
@@ -118,7 +118,7 @@ final class ShareViewController: UIViewController {
         autoDismissTimer?.cancel()
         let encoded = articleURL.absoluteString
             .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        guard let brieflyURL = URL(string: "briefly://open?url=\(encoded)") else {
+        guard let brieflyURL = URL(string: "briefly://item?url=\(encoded)") else {
             completeRequest()
             return
         }

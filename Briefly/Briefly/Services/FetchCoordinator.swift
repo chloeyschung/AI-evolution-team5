@@ -2,6 +2,7 @@ import Foundation
 
 extension Notification.Name {
     static let fetchCoordinatorDidUpdate = Notification.Name("FetchCoordinatorDidUpdate")
+    static let brieflyOpenItem = Notification.Name("BrieflyOpenItem")
 }
 
 /// pending 상태의 SavedItem을 최대 3개 동시에 크롤링하는 코디네이터
