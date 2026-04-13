@@ -7,10 +7,10 @@ This document tracks all identified features for the **Briefly** project, catego
 ## Phase 1: MVP (Mobile Focus)
 
 ### Authentication (AUTH)
-- [ ] **[AUTH-001] App Entry & Login State** (F-000): Check login state on app launch. If unauthenticated, show login screen immediately. Maintain login state across app restarts with token auto-refresh.
-- [ ] **[AUTH-002] Social Login — Google** (F-001): One-tap Google sign-in. Auto-create account on first login. Rejection of re-registration for deleted accounts within 30 days.
-- [ ] **[AUTH-003] Logout** (F-002): End current session. Local data retained, syncs on re-login.
-- [ ] **[AUTH-004] Account Delete** (F-003): Permanent deletion of account and all data. 2-step confirmation. 30-day re-registration block. Full server + local data deletion.
+- [x] **[AUTH-001] App Entry & Login State** (F-000): Check login state on app launch. If unauthenticated, show login screen immediately. Maintain login state across app restarts with token auto-refresh. ✅ Implemented
+- [x] **[AUTH-002] Social Login — Google** (F-001): One-tap Google sign-in. Auto-create account on first login. Rejection of re-registration for deleted accounts within 30 days. ✅ Implemented
+- [x] **[AUTH-003] Logout** (F-002): End current session. Local data retained, syncs on re-login. ✅ Implemented
+- [x] **[AUTH-004] Account Delete** (F-003): Permanent deletion of account and all data. 2-step confirmation. 30-day re-registration block. Full server + local data deletion. ✅ Implemented
 
 ### Ingestion
 - [x] **[ING-001] Mobile Share Sheet Integration** (F-004): Implement the ability for users to trigger "Save to Briefly" via the native OS share menu on iOS/Android. ✅ Implemented
@@ -25,9 +25,9 @@ This document tracks all identified features for the **Briefly** project, catego
 - [x] **[UX-001] Swipe Card Stack** (F-008, F-009, F-010): A mobile UI component that presents content as a deck of cards for rapid interaction. Provides both swipe view (F-009) and list view (F-010). ✅ Backend (`/content/pending`)
 - [x] **[UX-002] Swipe Actions (Keep/Discard)** (F-009, F-011): Implementation of the Right-Swipe (Keep) and Left-Swipe (Discard/Archive) logic. ✅ Implemented
 - [x] **[UX-003] Summary Detail View** (F-012): An "On-Demand" expansion view to see more details with swipe history. ✅ Implemented (`GET /content/{id}`)
-- [ ] **[UX-004] Filter by Platform** (F-013): Filter saved content by source platform (YouTube, LinkedIn, etc.). Platform list dynamically generated from user's save history. ⏸️ Spec pending
-- [ ] **[UX-005] Search by Title/Tag** (F-016): Real-time search across content titles and category tags. Search scope: INBOX + Archive integrated. ⏸️ Spec pending
-- [ ] **[UX-006] Delete Content** (F-019): Permanently delete individual saved content. 1-step confirmation popup. Irreversible. ⏸️ Spec pending
+- [x] **[UX-004] Filter by Platform** (F-013): Filter saved content by source platform (YouTube, LinkedIn, etc.). Platform list dynamically generated from user's save history. ✅ Implemented
+- [x] **[UX-005] Search by Title/Tag** (F-016): Real-time search across content titles and category tags. Search scope: INBOX + Archive integrated. ✅ Implemented
+- [x] **[UX-006] Delete Content** (F-019): Permanently delete individual saved content. 1-step confirmation popup. Irreversible. ✅ Implemented
 
 ### Data & Sync
 - [x] **[DAT-001] Hybrid Storage Engine** (F-018): Implementation of local on-device storage with background synchronization to the cloud. ✅ Implemented
