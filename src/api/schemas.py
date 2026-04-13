@@ -259,3 +259,23 @@ class GoogleLoginResponse(BaseModel):
     expires_at: str
     user: dict  # User info
     is_new_user: bool
+
+
+class LogoutResponse(BaseModel):
+    """Schema for logout response."""
+
+    message: str
+
+
+class AccountDeleteRequest(BaseModel):
+    """Schema for account deletion request."""
+
+    confirm: bool = False
+    confirmation_token: Optional[str] = None
+
+
+class AccountDeleteResponse(BaseModel):
+    """Schema for account deletion response."""
+
+    message: str
+    block_expires_at: str
