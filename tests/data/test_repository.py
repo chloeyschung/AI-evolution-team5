@@ -2,39 +2,25 @@
 
 import pytest
 from datetime import datetime, timezone
-from sqlalchemy import delete
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from src.ai.metadata_extractor import ContentMetadata, ContentType
-from src.data.models import Base, SwipeAction, Content, SwipeHistory
+from src.data.models import SwipeAction, Content
 from src.data.repository import ContentRepository, SwipeRepository
 
 
-# Test database configuration (using SQLite for tests)
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
-test_engine = create_async_engine(TEST_DATABASE_URL, echo=False, future=True)
+# Import shared test fixtures from conftest
+from tests.conftest import test_async_engine, AsyncTestingSessionLocal, Base
+from sqlalchemy import delete
 
 
 @pytest.fixture(scope="function")
-async def db_session():
-    """Create in-memory database session for testing."""
-    # Create tables for each test
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+async def db_session(db):
+    """Create database session for testing using shared fixtures.
 
-    # Create session
-    async_session = async_sessionmaker(
-        test_engine, class_=AsyncSession, expire_on_commit=False
-    )
-
-    async with async_session() as session:
-        # Clear any existing data
-        await session.execute(delete(SwipeHistory))
-        await session.execute(delete(Content))
-        await session.commit()
+    The 'db' fixture ensures tables are created and data is cleared.
+    """
+    async with AsyncTestingSessionLocal() as session:
         yield session
-
-    # Cleanup is handled by context manager
 
 
 @pytest.fixture

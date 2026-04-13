@@ -4,25 +4,41 @@ import pytest
 import httpx
 from httpx import ASGITransport
 from unittest.mock import AsyncMock
-from sqlalchemy import delete
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy import delete, text
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 from src.ai.metadata_extractor import ContentMetadata, ContentType
 from src.ingestion.extractor import ContentExtractor
 from src.ai.metadata_extractor import MetadataExtractor
 from src.api.app import app
-from src.data.models import Base, SwipeHistory, Content
+from src.data.models import (
+    Base,
+    SwipeHistory,
+    Content,
+    UserProfile,
+    UserPreferences,
+    InterestTag,
+)
 from src.data import database as db_module
 
 
 # ============================================================================
-# Shared Test Database Setup
+# Shared Test Database Setup (for API integration tests only)
 # ============================================================================
 
-TEST_DATABASE_URL = "sqlite+aiosqlite:///./test_briefly_async.db"
-test_async_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+# Use file-based SQLite for reliable test isolation
+# File-based avoids issues with in-memory DB not persisting across connections
+import os
+
+# Use a fixed test database file in the project root
+TEST_DATABASE_PATH = "test_briefly.db"
+TEST_DATABASE_URL = f"sqlite+aiosqlite:///{TEST_DATABASE_PATH}"
+
+test_async_engine = create_async_engine(
+    TEST_DATABASE_URL, echo=False, connect_args={"check_same_thread": False}
+)
 AsyncTestingSessionLocal = async_sessionmaker(
-    test_async_engine, autocommit=False, autoflush=False
+    test_async_engine, class_=AsyncSession, expire_on_commit=False
 )
 
 
@@ -39,28 +55,46 @@ async def async_get_db():
 app.dependency_overrides[db_module.get_db] = async_get_db
 
 
-@pytest.fixture(scope="module", autouse=True)
-async def create_test_tables():
-    """Create test tables before running tests."""
+@pytest.fixture(scope="function", name="db")
+async def setup_test_database():
+    """Create tables and clear data before each test.
+
+    This fixture must be explicitly requested by tests that need database access.
+    Use it as a parameter: async def test_xxx(db): ...
+    """
+    # Create tables
     async with test_async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
     yield
-    async with test_async_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+
+    # Cleanup: drop all data after test (keep tables for next test)
+    async with AsyncTestingSessionLocal() as session:
+        await session.execute(delete(InterestTag))
+        await session.execute(delete(UserPreferences))
+        await session.execute(delete(UserProfile))
+        await session.execute(delete(SwipeHistory))
+        await session.execute(delete(Content))
+        await session.commit()
 
 
-@pytest.fixture(scope="function", autouse=True)
-async def clear_test_data():
-    """Clear test data before each test."""
-    async with AsyncTestingSessionLocal() as db:
-        await db.execute(delete(SwipeHistory))
-        await db.execute(delete(Content))
-        await db.commit()
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_test_db_after_session():
+    """Clean up test database file after all tests complete."""
+    yield
+    if os.path.exists(TEST_DATABASE_PATH):
+        try:
+            os.remove(TEST_DATABASE_PATH)
+        except Exception:
+            pass  # Ignore cleanup errors
 
 
 @pytest.fixture
-async def async_client():
-    """Async test client fixture."""
+async def async_client(db):
+    """Async test client fixture.
+
+    Requires the db fixture to ensure tables are created before tests run.
+    """
     async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         yield client
 

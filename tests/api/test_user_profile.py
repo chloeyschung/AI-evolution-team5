@@ -3,62 +3,13 @@
 import pytest
 import httpx
 from httpx import ASGITransport
-from sqlalchemy import delete
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 from src.api.app import app
-from src.data.models import Base, UserProfile, UserPreferences, InterestTag, SwipeHistory, Content
-
-
-# Create test database using SQLite with async support
-TEST_DATABASE_URL = "sqlite+aiosqlite:///./test_briefly_async.db"
-test_async_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-AsyncTestingSessionLocal = async_sessionmaker(
-    test_async_engine, autocommit=False, autoflush=False
-)
-
-
-# Override the app's database dependency with async session
-from src.data import database as db_module
-
-
-async def async_get_db():
-    """Async database dependency for testing."""
-    async with AsyncTestingSessionLocal() as db:
-        try:
-            yield db
-        finally:
-            await db.close()
-
-
-app.dependency_overrides[db_module.get_db] = async_get_db
-
-
-@pytest.fixture(scope="module", autouse=True)
-async def create_test_tables():
-    """Create test tables before running tests."""
-    async with test_async_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with test_async_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-
-
-@pytest.fixture(scope="function", autouse=True)
-async def clear_test_data():
-    """Clear test data before each test."""
-    async with AsyncTestingSessionLocal() as db:
-        await db.execute(delete(InterestTag))
-        await db.execute(delete(UserPreferences))
-        await db.execute(delete(UserProfile))
-        await db.execute(delete(SwipeHistory))
-        await db.execute(delete(Content))
-        await db.commit()
 
 
 @pytest.fixture
-async def client():
-    """Create async test client."""
+async def client(async_client):
+    """Create async test client using shared fixture."""
     async with httpx.AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:

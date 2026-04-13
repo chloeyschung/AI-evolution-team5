@@ -3,48 +3,24 @@
 import pytest
 from datetime import datetime, timezone, timedelta, date
 from sqlalchemy import select, delete, func
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
-from src.data.models import Base, UserProfile, UserPreferences, InterestTag, SwipeHistory, SwipeAction, Content, Theme, DefaultSort
+from src.data.models import UserProfile, UserPreferences, InterestTag, SwipeHistory, SwipeAction, Content, Theme, DefaultSort
 from src.data.repository import UserProfileRepository
 
 
-# Test database setup - use same DB as other API tests
-TEST_DATABASE_URL = "sqlite+aiosqlite:///./test_briefly_async.db"
-test_async_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-AsyncTestingSessionLocal = async_sessionmaker(
-    test_async_engine, autocommit=False, autoflush=False
-)
+# Import shared test fixtures from conftest
+from tests.conftest import test_async_engine, AsyncTestingSessionLocal, Base
 
 
-@pytest.fixture(scope="module", autouse=True)
-async def create_test_tables():
-    """Create test tables before running tests."""
-    async with test_async_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with test_async_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+@pytest.fixture(scope="function")
+async def db_session(db):
+    """Provide a database session for tests using shared fixtures.
 
-
-@pytest.fixture(scope="function", autouse=True)
-async def clean_test_data():
-    """Clean test data before each test."""
-    async with AsyncTestingSessionLocal() as db:
-        await db.execute(delete(InterestTag))
-        await db.execute(delete(UserPreferences))
-        await db.execute(delete(UserProfile))
-        await db.execute(delete(SwipeHistory))
-        await db.execute(delete(Content))
-        await db.commit()
-
-
-@pytest.fixture
-async def db_session():
-    """Provide a database session for tests."""
-    async with AsyncTestingSessionLocal() as db:
-        yield db
-        await db.rollback()
+    The 'db' fixture ensures tables are created and data is cleared.
+    """
+    async with AsyncTestingSessionLocal() as session:
+        yield session
+        await session.rollback()
 
 
 class TestUserProfileRepository:
