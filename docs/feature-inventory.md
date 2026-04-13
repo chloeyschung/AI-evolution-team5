@@ -19,7 +19,7 @@ This document tracks all identified features for the **Briefly** project, catego
 ### AI & Processing
 - [x] **[AI-001] Core 3-Line Summarizer** (F-005): An AI-powered service that takes raw content and generates a high-density, 3-line summary (max 300 chars). ✅ Implemented (300-char limit enforced)
 - [x] **[AI-002] Multi-Modal Metadata Extraction** (F-007): Extract source platform, content type (video/text/image), timestamp, and OG image thumbnails. ✅ Implemented (OG thumbnail extraction added)
-- [ ] **[AI-003] AI Categorization** (F-006): Auto-classify content into AI-generated category tags (max 3 tags per content) using LLM. Free-form tags, no predefined category list. ⏸️ Spec pending
+- [x] **[AI-003] AI Categorization** (F-006): Auto-classify content into AI-generated category tags (max 3 tags per content) using LLM. Free-form tags, no predefined category list. ✅ Implemented
 
 ### User Experience (UX)
 - [x] **[UX-001] Swipe Card Stack** (F-008, F-009, F-010): A mobile UI component that presents content as a deck of cards for rapid interaction. Provides both swipe view (F-009) and list view (F-010). ✅ Backend (`/content/pending`)
