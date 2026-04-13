@@ -1,9 +1,9 @@
 """Repository pattern for data access operations."""
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import List
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.metadata_extractor import ContentMetadata
@@ -32,14 +32,12 @@ class ContentRepository:
         self,
         metadata: ContentMetadata,
         status: ContentStatus = ContentStatus.INBOX,
-        summary: str | None = None,
     ) -> Content:
         """Save or update content from metadata.
 
         Args:
             metadata: ContentMetadata to save.
             status: Content status (default: INBOX for new content).
-            summary: Optional summary to save (for share endpoint).
 
         Returns:
             The saved or updated Content object.
@@ -57,11 +55,10 @@ class ContentRepository:
             existing.author = metadata.author
             existing.timestamp = metadata.timestamp
             existing.thumbnail_url = metadata.thumbnail_url
-            if summary is not None:
-                existing.summary = summary
+            if metadata.summary is not None:
+                existing.summary = metadata.summary
             existing.updated_at = utc_now()
             await self.session.commit()
-            await self.session.refresh(existing)
             return existing
         else:
             # Create new
@@ -74,11 +71,10 @@ class ContentRepository:
                 timestamp=metadata.timestamp,
                 thumbnail_url=metadata.thumbnail_url,
                 status=status,
-                summary=summary,
+                summary=metadata.summary,
             )
             self.session.add(content)
             await self.session.commit()
-            await self.session.refresh(content)
             return content
 
     async def get_by_url(self, url: str) -> Content | None:
@@ -220,8 +216,6 @@ class ContentRepository:
         Returns:
             Dictionary with pending, kept, discarded counts.
         """
-        from sqlalchemy import func
-
         all_count = (await self.session.execute(select(func.count(Content.id)))).scalar()
         kept_count = (
             await self.session.execute(
@@ -283,8 +277,6 @@ class SwipeRepository:
             content_id: The content ID to update.
             new_status: The new status to set.
         """
-        from sqlalchemy import update
-
         stmt = (
             update(Content)
             .where(Content.id == content_id)
@@ -459,8 +451,6 @@ class UserProfileRepository:
             Dictionary with total_swipes, total_kept, total_discarded,
             retention_rate, streak_days, first_swipe_at, last_swipe_at.
         """
-        from sqlalchemy import func
-        from datetime import date, timedelta
 
         # Count total swipes
         total_result = await self.session.execute(select(func.count(SwipeHistory.id)))
@@ -563,12 +553,10 @@ class UserProfileRepository:
         Args:
             tag: The tag to remove (case-insensitive).
         """
-        from sqlalchemy import delete as sqla_delete
-
         tag_normalized = tag.strip().lower()
 
         await self.session.execute(
-            sqla_delete(InterestTag).where(
+            delete(InterestTag).where(
                 InterestTag.user_id == 1, InterestTag.tag.ilike(tag_normalized)
             )
         )

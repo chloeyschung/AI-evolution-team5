@@ -85,7 +85,7 @@ class Summarizer:
 
                     # Enforce 300-character limit (AI-001 spec)
                     if len(summary) > 300:
-                        summary = summary[:297] + "..."
+                        summary = summary[:300]
 
                     return summary
 

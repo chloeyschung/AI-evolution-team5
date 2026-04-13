@@ -333,7 +333,7 @@ async def share_content(
 
     # Save content using repository
     repo = ContentRepository(db)
-    content = await repo.save(metadata, summary=getattr(metadata, "summary", None))
+    content = await repo.save(metadata)
 
     return ShareResponse(
         id=content.id,
