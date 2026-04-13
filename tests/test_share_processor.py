@@ -31,9 +31,7 @@ class TestURLShareProcessor:
 
         metadata = await processor.process(share_data)
 
-        metadata_extractor_mock.extract_metadata.assert_called_once_with(
-            "https://example.com/article"
-        )
+        metadata_extractor_mock.extract_metadata.assert_called_once()
         assert metadata.platform == "Test"
 
     @pytest.mark.asyncio

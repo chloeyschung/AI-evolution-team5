@@ -172,7 +172,7 @@ class TestContentRepository:
         await swipe_repo.record_swipe(content1.id, SwipeAction.KEEP)
         await swipe_repo.record_swipe(content2.id, SwipeAction.DISCARD)
 
-        kept = await content_repo.async_get_kept()
+        kept = await content_repo.get_kept()
 
         assert len(kept) == 1
         assert kept[0].url == "https://example.com/1"

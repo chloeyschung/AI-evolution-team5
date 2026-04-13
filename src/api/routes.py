@@ -5,13 +5,12 @@ from typing import Union
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import outerjoin
 
 from src.ai.metadata_extractor import ContentMetadata
 from src.ingestion.share_handler import ShareHandler
 
 from ..data.database import get_db
-from ..data.models import Content, SwipeHistory
+from ..data.models import Content
 from ..data.repository import ContentRepository, SwipeRepository, UserProfileRepository
 from .schemas import (
     ContentCreate,
@@ -50,30 +49,8 @@ async def create_content(
         author=data.author,
     )
 
-    result = await db.execute(select(Content).where(Content.url == metadata.url))
-    existing = result.scalar_one_or_none()
-
-    if existing:
-        existing.platform = metadata.platform
-        existing.content_type = metadata.content_type.value
-        existing.title = metadata.title
-        existing.author = metadata.author
-        existing.timestamp = metadata.timestamp
-        await db.commit()
-        await db.refresh(existing)
-        content = existing
-    else:
-        content = Content(
-            platform=metadata.platform,
-            content_type=metadata.content_type.value,
-            url=metadata.url,
-            title=metadata.title,
-            author=metadata.author,
-            timestamp=metadata.timestamp,
-        )
-        db.add(content)
-        await db.commit()
-        await db.refresh(content)
+    repo = ContentRepository(db)
+    content = await repo.save(metadata)
 
     return ContentResponse(
         id=content.id,
@@ -147,14 +124,8 @@ async def list_pending_content(
 
     Returns content ordered by recency (newest first).
     """
-    result = await db.execute(
-        select(Content)
-        .outerjoin(SwipeHistory, Content.id == SwipeHistory.content_id)
-        .where(SwipeHistory.id.is_(None))
-        .order_by(Content.created_at.desc())
-        .limit(limit)
-    )
-    contents = result.scalars().all()
+    repo = ContentRepository(db)
+    contents = await repo.get_pending(limit=limit)
 
     return [
         ContentResponse(
@@ -318,35 +289,9 @@ async def share_content(
 
     metadata = await share_handler.process_share(raw_payload)
 
-    # Check if content already exists
-    result = await db.execute(select(Content).where(Content.url == metadata.url))
-    existing = result.scalar_one_or_none()
-
-    if existing:
-        # Update existing content
-        existing.platform = metadata.platform
-        existing.content_type = metadata.content_type.value
-        existing.title = metadata.title
-        existing.author = metadata.author
-        existing.timestamp = metadata.timestamp
-        # Note: summary is not regenerated for existing content
-        await db.commit()
-        await db.refresh(existing)
-        content = existing
-    else:
-        # Create new content
-        content = Content(
-            platform=metadata.platform,
-            content_type=metadata.content_type.value,
-            url=metadata.url,
-            title=metadata.title,
-            author=metadata.author,
-            timestamp=metadata.timestamp,
-            summary=getattr(metadata, "summary", None),
-        )
-        db.add(content)
-        await db.commit()
-        await db.refresh(content)
+    # Save content using repository
+    repo = ContentRepository(db)
+    content = await repo.save(metadata, summary=getattr(metadata, "summary", None))
 
     return ShareResponse(
         id=content.id,

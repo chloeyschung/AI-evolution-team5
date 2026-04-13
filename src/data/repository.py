@@ -28,12 +28,18 @@ class ContentRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def save(self, metadata: ContentMetadata, status: ContentStatus = ContentStatus.INBOX) -> Content:
+    async def save(
+        self,
+        metadata: ContentMetadata,
+        status: ContentStatus = ContentStatus.INBOX,
+        summary: str | None = None,
+    ) -> Content:
         """Save or update content from metadata.
 
         Args:
             metadata: ContentMetadata to save.
             status: Content status (default: INBOX for new content).
+            summary: Optional summary to save (for share endpoint).
 
         Returns:
             The saved or updated Content object.
@@ -50,6 +56,8 @@ class ContentRepository:
             existing.title = metadata.title
             existing.author = metadata.author
             existing.timestamp = metadata.timestamp
+            if summary is not None:
+                existing.summary = summary
             existing.updated_at = utc_now()
             await self.session.commit()
             await self.session.refresh(existing)
@@ -64,6 +72,7 @@ class ContentRepository:
                 author=metadata.author,
                 timestamp=metadata.timestamp,
                 status=status,
+                summary=summary,
             )
             self.session.add(content)
             await self.session.commit()
