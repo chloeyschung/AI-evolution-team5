@@ -1,0 +1,48 @@
+name: iOS CI
+
+on:
+  push:
+    branches: [prototype-1]
+  pull_request:
+    branches: [prototype-1]
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: Briefly
+        run: |
+          mkdir -p BrieflyTests
+          xcodegen generate
+
+      - name: Build (no code signing)
+        working-directory: Briefly
+        run: |
+          xcodebuild build \
+            -project Briefly.xcodeproj \
+            -scheme Briefly \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty && exit ${PIPESTATUS[0]}
+
+      - name: Run tests
+        working-directory: Briefly
+        run: |
+          xcodebuild test \
+            -project Briefly.xcodeproj \
+            -scheme Briefly \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty && exit ${PIPESTATUS[0]}
