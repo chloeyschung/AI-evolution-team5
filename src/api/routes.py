@@ -51,6 +51,12 @@ from .schemas import (
     YouTubeSyncConfigUpdate,
     YouTubeSyncLogResponse,
     YouTubeDisconnectResponse,
+    LinkedInConnectionStatus,
+    LinkedInSyncConfigCreate,
+    LinkedInSyncConfigResponse,
+    LinkedInSyncLogResponse,
+    LinkedInDisconnectResponse,
+    LinkedInImportRequest,
 )
 from src.data.models import ContentStatus, IntegrationTokens, IntegrationSyncConfig, IntegrationSyncLog
 
@@ -1770,3 +1776,209 @@ async def disconnect_youtube(
     await db.commit()
 
     return YouTubeDisconnectResponse(message="Disconnected from YouTube successfully")
+
+
+# INT-002: LinkedIn Integration endpoints
+
+
+@router.get("/integrations/linkedin/status", response_model=LinkedInConnectionStatus)
+async def get_linkedin_status(
+    db: AsyncSession = Depends(get_db),
+    authorization: str | None = None,
+) -> LinkedInConnectionStatus:
+    """Get LinkedIn connection status.
+
+    Args:
+        db: Database session.
+        authorization: Authorization header with Bearer token.
+
+    Returns:
+        LinkedIn connection status.
+    """
+    from src.integrations.repositories.integration import IntegrationRepository
+
+    # Get user_id from token (if provided)
+    user_id = 1  # Default for MVP
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization[7:]
+        auth_repo = AuthenticationRepository(db)
+        token_record = await auth_repo.get_token_by_access_token(token)
+        if token_record:
+            user_id = token_record.user_id
+
+    # Check if LinkedIn tokens exist
+    repo = IntegrationRepository(db)
+    tokens = await repo.get_tokens(user_id, "linkedin")
+
+    if not tokens:
+        return LinkedInConnectionStatus(is_connected=False)
+
+    # Get last sync time
+    last_sync = await repo.get_last_sync(user_id, "linkedin", "saved_posts")
+
+    return LinkedInConnectionStatus(
+        is_connected=True,
+        last_sync_at=last_sync.isoformat() if last_sync else None,
+    )
+
+
+@router.post("/integrations/linkedin/disconnect", response_model=LinkedInDisconnectResponse)
+async def disconnect_linkedin(
+    db: AsyncSession = Depends(get_db),
+    authorization: str | None = None,
+) -> LinkedInDisconnectResponse:
+    """Disconnect LinkedIn integration.
+
+    Revokes OAuth tokens and deletes all sync configurations.
+
+    Args:
+        db: Database session.
+        authorization: Authorization header with Bearer token.
+
+    Returns:
+        Disconnection confirmation.
+
+    Raises:
+        401: Not authenticated.
+    """
+    from sqlalchemy import delete
+
+    from src.integrations.repositories.integration import IntegrationRepository
+
+    # Get user_id from token
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    token = authorization[7:]
+    auth_repo = AuthenticationRepository(db)
+    token_record = await auth_repo.get_token_by_access_token(token)
+
+    if not token_record:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    user_id = token_record.user_id
+
+    # Delete tokens from database
+    repo = IntegrationRepository(db)
+    await repo.delete_tokens(user_id, "linkedin")
+
+    # Delete all sync configs
+    await db.execute(
+        delete(IntegrationSyncConfig).where(
+            IntegrationSyncConfig.user_id == user_id,
+            IntegrationSyncConfig.provider == "linkedin",
+        )
+    )
+
+    await db.commit()
+
+    return LinkedInDisconnectResponse(message="Disconnected from LinkedIn successfully")
+
+
+@router.get("/integrations/linkedin/sync/logs", response_model=list[LinkedInSyncLogResponse])
+async def get_linkedin_sync_logs(
+    limit: int = Query(50, gt=0, le=100),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    authorization: str | None = None,
+) -> list[LinkedInSyncLogResponse]:
+    """Get LinkedIn sync logs.
+
+    Args:
+        limit: Maximum number of logs to return.
+        offset: Offset for pagination.
+        db: Database session.
+        authorization: Authorization header with Bearer token.
+
+    Returns:
+        List of sync logs.
+
+    Raises:
+        401: Not authenticated.
+    """
+    from src.integrations.repositories.integration import IntegrationRepository
+
+    # Get user_id from token
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    token = authorization[7:]
+    auth_repo = AuthenticationRepository(db)
+    token_record = await auth_repo.get_token_by_access_token(token)
+
+    if not token_record:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    user_id = token_record.user_id
+
+    # Get sync logs
+    repo = IntegrationRepository(db)
+    logs = await repo.get_sync_logs(user_id, "linkedin", limit=limit, offset=offset)
+
+    return [
+        LinkedInSyncLogResponse(
+            id=log.id,
+            resource_id=log.playlist_id,
+            status=log.status,
+            ingested_count=log.ingested_count,
+            skipped_count=log.skipped_count,
+            error_message=log.error_message,
+            executed_at=log.executed_at.isoformat(),
+        )
+        for log in logs
+    ]
+
+
+@router.post("/integrations/linkedin/import", status_code=201, response_model=ShareResponse)
+async def import_linkedin_post(
+    data: LinkedInImportRequest,
+    db: AsyncSession = Depends(get_db),
+) -> ShareResponse:
+    """Import a single LinkedIn post by URL.
+
+    This endpoint allows manual import of LinkedIn posts without OAuth.
+    It fetches the post data from the public URL.
+
+    Args:
+        data: Import request with LinkedIn post URL.
+        db: Database session.
+
+    Returns:
+        Share response with imported content.
+    """
+    from src.integrations.linkedin.client import LinkedInClient
+    from src.integrations.linkedin.sync import LinkedInSyncService
+
+    # Create LinkedIn client (no auth needed for public posts)
+    client = LinkedInClient(access_token="")
+
+    # Use sync service to import the post
+    result = await LinkedInSyncService(db).sync_single_post(
+        user_id=1,  # Default for MVP
+        url=data.url,
+        client=client,
+    )
+
+    if result.get("status") == "error":
+        raise HTTPException(status_code=400, detail=result.get("error", "failed_to_import"))
+
+    # Fetch the content for response
+    content_id = result.get("content_id")
+    if not content_id:
+        raise HTTPException(status_code=500, detail="failed_to_get_content_id")
+
+    content_repo = ContentRepository(db)
+    content = await content_repo.get(content_id)
+    if not content:
+        raise HTTPException(status_code=404, detail="content_not_found")
+
+    return ShareResponse(
+        id=content.id,
+        platform=content.platform,
+        content_type=content.content_type,
+        url=content.url,
+        title=content.title,
+        author=content.author,
+        summary=content.summary,
+        created_at=content.created_at.isoformat(),
+    )

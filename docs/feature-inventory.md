@@ -41,7 +41,7 @@ This document tracks all identified features for the **Briefly** project, catego
 
 ### Integrations
 - [x] **[INT-001] YouTube Auto-Sync**: Automatically ingest "Watch Later" or specific playlists via API. ✅ Implemented
-- [ ] **[INT-002] LinkedIn/Social Sync**: Integration to pull saved posts from major professional networks.
+- [x] **[INT-002] LinkedIn/Social Sync**: Integration to pull saved posts from major professional networks. ✅ Implemented (MVP: manual import via public URLs; OAuth flow ready for future activation)
 
 ## Phase 3: Advanced Features
 

@@ -372,3 +372,59 @@ class YouTubeDisconnectResponse(BaseModel):
     """Schema for YouTube disconnect response."""
 
     message: str
+
+
+# INT-002: LinkedIn Integration schemas
+
+
+class LinkedInConnectionStatus(BaseModel):
+    """Schema for LinkedIn connection status."""
+
+    is_connected: bool
+    last_sync_at: Optional[str] = None
+
+
+class LinkedInSyncConfigCreate(BaseModel):
+    """Schema for creating LinkedIn sync configuration."""
+
+    resource_id: str = Field(default="saved_posts", min_length=1, max_length=200)
+    resource_name: str = Field(default="Saved Posts", min_length=1, max_length=500)
+    sync_frequency: str = Field(default="daily", pattern="^(hourly|daily|weekly)$")
+
+
+class LinkedInSyncConfigResponse(BaseModel):
+    """Schema for LinkedIn sync configuration response."""
+
+    model_config = {"from_attributes": True}
+
+    resource_id: str
+    resource_name: str
+    sync_frequency: str
+    is_active: bool
+    last_sync_at: Optional[str] = None
+
+
+class LinkedInSyncLogResponse(BaseModel):
+    """Schema for LinkedIn sync log response."""
+
+    model_config = {"from_attributes": True}
+
+    id: int
+    resource_id: str
+    status: str
+    ingested_count: int
+    skipped_count: int
+    error_message: Optional[str] = None
+    executed_at: str
+
+
+class LinkedInDisconnectResponse(BaseModel):
+    """Schema for LinkedIn disconnect response."""
+
+    message: str
+
+
+class LinkedInImportRequest(BaseModel):
+    """Schema for manual LinkedIn post import."""
+
+    url: str = Field(..., min_length=1, description="LinkedIn post URL")
