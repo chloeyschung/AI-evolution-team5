@@ -13,7 +13,7 @@
 | Phase | 기능 | 상세 문서 | 상태 |
 |-------|------|-----------|------|
 | 1 | Share Extension (URL 저장) | `phase1-share-extension.md` (plan.md 하단 참조) | ✅ 완료 |
-| 2a | 콘텐츠 크롤링 (제목·썸네일·본문) | [phase2-crawling.md](phase2-crawling.md) | 🔵 진행 중 |
+| 2a | 콘텐츠 크롤링 (제목·썸네일·본문) | [phase2-crawling.md](phase2-crawling.md) | 🟡 부분 완료 |
 | 2b | AI 요약 (Claude API) | phase2-ai-summary.md (미작성) | 🔲 대기 |
 | 3 | Swipe UX (Keep / Discard) | phase3-swipe-ux.md (미작성) | 🔲 대기 |
 
@@ -29,6 +29,8 @@
 | 2026-04-13 | GitHub Actions CI 추가 (prototype-1 push 시 자동 빌드). |
 | 2026-04-14 | 하단 탭바 추가 (Home / Library / Search / Account). Library 카드 UI + ItemDetailView + SafariBrowserView 구현. |
 | 2026-04-14 | plan.md를 마스터 인덱스로 재편. phase2-crawling.md 작성 완료. |
+| 2026-04-14 | Phase 2a 크롤링 구현 완료 (MetadataService / ArticleService / WebContentService / FetchCoordinator). SwiftSoup SPM 추가. SavedItem 모델 확장. LibraryCardView·ItemDetailView UI 연결. |
+| 2026-04-14 | "지금 읽기" 딥링크 개선: briefly://item?url= 로 Library 탭 + 상세 카드 자동 이동. ItemDetailView 본문 텍스트 펼치기/접기 추가. URL 스킴 YAML 들여쓰기 버그 수정. YouTube·비-기사 콘텐츠 ogDescription 폴백 추가. |
 
 ---
 

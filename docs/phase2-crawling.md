@@ -208,11 +208,14 @@ func fetchIfNeeded(for items: [SavedItem]) async
 
 ## 8. 완료 기준 (Definition of Done)
 
-- [ ] 저장된 뉴스·블로그 링크의 실제 제목·썸네일이 카드에 표시됨
-- [ ] 저장된 공개 사이트의 본문 텍스트가 `articleText`에 저장됨
-- [ ] LinkedIn·Medium: Safari 로그인 상태 시 전체 본문 추출 성공
-- [ ] 크롤링 중 앱 반응성 유지 (async/await, 메인 스레드 블로킹 없음)
-- [ ] 네트워크 없는 환경에서 크래시 없음
+- [x] 저장된 뉴스·블로그 링크의 실제 제목·썸네일이 카드에 표시됨
+- [x] 저장된 공개 사이트의 본문 텍스트가 `articleText`에 저장됨
+- [x] LinkedIn: Safari 로그인 상태 시 전체 본문 추출 성공
+- [x] YouTube: OG 제목·썸네일 추출 성공, 설명(ogDescription)을 본문 폴백으로 표시
+- [x] 크롤링 중 앱 반응성 유지 (async/await, 메인 스레드 블로킹 없음)
+- [x] 네트워크 없는 환경에서 크래시 없음
+- [ ] Reddit: 현재 "Please wait for verification" 페이지 반환 → 미해결 (다음 세션)
+- [ ] "지금 읽기" 딥링크: 실기기 테스트 필요 (시뮬레이터에서 extensionContext?.open 미지원)
 
 ---
 
@@ -269,7 +272,27 @@ Response body:
 
 ---
 
-## 10. 진행 로그
+## 10. 다음 세션에서 할 일 (Next Steps)
+
+### 2a 잔여 작업
+| 우선순위 | 항목 | 설명 |
+|---------|------|------|
+| 🔴 높음 | Reddit 크롤링 해결 | Reddit이 봇 감지로 verification 페이지 반환. WKWebView + 공유 쿠키 전략으로 전환 또는 User-Agent 튜닝 시도 |
+| 🟡 중간 | "지금 읽기" 실기기 테스트 | `extensionContext?.open()` 시뮬레이터 미지원. 실기기에서 Library 탭 + 상세 카드 이동 확인 |
+| 🟡 중간 | 재시도 기능 | fetchStatus == .failed 인 아이템을 수동 또는 자동으로 재시도하는 버튼/로직 추가 |
+| 🟢 낮음 | 저장된 아이템 삭제 기능 | 카드 스와이프 또는 버튼으로 삭제 (Discard → Archive 이동) |
+
+### 2b 다음 Phase
+| 항목 | 설명 |
+|------|------|
+| Claude API 연동 | `articleText` 또는 `ogDescription`을 입력으로 최대 300자 요약 생성 |
+| `phase2-ai-summary.md` 작성 | AI 요약 phase 문서 작성 후 구현 시작 |
+| AI 요약 UI | ItemDetailView의 "AI 요약" 섹션에 실제 Claude 요약 결과 표시 |
+| 비용 관리 | 캐싱 전략 — 이미 요약된 아이템 재요약 방지 (`aiSummary` 필드 nil 체크) |
+
+---
+
+## 11. 진행 로그
 
 | 날짜 | 내용 |
 |------|------|
@@ -277,3 +300,6 @@ Response body:
 | 2026-04-14 | WKWebView + 공유 쿠키 전략 추가. LinkedIn·Medium 전체 본문 추출 가능하도록 계획 수정. |
 | 2026-04-14 | 백엔드 개발자 역할 섹션 추가. |
 | 2026-04-14 | Step 1~7 구현 완료. project.yml SwiftSoup 패키지 추가. SavedItem 모델 업데이트. MetadataService / ArticleService / WebContentService / FetchCoordinator 구현. LibraryCardView·ItemDetailView UI 연결. 포그라운드 진입 시 자동 크롤링 트리거. |
+| 2026-04-14 | 동작 확인: LinkedIn ✅, YouTube ✅ (OG+설명), Reddit ❌ (봇 감지). Library 자동 갱신 버그 수정 (scenePhase 구독 추가). CI SwiftSoup 패키지 resolve 단계 추가. |
+| 2026-04-14 | "지금 읽기" 딥링크 개선: briefly://item?url= 스킴으로 Library 탭 전환 + 해당 아이템 상세 화면 자동 이동. NavigationStack(path:) 도입. ItemDetailView 본문 텍스트 펼치기/접기 추가. |
+| 2026-04-14 | URL 스킴 YAML 들여쓰기 버그 수정 (CFBundleURLSchemes 하위 항목 들여쓰기 오류로 briefly:// 스킴 미등록). YouTube 본문 ogDescription 폴백 추가. |
