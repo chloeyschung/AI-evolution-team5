@@ -2,7 +2,7 @@
 
 from typing import Union
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import outerjoin
@@ -261,10 +261,8 @@ async def update_content_status(
             updated_at=content.updated_at.isoformat(),
         )
     except ValueError as e:
-        from fastapi import HTTPException
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail=str(e))
 
 

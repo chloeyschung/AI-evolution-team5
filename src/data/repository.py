@@ -189,35 +189,6 @@ class ContentRepository:
         )
         return list(result.scalars().unique().all())
 
-    async def update_status(self, content_id: int, new_status: ContentStatus) -> Content:
-        """Update content status (INBOX → ARCHIVED transition).
-
-        Args:
-            content_id: The content ID to update.
-            new_status: The new status (ARCHIVED only, one-way transition).
-
-        Returns:
-            Updated Content object.
-
-        Raises:
-            ValueError: If content is already ARCHIVED (one-way transition).
-            RuntimeError: If content not found.
-        """
-        result = await self.session.execute(select(Content).where(Content.id == content_id))
-        content = result.scalar_one_or_none()
-
-        if content is None:
-            raise RuntimeError(f"Content with ID {content_id} not found")
-
-        if content.status == ContentStatus.ARCHIVED and new_status == ContentStatus.INBOX:
-            raise ValueError("Cannot transition from ARCHIVED to INBOX (one-way transition)")
-
-        content.status = new_status
-        content.updated_at = utc_now()
-        await self.session.commit()
-        await self.session.refresh(content)
-        return content
-
     async def get_stats(self) -> dict:
         """Get content statistics.
 
