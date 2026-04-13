@@ -14,6 +14,18 @@ struct ContentView: View {
                 viewModel.reload()
             }
         }
+        .onOpenURL { url in
+            // briefly://open?url=<articleURL> 처리
+            viewModel.reload() // inbox drain
+            guard
+                url.scheme == "briefly",
+                url.host == "open",
+                let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                let articleURLString = components.queryItems?.first(where: { $0.name == "url" })?.value,
+                let articleURL = URL(string: articleURLString)
+            else { return }
+            UIApplication.shared.open(articleURL)
+        }
     }
 }
 

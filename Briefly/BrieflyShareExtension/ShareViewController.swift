@@ -2,15 +2,17 @@ import UIKit
 import UniformTypeIdentifiers
 import SwiftUI
 
-/// Share Extension 진입점.
+/// Action Extension 진입점 (com.apple.ui-services).
 /// Safari 등 외부 앱에서 URL을 공유하면 이 뷰컨트롤러가 호출됩니다.
 ///
 /// 흐름:
-/// 1. NSExtensionItem에서 URL 추출 (async)
-/// 2. App Group UserDefaults inbox에 SavedItem 추가
-/// 3. 확인 UI 표시 (1.5초)
-/// 4. Extension 닫기
+/// 1. 첨부파일에서 URL 추출 (public.url → public.plain-text 순서로 시도)
+/// 2. App Group UserDefaults inbox에 SavedItem 추가 + synchronize()
+/// 3. 확인 UI 표시 ("닫기" / "지금 읽기" 버튼, 3초 후 자동 닫기)
+/// 4. "지금 읽기" → briefly://open?url=… 로 메인 앱 오픈
 final class ShareViewController: UIViewController {
+
+    private var autoDismissTimer: DispatchWorkItem?
 
     // MARK: - Lifecycle
 
@@ -25,44 +27,69 @@ final class ShareViewController: UIViewController {
     private func extractURLAndSave() {
         guard
             let item = extensionContext?.inputItems.first as? NSExtensionItem,
-            let provider = item.attachments?.first,
-            provider.hasItemConformingToTypeIdentifier(UTType.url.identifier)
+            let attachments = item.attachments,
+            !attachments.isEmpty
         else {
             showConfirmation(success: false)
             return
         }
+        findURL(in: attachments)
+    }
 
-        provider.loadItem(forTypeIdentifier: UTType.url.identifier) { [weak self] urlItem, error in
-            guard let self else { return }
-
-            if let url = urlItem as? URL {
-                let savedItem = SavedItem(url: url, title: nil)
-                StorageService.shared.appendToInbox(savedItem)
-                DispatchQueue.main.async {
-                    self.showConfirmation(success: true, url: url)
-                }
-            } else {
-                DispatchQueue.main.async {
-                    self.showConfirmation(success: false)
+    /// public.url → public.plain-text 순으로 URL을 탐색합니다.
+    private func findURL(in providers: [NSItemProvider]) {
+        if let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.url.identifier) }) {
+            provider.loadItem(forTypeIdentifier: UTType.url.identifier) { [weak self] item, _ in
+                if let url = item as? URL, url.scheme?.hasPrefix("http") == true {
+                    self?.saveAndShow(url: url)
+                } else {
+                    self?.tryPlainText(in: providers)
                 }
             }
+        } else {
+            tryPlainText(in: providers)
+        }
+    }
+
+    private func tryPlainText(in providers: [NSItemProvider]) {
+        guard let provider = providers.first(where: { $0.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) }) else {
+            DispatchQueue.main.async { self.showConfirmation(success: false) }
+            return
+        }
+        provider.loadItem(forTypeIdentifier: UTType.plainText.identifier) { [weak self] item, _ in
+            let text = (item as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if let url = URL(string: text), url.scheme?.hasPrefix("http") == true {
+                self?.saveAndShow(url: url)
+            } else {
+                DispatchQueue.main.async { self?.showConfirmation(success: false) }
+            }
+        }
+    }
+
+    private func saveAndShow(url: URL) {
+        let item = SavedItem(url: url, title: nil)
+        StorageService.shared.appendToInbox(item)
+        DispatchQueue.main.async {
+            self.showConfirmation(success: true, savedURL: url)
         }
     }
 
     // MARK: - 확인 UI
 
-    private func showConfirmation(success: Bool, url: URL? = nil) {
-        // SwiftUI 확인 뷰를 UIHostingController로 embed
+    private func showConfirmation(success: Bool, savedURL: URL? = nil) {
         let confirmView = ConfirmationView(
             success: success,
-            domain: url?.host ?? "",
+            domain: savedURL?.host ?? "",
             onDismiss: { [weak self] in
-                self?.completeRequest()
+                self?.cancelTimerAndComplete()
+            },
+            onReadNow: savedURL.map { url in
+                { [weak self] in self?.openMainApp(articleURL: url) }
             }
         )
+
         let host = UIHostingController(rootView: confirmView)
         host.view.backgroundColor = .clear
-
         addChild(host)
         view.addSubview(host.view)
         host.view.translatesAutoresizingMaskIntoConstraints = false
@@ -74,8 +101,28 @@ final class ShareViewController: UIViewController {
         ])
         host.didMove(toParent: self)
 
-        // 1.5초 후 자동 닫기
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+        // 3초 후 자동 닫기 (버튼 탭 시 취소됨)
+        let timer = DispatchWorkItem { [weak self] in self?.completeRequest() }
+        autoDismissTimer = timer
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3, execute: timer)
+    }
+
+    // MARK: - 액션
+
+    private func cancelTimerAndComplete() {
+        autoDismissTimer?.cancel()
+        completeRequest()
+    }
+
+    private func openMainApp(articleURL: URL) {
+        autoDismissTimer?.cancel()
+        let encoded = articleURL.absoluteString
+            .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        guard let brieflyURL = URL(string: "briefly://open?url=\(encoded)") else {
+            completeRequest()
+            return
+        }
+        extensionContext?.open(brieflyURL) { [weak self] _ in
             self?.completeRequest()
         }
     }
@@ -91,6 +138,7 @@ private struct ConfirmationView: View {
     let success: Bool
     let domain: String
     let onDismiss: () -> Void
+    let onReadNow: (() -> Void)?
 
     var body: some View {
         VStack(spacing: 16) {
@@ -106,12 +154,22 @@ private struct ConfirmationView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
+                HStack(spacing: 12) {
+                    Button("닫기", action: onDismiss)
+                        .buttonStyle(.bordered)
+                    Button("지금 읽기") { onReadNow?() }
+                        .buttonStyle(.borderedProminent)
+                }
+                .padding(.top, 4)
             } else {
                 Text("저장 실패")
                     .font(.headline)
                 Text("Briefly 앱을 열어 재시도해주세요")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                Button("닫기", action: onDismiss)
+                    .buttonStyle(.bordered)
+                    .padding(.top, 4)
             }
         }
         .padding(32)

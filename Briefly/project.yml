@@ -30,6 +30,10 @@ targets:
         CFBundleShortVersionString: "1.0"
         CFBundleVersion: "1"
         UILaunchScreen: {}
+        CFBundleURLTypes:
+          - CFBundleURLSchemes:
+            - briefly
+            CFBundleURLName: com.briefly-ai.app
     entitlements:
       path: Briefly/Briefly.entitlements
     settings:

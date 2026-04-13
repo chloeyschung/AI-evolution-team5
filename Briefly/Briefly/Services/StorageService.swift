@@ -29,6 +29,8 @@ final class StorageService {
         var inbox = decode(from: defaults, key: inboxKey)
         inbox.append(item)
         encode(inbox, to: defaults, key: inboxKey)
+        // Extension이 닫히기 전에 디스크에 flush
+        defaults.synchronize()
     }
 
     // MARK: - 메인 앱 전용: drain 후 merge
