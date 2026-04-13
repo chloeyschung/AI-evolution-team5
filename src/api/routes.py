@@ -15,6 +15,8 @@ from ..data.repository import ContentRepository, SwipeRepository, UserProfileRep
 from .schemas import (
     ContentCreate,
     ContentResponse,
+    ContentDetailResponse,
+    SwipeHistoryResponse,
     SwipeCreate,
     SwipeResponse,
     SwipeBatchRequest,
@@ -193,6 +195,46 @@ async def list_discarded_content(
         )
         for c in contents
     ]
+
+
+# UX-003: Content Detail View
+
+
+@router.get("/content/{content_id}", response_model=ContentDetailResponse)
+async def get_content_detail(
+    content_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> ContentDetailResponse:
+    """Get content detail with swipe history."""
+    content_repo = ContentRepository(db)
+    content = await content_repo.get_by_id(content_id)
+
+    if content is None:
+        raise HTTPException(status_code=404, detail=f"Content with ID {content_id} not found")
+
+    swipe_repo = SwipeRepository(db)
+    history = await swipe_repo.get_history(content_id)
+    swipe_history = None
+    if history:
+        latest = history[-1]
+        swipe_history = SwipeHistoryResponse(
+            action=latest.action.value,
+            swiped_at=latest.swiped_at.isoformat(),
+        )
+
+    return ContentDetailResponse(
+        id=content.id,
+        platform=content.platform,
+        content_type=content.content_type,
+        url=content.url,
+        title=content.title,
+        author=content.author,
+        summary=content.summary,
+        status=content.status,
+        swipe_history=swipe_history,
+        created_at=content.created_at.isoformat(),
+        updated_at=content.updated_at.isoformat() if content.updated_at else None,
+    )
 
 
 @router.patch("/content/{content_id}/status", response_model=ContentResponse)

@@ -188,6 +188,77 @@ class TestPendingContentEndpoints:
         assert len(data) == 5
 
 
+class TestContentDetailEndpoint:
+    """Tests for GET /content/{content_id} endpoint (UX-003)."""
+
+    async def test_get_content_detail(self, async_client):
+        """Test getting content detail with all fields."""
+        # Create content with summary
+        create_response = await async_client.post(
+            "/api/v1/content",
+            json={
+                "platform": "YouTube",
+                "content_type": "video",
+                "url": "https://youtube.com/watch?v=test123",
+                "title": "Test Video",
+                "author": "Test Author",
+            },
+        )
+        content_id = create_response.json()["id"]
+
+        # Get content detail
+        response = await async_client.get(f"/api/v1/content/{content_id}")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == content_id
+        assert data["platform"] == "YouTube"
+        assert data["content_type"] == "video"
+        assert data["url"] == "https://youtube.com/watch?v=test123"
+        assert data["title"] == "Test Video"
+        assert data["author"] == "Test Author"
+        assert data["status"] == "inbox"
+        assert data["summary"] is None
+        assert data["swipe_history"] is None
+        assert "created_at" in data
+
+    async def test_get_content_detail_not_found(self, async_client):
+        """Test getting non-existent content returns 404."""
+        response = await async_client.get("/api/v1/content/9999")
+
+        assert response.status_code == 404
+        data = response.json()
+        assert "detail" in data
+
+    async def test_get_content_detail_with_swipe_history(self, async_client):
+        """Test getting content detail with swipe history."""
+        # Create content
+        create_response = await async_client.post(
+            "/api/v1/content",
+            json={
+                "platform": "Test",
+                "content_type": "article",
+                "url": "https://example.com/swipe-detail",
+            },
+        )
+        content_id = create_response.json()["id"]
+
+        # Record swipe
+        await async_client.post(
+            "/api/v1/swipe",
+            json={"content_id": content_id, "action": "keep"},
+        )
+
+        # Get content detail
+        response = await async_client.get(f"/api/v1/content/{content_id}")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["swipe_history"] is not None
+        assert data["swipe_history"]["action"] == "keep"
+        assert "swiped_at" in data["swipe_history"]
+
+
 class TestHealthCheck:
     """Tests for health check endpoint."""
 

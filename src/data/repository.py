@@ -93,6 +93,20 @@ class ContentRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_by_id(self, content_id: int) -> Content | None:
+        """Get content by ID.
+
+        Args:
+            content_id: The content ID.
+
+        Returns:
+            Content object if found, None otherwise.
+        """
+        result = await self.session.execute(
+            select(Content).where(Content.id == content_id)
+        )
+        return result.scalar_one_or_none()
+
     async def get_all(self, limit: int = 50, offset: int = 0,
                      status: ContentStatus | None = None) -> List[Content]:
         """Get all content with pagination.

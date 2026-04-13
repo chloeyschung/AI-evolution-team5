@@ -100,6 +100,36 @@ class ShareResponse(BaseModel):
     created_at: str
 
 
+# UX-003: Content Detail View schemas
+
+
+class SwipeHistoryResponse(BaseModel):
+    """Schema for swipe history in content detail."""
+
+    model_config = {"from_attributes": True}
+
+    action: str
+    swiped_at: str
+
+
+class ContentDetailResponse(BaseModel):
+    """Schema for content detail view (UX-003)."""
+
+    model_config = {"from_attributes": True}
+
+    id: int
+    platform: str
+    content_type: str
+    url: str
+    title: Optional[str] = None
+    author: Optional[str] = None
+    summary: Optional[str] = None
+    status: ContentStatus
+    swipe_history: Optional[SwipeHistoryResponse] = None
+    created_at: str
+    updated_at: Optional[str] = None
+
+
 # DAT-002: User Profile & Preferences schemas
 
 
