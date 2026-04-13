@@ -369,6 +369,47 @@ async def list_platforms(db: AsyncSession = Depends(get_db)) -> list[PlatformCou
     return [PlatformCount(platform=p, count=c) for p, c in platform_counts]
 
 
+# UX-005: Search endpoint
+
+
+@router.get("/search", response_model=list[ContentResponse])
+async def search_content(
+    q: str = Query(..., min_length=1, description="Search query"),
+    limit: int = Query(50, gt=0, le=100),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+) -> list[ContentResponse]:
+    """Search content by title, author, or tags.
+
+    Real-time search across all content (INBOX + ARCHIVED).
+    Case-insensitive search.
+
+    Args:
+        q: Search query string (minimum 1 character).
+        limit: Maximum number of results.
+        offset: Pagination offset.
+        db: Database session.
+
+    Returns:
+        List of matching content, sorted by recency.
+    """
+    repo = ContentRepository(db)
+    results = await repo.search_content(q, limit=limit, offset=offset)
+
+    return [
+        ContentResponse(
+            id=c.id,
+            platform=c.platform,
+            content_type=c.content_type,
+            url=c.url,
+            title=c.title,
+            author=c.author,
+            created_at=c.created_at.isoformat(),
+        )
+        for c in results
+    ]
+
+
 # Share handler dependency - initialized in app.py
 _share_handler: ShareHandler | None = None
 

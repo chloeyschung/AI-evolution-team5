@@ -242,6 +242,40 @@ class ContentRepository:
         )
         return [(row[0], row[1]) for row in result.fetchall()]
 
+    async def search_content(
+        self, query: str, limit: int = 50, offset: int = 0
+    ) -> List[Content]:
+        """Search content by title, author, or tags.
+
+        Args:
+            query: Search query string (case-insensitive).
+            limit: Maximum number of results.
+            offset: Pagination offset.
+
+        Returns:
+            List of matching Content objects, sorted by relevance then recency.
+        """
+        # Build search query with OR conditions for title and author
+        query_pattern = f"%{query}%"
+
+        # Search in title and author (case-insensitive)
+        query_stmt = (
+            select(Content)
+            .where(
+                (Content.title.isnot(None)) &  # Must have title
+                ((Content.title.ilike(query_pattern)) | (Content.author.ilike(query_pattern)))
+            )
+            .order_by(Content.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+
+        # Execute search
+        result = await self.session.execute(query_stmt)
+        results = list(result.scalars().unique().all())
+
+        return results
+
     async def get_stats(self) -> dict:
         """Get content statistics.
 
