@@ -53,14 +53,13 @@ targets:
     info:
       path: BrieflyShareExtension/Info.plist
       properties:
-        CFBundleDisplayName: Briefly
+        CFBundleDisplayName: Save Document to Briefly
         CFBundleVersion: "1"
         CFBundleShortVersionString: "1.0"
         NSExtension:
           NSExtensionAttributes:
-            NSExtensionActivationRule:
-              NSExtensionActivationSupportsWebURLWithMaxCount: 1
-          NSExtensionPointIdentifier: com.apple.share-services
+            NSExtensionActivationRule: "SUBQUERY(extensionItems, $extensionItem, SUBQUERY($extensionItem.attachments, $attachment, ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO 'public.url').@count > 0).@count > 0"
+          NSExtensionPointIdentifier: com.apple.ui-services
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
     entitlements:
       path: BrieflyShareExtension/BrieflyShareExtension.entitlements

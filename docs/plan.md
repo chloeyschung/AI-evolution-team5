@@ -102,6 +102,7 @@
 |------|--------------|
 | 2026-04-10 | plan.md 초안 작성. prototype-1 브랜치 생성. Phase 1 설계 완료. |
 | 2026-04-10 | /autoplan 실행. 팀 결정: prototype-1은 Phase 1(Share Extension)만 집중. |
+| 2026-04-13 | Share Extension 노출 위치 변경: 앱 아이콘 행 → 하단 액션 목록. `NSExtensionPointIdentifier`를 `com.apple.share-services` → `com.apple.ui-services`로 변경. 표시 이름 "Briefly" → "Save Document to Briefly". `NSExtensionActivationRule`을 딕셔너리에서 Predicate 문자열로 교체. |
 
 ---
 
