@@ -32,8 +32,8 @@ Feature dependency mapping for optimal implementation order.
 
 | Feature | Depends On | Blocked By | Notes | F-xxx Mapping |
 |---------|------------|------------|-------|---------------|
-| **AI-001** Core Summarizer | ING-002 | - | Needs extracted text. ⚠️ Spec requires 300-char limit update for F-005 compliance. | F-005 |
-| **AI-002** Metadata Extraction | ING-001 | - | Works with URL directly. ⚠️ OG image thumbnail crawling not implemented (F-007). | F-007 |
+| **AI-001** Core Summarizer | ING-002 | - | Needs extracted text. 300-char limit enforced. | F-005 |
+| **AI-002** Metadata Extraction | ING-001 | - | Works with URL directly. OG image thumbnail extraction implemented. | F-007 |
 | **AI-003** AI Categorization | ING-002 | - | LLM-based auto-tagging (max 3 tags). ⏸️ Spec pending. | F-006 |
 
 ### UX Layer
@@ -41,8 +41,11 @@ Feature dependency mapping for optimal implementation order.
 | Feature | Depends On | Blocked By | Notes | F-xxx Mapping |
 |---------|------------|------------|-------|---------------|
 | **UX-001** Swipe Card Stack | AI-001, AI-002 | - | Needs summary + metadata. Provides F-008/F-009/F-010. | F-008, F-009, F-010 |
-| **UX-002** Swipe Actions | UX-001, DAT-001 | - | Persists Keep/Discard. ⚠️ Requires `status` field update (INBOX/ARCHIVED). | F-009, F-011 |
-| **UX-003** Detail View | UX-001, AI-002 | - | Shows source content. ⚠️ Requires F-012 state transition logic ("읽었어요" button, INBOX→ARCHIVED). | F-012 |
+| **UX-002** Swipe Actions | UX-001, DAT-001 | - | Persists Keep/Discard. ✅ `status` field (INBOX/ARCHIVED) implemented. | F-009, F-011 |
+| **UX-003** Detail View | UX-001, AI-002 | - | Shows source content with swipe history. ✅ Implemented (`GET /content/{id}`). | F-012 |
+| **UX-004** Filter by Platform | UX-001 | - | Filter by source platform. Dynamic list from user's save history. ⏸️ Spec pending | F-013 |
+| **UX-005** Search by Title/Tag | UX-001 | - | Real-time search across titles and tags. Scope: INBOX + Archive. ⏸️ Spec pending | F-016 |
+| **UX-006** Delete Content | UX-001 | - | Permanent deletion with 1-step confirmation. Irreversible. ⏸️ Spec pending | F-019 |
 
 ### Data Layer
 
@@ -103,8 +106,8 @@ ING-001 → ING-002 → AI-001 → UX-001 → UX-002
 | AUTH-002 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-001 | Google social login not implemented |
 | AUTH-003 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-002 | Logout not implemented |
 | AUTH-004 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-003 | Account delete not implemented |
-| AI-001 | ✅ [`AI-001.md`](specs/AI-001.md) | ✅ [`AI-001-record.md`](records/AI-001-record.md) | ✅ Implemented | `src/ai/summarizer.py` | F-005 | ⚠️ Spec requires 300-char limit update |
-| AI-002 | ✅ [`AI-002.md`](specs/AI-002.md) | ✅ [`AI-002-record.md`](records/AI-002-record.md) | ✅ Implemented | `src/ai/metadata_extractor.py` | F-007 | ⚠️ OG image thumbnail not implemented |
+| AI-001 | ✅ [`AI-001.md`](specs/AI-001.md) | ✅ [`AI-001-record.md`](records/AI-001-record.md) | ✅ Implemented | `src/ai/summarizer.py` | F-005 | ✅ 300-char limit enforced |
+| AI-002 | ✅ [`AI-002.md`](specs/AI-002.md) | ✅ [`AI-002-record.md`](records/AI-002-record.md) | ✅ Implemented | `src/ai/metadata_extractor.py` | F-007 | ✅ OG image thumbnail extraction added |
 | AI-003 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-006 | Spec not created |
 | ING-001 | ✅ [`ING-001.md`](specs/ING-001.md) | ✅ [`ING-001-record.md`](records/ING-001-record.md) | ✅ Implemented | `src/ingestion/share_handler.py` | F-004 | - |
 | ING-002 | ✅ [`ING-002.md`](specs/ING-002.md) | ✅ [`ING-002-record.md`](records/ING-002-record.md) | ✅ Implemented | `src/ingestion/extractor.py` | F-005 | - |
@@ -112,7 +115,10 @@ ING-001 → ING-002 → AI-001 → UX-001 → UX-002
 | DAT-002 | ✅ [`DAT-002.md`](specs/DAT-002.md) | ✅ [`DAT-002-record.md`](records/DAT-002-record.md) | ✅ Implemented | `src/data/models.py`, `src/data/repository.py`, `src/api/routes.py` | F-017, F-015 | ⚠️ `InterestTag` is user-created, not AI-generated (F-014 gap) |
 | UX-001 | ✅ [`UX-001.md`](specs/UX-001.md) | ✅ [`UX-001-record.md`](records/UX-001-record.md) | ✅ Backend | `src/api/routes.py` (/content/pending) | F-008, F-009, F-010 | - |
 | UX-002 | ✅ [`UX-002.md`](specs/UX-002.md) | ✅ [`UX-002-record.md`](records/UX-002-record.md) | ✅ Implemented | `src/api/routes.py` (/swipe, /content/kept, /content/discarded, /stats) | F-009, F-011 | ⚠️ Requires status field integration |
-| UX-003 | ✅ [`UX-003.md`](specs/UX-003.md) | ⏸️ Pending | ⏸️ Pending | - | F-012 | ⚠️ Requires F-012 state transition logic |
+| UX-003 | ✅ [`UX-003.md`](specs/UX-003.md) | ✅ [`UX-003-record.md`](records/UX-003-record.md) | ✅ Implemented | `src/api/routes.py` (GET /content/{id}) | F-012 | ✅ Content detail with swipe history |
+| UX-004 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-013 | Filter by platform (dynamic list) |
+| UX-005 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-016 | Search by title/tag |
+| UX-006 | ⏸️ Pending | ⏸️ - | ⏸️ Pending | - | F-019 | Delete content |
 
 ## Next: AUTH-001 (App Entry & Login State)
 
