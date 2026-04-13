@@ -41,6 +41,9 @@ struct ContentView: View {
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .active {
                 viewModel.reload()
+                Task {
+                    await FetchCoordinator.shared.fetchIfNeeded(for: viewModel.items)
+                }
             }
         }
         .onOpenURL { url in

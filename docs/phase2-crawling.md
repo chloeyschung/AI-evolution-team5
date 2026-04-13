@@ -216,9 +216,64 @@ func fetchIfNeeded(for items: [SavedItem]) async
 
 ---
 
-## 9. 진행 로그
+## 9. 백엔드 개발자 역할 (Backend Developer Responsibilities)
+
+> 현재 클라이언트 단독(URLSession + WKWebView)으로 구현하지만,
+> 백엔드 개발자가 합류하면 아래 서버 측 기능으로 전환해 더 넓은 범위를 커버할 수 있습니다.
+
+### 9-1. 서버 크롤링 API
+| 엔드포인트 | 역할 |
+|-----------|------|
+| `POST /api/fetch-content` | URL을 받아 OG 메타데이터 + 본문 텍스트 반환 |
+| `GET /api/fetch-status/{id}` | 비동기 크롤링 완료 여부 폴링 |
+
+Request body:
+```json
+{ "url": "https://www.linkedin.com/posts/..." }
+```
+Response body:
+```json
+{
+  "ogTitle": "...",
+  "ogImageURL": "https://...",
+  "ogDescription": "...",
+  "siteName": "LinkedIn",
+  "articleText": "본문 전체..."
+}
+```
+
+### 9-2. 헤드리스 브라우저 크롤링
+- **도구:** Playwright(Node.js) 또는 Puppeteer
+- **적용 대상:** LinkedIn, YouTube(자막), Instagram, Medium(유료)
+- 서버에서 실제 브라우저를 띄워 JS 렌더링 후 본문 추출
+- **쿠키 불필요** — 서버 세션 또는 서비스 계정으로 인증
+
+### 9-3. 인증 관리
+| 서비스 | 방식 |
+|--------|------|
+| LinkedIn | OAuth 2.0 (공식 API) 또는 서버 계정 세션 쿠키 |
+| YouTube | YouTube Data API v3 (자막: captions.download) |
+| Medium | RSS 피드 또는 공식 API |
+| Instagram | Meta Graph API (제한적) |
+
+### 9-4. 프록시 / 레이트 리밋 처리
+- IP 차단 방지: rotating proxy pool 운영
+- 요청 간격 조절 (rate limiting per domain)
+- 실패 시 자동 재시도 로직 (exponential backoff)
+
+### 9-5. 클라이언트 전환 시 변경 필요 파일
+- `MetadataService.swift` → 서버 API 호출로 교체
+- `ArticleService.swift` → 서버 응답 파싱으로 교체
+- `WebContentService.swift` → 불필요 (서버가 처리)
+- `FetchCoordinator.swift` → 폴링 또는 웹소켓으로 전환
+
+---
+
+## 10. 진행 로그
 
 | 날짜 | 내용 |
 |------|------|
 | 2026-04-14 | phase2-crawling.md 초안 작성. 아키텍처·단계 확정. |
 | 2026-04-14 | WKWebView + 공유 쿠키 전략 추가. LinkedIn·Medium 전체 본문 추출 가능하도록 계획 수정. |
+| 2026-04-14 | 백엔드 개발자 역할 섹션 추가. |
+| 2026-04-14 | Step 1~7 구현 완료. project.yml SwiftSoup 패키지 추가. SavedItem 모델 업데이트. MetadataService / ArticleService / WebContentService / FetchCoordinator 구현. LibraryCardView·ItemDetailView UI 연결. 포그라운드 진입 시 자동 크롤링 트리거. |

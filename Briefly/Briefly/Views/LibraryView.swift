@@ -81,6 +81,9 @@ struct LibraryView: View {
         .navigationTitle(navigationTitle)
         .navigationBarTitleDisplayMode(.large)
         .onAppear { viewModel.reload() }
+        .onReceive(NotificationCenter.default.publisher(for: .fetchCoordinatorDidUpdate)) { _ in
+            viewModel.reload()
+        }
     }
 
     private var emptyView: some View {
@@ -142,22 +145,30 @@ struct LibraryCardView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    Text("AI 요약이 준비 중입니다")
+                    Text(item.ogDescription ?? "AI 요약이 준비 중입니다")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .lineLimit(3)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                // 썸네일 — 우측 고정 (Phase 2에서 OG Image로 교체 예정)
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.secondary.opacity(0.12))
-                    .overlay {
-                        Image(systemName: "photo")
-                            .foregroundStyle(.secondary.opacity(0.4))
-                            .font(.title3)
+                // 썸네일 — OG Image (없으면 placeholder)
+                Group {
+                    if let imageURL = item.ogImageURL {
+                        AsyncImage(url: imageURL) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image.resizable().scaledToFill()
+                            default:
+                                thumbnailPlaceholder
+                            }
+                        }
+                    } else {
+                        thumbnailPlaceholder
                     }
-                    .frame(width: 80, height: 80)
+                }
+                .frame(width: 80, height: 80)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
         .padding(16)
@@ -166,6 +177,16 @@ struct LibraryCardView: View {
 
     var faviconURL: URL? {
         URL(string: "https://www.google.com/s2/favicons?domain=\(item.domain)&sz=64")
+    }
+
+    var thumbnailPlaceholder: some View {
+        RoundedRectangle(cornerRadius: 8)
+            .fill(Color.secondary.opacity(0.12))
+            .overlay {
+                Image(systemName: "photo")
+                    .foregroundStyle(.secondary.opacity(0.4))
+                    .font(.title3)
+            }
     }
 }
 

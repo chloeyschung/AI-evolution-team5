@@ -9,15 +9,23 @@ struct ItemDetailView: View {
             VStack(alignment: .leading, spacing: 0) {
 
                 // ── 썸네일 (상단 풀너비) ──────────────────────────
-                Rectangle()
-                    .fill(Color.secondary.opacity(0.1))
-                    .overlay {
-                        Image(systemName: "photo")
-                            .font(.system(size: 40))
-                            .foregroundStyle(.secondary.opacity(0.35))
+                Group {
+                    if let imageURL = item.ogImageURL {
+                        AsyncImage(url: imageURL) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image.resizable().scaledToFill()
+                            default:
+                                thumbnailPlaceholder
+                            }
+                        }
+                    } else {
+                        thumbnailPlaceholder
                     }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 220)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 220)
+                .clipped()
 
                 VStack(alignment: .leading, spacing: 20) {
 
@@ -100,6 +108,16 @@ struct ItemDetailView: View {
 
     private var faviconURL: URL? {
         URL(string: "https://www.google.com/s2/favicons?domain=\(item.domain)&sz=64")
+    }
+
+    private var thumbnailPlaceholder: some View {
+        Rectangle()
+            .fill(Color.secondary.opacity(0.1))
+            .overlay {
+                Image(systemName: "photo")
+                    .font(.system(size: 40))
+                    .foregroundStyle(.secondary.opacity(0.35))
+            }
     }
 }
 

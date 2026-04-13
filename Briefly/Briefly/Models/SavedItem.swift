@@ -9,8 +9,24 @@ struct SavedItem: Codable, Identifiable {
     let savedAt: Date
     var status: Status
 
+    // Phase 2a — 크롤링 결과
+    var ogTitle: String?
+    var ogImageURL: URL?
+    var ogDescription: String?
+    var siteName: String?
+    var articleText: String?
+    var fetchStatus: FetchStatus
+
     enum Status: String, Codable {
         case unread, read, discarded
+    }
+
+    enum FetchStatus: String, Codable {
+        case pending    // 아직 시도 안 함
+        case fetching   // 진행 중
+        case done       // 완료
+        case failed     // 실패 (OG도 못 가져옴)
+        case partial    // OG만 성공, 본문 실패
     }
 
     init(url: URL, title: String? = nil) {
@@ -19,11 +35,12 @@ struct SavedItem: Codable, Identifiable {
         self.title = title
         self.savedAt = Date()
         self.status = .unread
+        self.fetchStatus = .pending
     }
 
-    /// 표시용 제목 — title이 없으면 도메인만
+    /// 표시용 제목 — ogTitle → title → 도메인
     var displayTitle: String {
-        title ?? url.host ?? url.absoluteString
+        ogTitle ?? title ?? url.host ?? url.absoluteString
     }
 
     /// 도메인만 추출 (예: "medium.com")
