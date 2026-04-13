@@ -12,6 +12,7 @@ from src.ingestion.share_handler import ShareHandler
 from ..data.database import get_db
 from ..data.models import Content
 from ..data.repository import ContentRepository, SwipeRepository, UserProfileRepository
+from ..data.auth_repository import AuthenticationRepository
 from .schemas import (
     ContentCreate,
     ContentResponse,
@@ -31,6 +32,9 @@ from .schemas import (
     UserStatisticsResponse,
     InterestTagRequest,
     InterestTagResponse,
+    AuthStatusResponse,
+    TokenRefreshRequest,
+    TokenRefreshResponse,
 )
 from src.data.models import ContentStatus
 
@@ -480,3 +484,75 @@ async def remove_interest(tag: str, db: AsyncSession = Depends(get_db)) -> dict:
     await repo.remove_interest_tag(tag)
 
     return {"message": f"Interest tag '{tag}' removed successfully"}
+
+
+# AUTH-001: Authentication endpoints
+
+
+@router.get("/auth/status", response_model=AuthStatusResponse)
+async def get_auth_status(
+    db: AsyncSession = Depends(get_db),
+    authorization: str | None = None,
+) -> AuthStatusResponse:
+    """Check current authentication status.
+
+    Args:
+        db: Database session.
+        authorization: Authorization header with Bearer token.
+
+    Returns:
+        Auth status with user info if authenticated.
+    """
+    # No token provided
+    if not authorization or not authorization.startswith("Bearer "):
+        return AuthStatusResponse(is_authenticated=False)
+
+    # Extract token
+    token = authorization[7:]  # Remove "Bearer " prefix
+    auth_repo = AuthenticationRepository(db)
+
+    # Get token from database
+    token_record = await auth_repo.get_token_by_access_token(token)
+
+    if not token_record:
+        return AuthStatusResponse(is_authenticated=False)
+
+    # Return authenticated status
+    return AuthStatusResponse(
+        is_authenticated=True,
+        user_id=token_record.user_id,
+        token_expires_at=token_record.expires_at.isoformat(),
+    )
+
+
+@router.post("/auth/refresh", response_model=TokenRefreshResponse)
+async def refresh_auth_token(
+    data: TokenRefreshRequest,
+    db: AsyncSession = Depends(get_db),
+) -> TokenRefreshResponse:
+    """Refresh access token using refresh token.
+
+    Implements token rotation: issues new refresh token on each refresh.
+
+    Args:
+        data: Refresh token request.
+        db: Database session.
+
+    Returns:
+        New access token and expiry time.
+
+    Raises:
+        401: Invalid or expired refresh token.
+    """
+    auth_repo = AuthenticationRepository(db)
+
+    # Refresh token (includes token rotation)
+    token_record = await auth_repo.refresh_access_token(data.refresh_token)
+
+    if not token_record:
+        raise HTTPException(status_code=401, detail="invalid_refresh_token")
+
+    return TokenRefreshResponse(
+        access_token=token_record.access_token,
+        expires_at=token_record.expires_at.isoformat(),
+    )

@@ -199,3 +199,34 @@ class InterestTagResponse(BaseModel):
 
     id: int
     tag: str
+
+
+# AUTH-001: Authentication schemas
+
+
+class AuthStatusResponse(BaseModel):
+    """Schema for authentication status check."""
+
+    is_authenticated: bool
+    user_id: Optional[int] = None
+    email: Optional[str] = None
+    token_expires_at: Optional[str] = None
+
+
+class TokenRefreshRequest(BaseModel):
+    """Schema for token refresh request."""
+
+    refresh_token: str
+
+
+class TokenRefreshResponse(BaseModel):
+    """Schema for token refresh response."""
+
+    access_token: str
+    expires_at: str
+
+
+class AuthError(BaseModel):
+    """Schema for authentication error response."""
+
+    error: str

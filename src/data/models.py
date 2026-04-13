@@ -119,3 +119,20 @@ class InterestTag(Base):
     __table_args__ = (
         sqlalchemy.UniqueConstraint("user_id", "tag", name="unique_user_tag"),
     )
+
+
+class AuthenticationToken(Base):
+    """User authentication tokens for session management."""
+
+    __tablename__ = "authentication_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("user_profile.id"), unique=True, nullable=False, index=True)
+    access_token = Column(String(1000), nullable=False)
+    refresh_token = Column(String(1000), nullable=False)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    revoked_at = Column(DateTime, nullable=True, index=True)  # For logout/account delete
+
+    # Relationship to user profile
+    user = relationship("UserProfile", backref="auth_token")
