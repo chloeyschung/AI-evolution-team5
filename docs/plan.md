@@ -1,19 +1,38 @@
 <!-- /autoplan restore point: /Users/melkwon-imac/.gstack/projects/chloeyschung-AI-evolution-team5/prototype-1-autoplan-restore-20260410-215542.md -->
-# Briefly — Prototype-1 개발 계획
+# Briefly — 마스터 플랜 인덱스
 
-**브랜치:** `prototype-1`  
-**목표:** 핵심 기능 3가지를 검증할 수 있는 iOS 앱 프로토타입 제작  
+**브랜치:** `prototype-1`
 **플랫폼:** iOS (Swift / SwiftUI)
+
+> 각 Phase의 상세 내용은 개별 파일을 참조하세요.
+
+---
+
+## Phase 현황
+
+| Phase | 기능 | 상세 문서 | 상태 |
+|-------|------|-----------|------|
+| 1 | Share Extension (URL 저장) | `phase1-share-extension.md` (plan.md 하단 참조) | ✅ 완료 |
+| 2a | 콘텐츠 크롤링 (제목·썸네일·본문) | [phase2-crawling.md](phase2-crawling.md) | 🔵 진행 중 |
+| 2b | AI 요약 (Claude API) | phase2-ai-summary.md (미작성) | 🔲 대기 |
+| 3 | Swipe UX (Keep / Discard) | phase3-swipe-ux.md (미작성) | 🔲 대기 |
+
+---
+
+## 진행 로그
+
+| 날짜 | 업데이트 내용 |
+|------|--------------|
+| 2026-04-10 | plan.md 초안 작성. prototype-1 브랜치 생성. Phase 1 설계 완료. |
+| 2026-04-10 | /autoplan 실행. 팀 결정: prototype-1은 Phase 1(Share Extension)만 집중. |
+| 2026-04-13 | Share Extension 노출 위치 변경: 앱 아이콘 행 → 하단 액션 목록. `NSExtensionPointIdentifier` `com.apple.share-services` → `com.apple.ui-services`. 표시 이름 → "Save Document to Briefly". |
+| 2026-04-13 | GitHub Actions CI 추가 (prototype-1 push 시 자동 빌드). |
+| 2026-04-14 | 하단 탭바 추가 (Home / Library / Search / Account). Library 카드 UI + ItemDetailView + SafariBrowserView 구현. |
+| 2026-04-14 | plan.md를 마스터 인덱스로 재편. phase2-crawling.md 작성 완료. |
 
 ---
 
 ## 핵심 기능 범위 (Prototype-1 Scope)
-
-| 우선순위 | 기능 | 설명 | 상태 |
-|----------|------|------|------|
-| 1 | **외부 정보 저장** | iOS Share Extension으로 Safari 등 외부 앱에서 링크 저장 | 🔲 진행 예정 |
-| 2 | **간결 요약** | 저장된 URL의 내용을 AI로 3줄 요약 | 🔲 미시작 |
-| 3 | **Swipe UX** | 요약 카드 스와이프(Keep / Discard) | 🔲 미시작 |
 
 ---
 
