@@ -21,27 +21,48 @@
 
 ## 2. 사이트별 가능 범위
 
-| 사이트 유형 | OG 메타데이터 | 본문 전체 | 비고 |
+| 사이트 유형 | OG 메타데이터 | 본문 전체 | 방식 |
 |-------------|--------------|-----------|------|
-| 뉴스·블로그 (공개) | ✅ | ✅ | 기본 동작 |
-| Reddit | ✅ | ✅ (댓글 제외) | — |
-| YouTube | ✅ (썸네일·제목) | ❌ (자막 API 필요) | Phase 2c 검토 |
-| Medium (공개글) | ✅ | ✅ | — |
-| Medium (유료글) | ✅ | ❌ (paywall) | OG description으로 대체 |
-| LinkedIn | ✅ (제한적) | ❌ (JS 렌더링·로그인) | OG description으로 대체 |
-| Instagram | ❌ | ❌ | 지원 불가 |
+| 뉴스·블로그 (공개) | ✅ | ✅ | URLSession |
+| Reddit | ✅ | ✅ (댓글 제외) | URLSession |
+| Medium (공개글) | ✅ | ✅ | URLSession |
+| Medium (유료글) | ✅ | ✅ (로그인 시) | WKWebView |
+| LinkedIn | ✅ | ✅ (로그인 시) | WKWebView |
+| YouTube | ✅ (썸네일·제목) | ❌ (자막 API 필요) | URLSession, Phase 2c 검토 |
+| Instagram | ✅ (제한적) | ❌ | WKWebView, 로그인 필요 |
 
-**LinkedIn 우회 전략:** Share Extension이 호출되는 시점(사용자가 이미 로그인 상태)에
-`NSExtensionItem.attachments`로 전달되는 텍스트를 함께 캡처. Phase 2c에서 검토.
+### WKWebView + 공유 쿠키 전략
+
+Readwise Reader가 LinkedIn 전체 본문을 가져오는 원리:
+
+```
+사용자가 Safari에서 LinkedIn 로그인 (1회)
+        ↓
+iOS 시스템이 쿠키를 WKWebsiteDataStore.default()에 공유 보관
+        ↓
+Briefly 앱이 WKWebView(dataStore: .default()) 로 해당 URL 로딩
+        ↓
+사용자 세션 쿠키로 인증된 상태로 페이지 렌더링
+        ↓
+JS 완료 후 본문 텍스트 추출
+```
+
+**조건:** 사용자가 Safari(또는 인앱 브라우저)로 해당 서비스에 로그인한 적 있을 것.
+별도 백엔드 불필요. 클라이언트 단독으로 처리 가능.
 
 ---
 
 ## 3. 기술 스택
 
 ```
-URLSession (async/await)
-    └─ OG 파싱: 정규식 or SwiftSoup (경량)
-    └─ 본문 파싱: SwiftSoup (HTML → 텍스트)
+1단계: URLSession (async/await) — 빠른 선처리
+    └─ OG 파싱: SwiftSoup
+    └─ 본문 파싱: SwiftSoup (<article>, <main>, <p> 추출)
+
+2단계: WKWebView + .default() 쿠키 스토어 — JS 렌더링 필요 사이트
+    └─ WKNavigationDelegate로 로딩 완료 감지
+    └─ evaluateJavaScript()로 본문 텍스트 추출
+    └─ 백그라운드 WKWebView (화면에 표시 안 함)
 
 SwiftSoup — Swift Package Manager로 추가
     URL: https://github.com/scinfu/SwiftSoup
@@ -56,8 +77,13 @@ SwiftSoup — Swift Package Manager로 추가
 [LibraryView / ItemDetailView]
         ↓ item.fetchStatus == .pending
 [FetchCoordinator]
-        ├─ MetadataService   → OG title, ogImage, description, siteName
-        └─ ArticleService    → 본문 텍스트 (공개 사이트만)
+        ├─ MetadataService (URLSession)
+        │       → OG title, ogImage, description, siteName
+        │       → 공개 사이트 본문 텍스트
+        │
+        └─ (본문 실패 시) WebContentService (WKWebView)
+                → 공유 쿠키로 JS 렌더링
+                → LinkedIn·Medium 등 인증 필요 사이트 본문
         ↓ 결과를 SavedItem에 merge
 [StorageService]  → App Group UserDefaults에 저장
         ↓
@@ -118,7 +144,22 @@ func fetchArticleText(for url: URL) async throws -> String?
     2. SwiftSoup으로 파싱
     3. <article>, <main>, [role="main"] 순서로 탐색
     4. <p> 태그 텍스트 추출 후 join
-    5. 빈 결과이면 nil 반환
+    5. 빈 결과이면 nil 반환 → WebContentService로 폴백
+```
+
+### Step 3b. `WebContentService` 구현 (JS 렌더링 필요 사이트)
+```
+Services/WebContentService.swift
+
+func fetchWithWebView(url: URL) async throws -> String?
+    1. WKWebView(dataStore: .default()) 생성 (화면 밖에 배치)
+    2. url 로드 → WKNavigationDelegate.didFinish 대기
+    3. evaluateJavaScript("document.body.innerText") 호출
+    4. 텍스트 반환 후 WKWebView 해제
+    5. 타임아웃: 10초
+
+적용 대상 도메인: linkedin.com, medium.com, instagram.com 등
+판단 기준: ArticleService 결과가 500자 미만이면 자동 폴백
 ```
 
 ### Step 4. `FetchCoordinator` 구현
@@ -169,7 +210,7 @@ func fetchIfNeeded(for items: [SavedItem]) async
 
 - [ ] 저장된 뉴스·블로그 링크의 실제 제목·썸네일이 카드에 표시됨
 - [ ] 저장된 공개 사이트의 본문 텍스트가 `articleText`에 저장됨
-- [ ] LinkedIn·Medium: 제목·썸네일은 표시, 본문은 graceful fallback
+- [ ] LinkedIn·Medium: Safari 로그인 상태 시 전체 본문 추출 성공
 - [ ] 크롤링 중 앱 반응성 유지 (async/await, 메인 스레드 블로킹 없음)
 - [ ] 네트워크 없는 환경에서 크래시 없음
 
@@ -180,3 +221,4 @@ func fetchIfNeeded(for items: [SavedItem]) async
 | 날짜 | 내용 |
 |------|------|
 | 2026-04-14 | phase2-crawling.md 초안 작성. 아키텍처·단계 확정. |
+| 2026-04-14 | WKWebView + 공유 쿠키 전략 추가. LinkedIn·Medium 전체 본문 추출 가능하도록 계획 수정. |
