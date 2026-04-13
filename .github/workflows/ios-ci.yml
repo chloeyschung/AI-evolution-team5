@@ -24,6 +24,9 @@ jobs:
       - name: Install xcodegen
         run: brew install xcodegen
 
+      - name: Show available simulators
+        run: xcrun simctl list devicetypes | grep iPhone
+
       - name: Generate Xcode project
         working-directory: Briefly
         run: |
@@ -33,11 +36,9 @@ jobs:
       - name: Build (no code signing)
         working-directory: Briefly
         run: |
-          set -o pipefail
           xcodebuild build \
             -project Briefly.xcodeproj \
             -scheme Briefly \
             -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_ENTITLEMENTS="" \
-            | xcpretty
+            CODE_SIGN_ENTITLEMENTS=""
