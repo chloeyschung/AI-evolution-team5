@@ -33,6 +33,7 @@ from .schemas import (
     InterestTagRequest,
     InterestTagResponse,
     DeleteContentResponse,
+    PlatformCount,
     AuthStatusResponse,
     TokenRefreshRequest,
     TokenRefreshResponse,
@@ -130,14 +131,16 @@ async def record_swipe(
 @router.get("/content/pending", response_model=list[ContentResponse])
 async def list_pending_content(
     limit: int = Query(50, gt=0, le=100),
+    platform: str | None = Query(None),  # UX-004: Filter by platform
     db: AsyncSession = Depends(get_db),
 ) -> list[ContentResponse]:
     """Fetch content that hasn't been swiped yet.
 
     Returns content ordered by recency (newest first).
+    Optionally filter by platform.
     """
     repo = ContentRepository(db)
-    contents = await repo.get_pending(limit=limit)
+    contents = await repo.get_pending(limit=limit, platform=platform)
 
     return [
         ContentResponse(
@@ -157,14 +160,16 @@ async def list_pending_content(
 async def list_kept_content(
     limit: int = Query(50, gt=0, le=100),
     offset: int = Query(0, ge=0),
+    platform: str | None = Query(None),  # UX-004: Filter by platform
     db: AsyncSession = Depends(get_db),
 ) -> list[ContentResponse]:
     """Get content that was swiped Keep.
 
     Returns kept content ordered by swipe recency (newest first).
+    Optionally filter by platform.
     """
     repo = ContentRepository(db)
-    contents = await repo.get_kept(limit=limit, offset=offset)
+    contents = await repo.get_kept(limit=limit, offset=offset, platform=platform)
 
     return [
         ContentResponse(
@@ -184,14 +189,16 @@ async def list_kept_content(
 async def list_discarded_content(
     limit: int = Query(50, gt=0, le=100),
     offset: int = Query(0, ge=0),
+    platform: str | None = Query(None),  # UX-004: Filter by platform
     db: AsyncSession = Depends(get_db),
 ) -> list[ContentResponse]:
     """Get content that was swiped Discard.
 
     Returns discarded content ordered by swipe recency (newest first).
+    Optionally filter by platform.
     """
     repo = ContentRepository(db)
-    contents = await repo.get_discarded(limit=limit, offset=offset)
+    contents = await repo.get_discarded(limit=limit, offset=offset, platform=platform)
 
     return [
         ContentResponse(
@@ -345,6 +352,21 @@ async def get_content_stats(db: AsyncSession = Depends(get_db)) -> StatsResponse
         kept=stats["kept"],
         discarded=stats["discarded"],
     )
+
+
+# UX-004: Get platforms endpoint
+
+
+@router.get("/platforms", response_model=list[PlatformCount])
+async def list_platforms(db: AsyncSession = Depends(get_db)) -> list[PlatformCount]:
+    """Get list of platforms user has saved content from.
+
+    Returns platforms with content counts, sorted by count descending.
+    """
+    repo = ContentRepository(db)
+    platform_counts = await repo.get_platform_counts()
+
+    return [PlatformCount(platform=p, count=c) for p, c in platform_counts]
 
 
 # Share handler dependency - initialized in app.py

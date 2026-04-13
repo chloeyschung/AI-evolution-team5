@@ -153,35 +153,42 @@ class ContentRepository:
         await self.session.refresh(content)
         return content
 
-    async def get_pending(self, limit: int = 50) -> List[Content]:
+    async def get_pending(self, limit: int = 50, platform: str | None = None) -> List[Content]:
         """Get content that hasn't been swiped yet.
 
         Args:
             limit: Maximum number of results.
+            platform: Optional platform filter (case-insensitive).
 
         Returns:
             List of Content objects that have no swipe history.
         """
-        result = await self.session.execute(
+        query = (
             select(Content)
             .outerjoin(SwipeHistory, Content.id == SwipeHistory.content_id)
             .where(SwipeHistory.id.is_(None))
             .order_by(Content.created_at.desc())
             .limit(limit)
         )
+
+        if platform:
+            query = query.where(Content.platform.ilike(platform))
+
+        result = await self.session.execute(query)
         return list(result.scalars().all())
 
-    async def get_kept(self, limit: int = 50, offset: int = 0) -> List[Content]:
+    async def get_kept(self, limit: int = 50, offset: int = 0, platform: str | None = None) -> List[Content]:
         """Get content that was swiped Keep.
 
         Args:
             limit: Maximum number of results.
             offset: Pagination offset.
+            platform: Optional platform filter (case-insensitive).
 
         Returns:
             List of Content objects that were kept, ordered by recency.
         """
-        result = await self.session.execute(
+        query = (
             select(Content)
             .join(SwipeHistory, Content.id == SwipeHistory.content_id)
             .where(SwipeHistory.action == SwipeAction.KEEP)
@@ -189,19 +196,25 @@ class ContentRepository:
             .offset(offset)
             .limit(limit)
         )
+
+        if platform:
+            query = query.where(Content.platform.ilike(platform))
+
+        result = await self.session.execute(query)
         return list(result.scalars().unique().all())
 
-    async def get_discarded(self, limit: int = 50, offset: int = 0) -> List[Content]:
+    async def get_discarded(self, limit: int = 50, offset: int = 0, platform: str | None = None) -> List[Content]:
         """Get content that was swiped Discard.
 
         Args:
             limit: Maximum number of results.
             offset: Pagination offset.
+            platform: Optional platform filter (case-insensitive).
 
         Returns:
             List of Content objects that were discarded, ordered by recency.
         """
-        result = await self.session.execute(
+        query = (
             select(Content)
             .join(SwipeHistory, Content.id == SwipeHistory.content_id)
             .where(SwipeHistory.action == SwipeAction.DISCARD)
@@ -209,7 +222,25 @@ class ContentRepository:
             .offset(offset)
             .limit(limit)
         )
+
+        if platform:
+            query = query.where(Content.platform.ilike(platform))
+
+        result = await self.session.execute(query)
         return list(result.scalars().unique().all())
+
+    async def get_platform_counts(self) -> List[tuple[str, int]]:
+        """Get list of platforms with content counts.
+
+        Returns:
+            List of (platform, count) tuples, sorted by count descending.
+        """
+        result = await self.session.execute(
+            select(Content.platform, func.count(Content.id))
+            .group_by(Content.platform)
+            .order_by(func.count(Content.id).desc())
+        )
+        return [(row[0], row[1]) for row in result.fetchall()]
 
     async def get_stats(self) -> dict:
         """Get content statistics.

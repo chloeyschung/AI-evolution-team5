@@ -207,6 +207,15 @@ class DeleteContentResponse(BaseModel):
     message: str
 
 
+class PlatformCount(BaseModel):
+    """Schema for platform with content count."""
+
+    model_config = {"from_attributes": True}
+
+    platform: str
+    count: int
+
+
 # AUTH-001: Authentication schemas
 
 
