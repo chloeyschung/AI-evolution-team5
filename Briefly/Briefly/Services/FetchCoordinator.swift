@@ -48,12 +48,15 @@ final class FetchCoordinator {
 
             // 2단계: 본문 텍스트
             let articleText = try await fetchArticleText(for: item.url)
-            updated.articleText = articleText
+            // 본문이 없으면 ogDescription을 폴백으로 사용 (YouTube, 영상 플랫폼 등)
+            updated.articleText = articleText ?? updated.ogDescription
             updated.fetchStatus = (articleText != nil) ? .done : .partial
-            print("[Fetch] 본문 완료: \(articleText?.count ?? 0)자, status=\(updated.fetchStatus)")
+            print("[Fetch] 본문 완료: \(updated.articleText?.count ?? 0)자, status=\(updated.fetchStatus)")
 
         } catch {
             print("[Fetch] 에러: \(error)")
+            // 에러가 나도 ogDescription이 있으면 폴백으로 저장
+            updated.articleText = updated.ogDescription
             if updated.ogTitle != nil {
                 updated.fetchStatus = .partial
             } else {

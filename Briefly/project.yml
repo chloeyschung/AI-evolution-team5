@@ -40,7 +40,7 @@ targets:
           NSAllowsArbitraryLoads: true
         CFBundleURLTypes:
           - CFBundleURLSchemes:
-            - briefly
+              - briefly
             CFBundleURLName: com.briefly-ai.app
     entitlements:
       path: Briefly/Briefly.entitlements
