@@ -46,6 +46,6 @@ This document tracks all identified features for the **Briefly** project, catego
 ## Phase 3: Advanced Features
 
 ### Intelligence & Community
-- [ ] **[ADV-001] Personalized Trend Feed**: A curated feed of trending summaries based on the user's swipe history.
+- [x] **[ADV-001] Personalized Trend Feed**: A curated feed of trending summaries based on the user's swipe history. ✅ Implemented (relevance scoring with interest match, tag similarity, recency, engagement)
 - [ ] **[ADV-002] Gamified Achievement System**: Visualizing "Knowledge Gained" to encourage daily consumption.
 - [ ] **[ADV-003] Smart Reminders**: Push notifications triggered by user-defined "knowledge consumption windows."

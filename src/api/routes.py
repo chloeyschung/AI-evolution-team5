@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 from typing import Union
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -57,10 +57,41 @@ from .schemas import (
     LinkedInSyncLogResponse,
     LinkedInDisconnectResponse,
     LinkedInImportRequest,
+    TrendFeedResponse,
+    TrendFeedItem,
 )
 from src.data.models import ContentStatus, IntegrationTokens, IntegrationSyncConfig, IntegrationSyncLog
 
 router = APIRouter()
+
+
+async def get_current_user(
+    db: AsyncSession = Depends(get_db),
+    authorization: str | None = Header(None),
+) -> int:
+    """Get current user ID from Bearer token.
+
+    Args:
+        db: Database session
+        authorization: Authorization header with Bearer token
+
+    Returns:
+        User ID
+
+    Raises:
+        401: Invalid or missing token
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    token = authorization[7:]  # Remove "Bearer " prefix
+    auth_repo = AuthenticationRepository(db)
+    token_record = await auth_repo.get_token_by_access_token(token)
+
+    if not token_record:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    return token_record.user_id
 
 
 @router.post("/content", status_code=201, response_model=ContentResponse)
@@ -1981,4 +2012,88 @@ async def import_linkedin_post(
         author=content.author,
         summary=content.summary,
         created_at=content.created_at.isoformat(),
+    )
+
+
+# ADV-001: Personalized Trend Feed endpoints
+
+
+@router.get("/content/trend-feed", response_model=TrendFeedResponse)
+async def get_trend_feed(
+    limit: int = Query(20, gt=0, le=50, description="Maximum items to return"),
+    offset: int = Query(0, ge=0, description="Pagination offset"),
+    time_range: str = Query(
+        "all",
+        pattern="^(week|month|all)$",
+        description="Time range filter: week, month, or all",
+    ),
+    min_score: float = Query(
+        0.1, ge=0, le=1, description="Minimum relevance score threshold"
+    ),
+    user_id: int = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> TrendFeedResponse:
+    """Get personalized trend feed for authenticated user.
+
+    Returns kept content ranked by relevance score based on:
+    - User's interest tags
+    - Content tag similarity with preferred tags
+    - Recency (when content was kept)
+    - Engagement (keep ratio for same tags)
+
+    Args:
+        limit: Maximum items to return (1-50)
+        offset: Pagination offset
+        time_range: Filter by week, month, or all time
+        min_score: Minimum relevance score threshold (0-1)
+        user_id: Current user ID (from auth)
+        db: Database session
+
+    Returns:
+        Trend feed response with ranked items and metadata
+
+    Raises:
+        401: Not authenticated
+    """
+    from src.ai.trend_analyzer import TrendAnalyzer
+
+    # Get trend feed
+    analyzer = TrendAnalyzer(db)
+    items, total = await analyzer.get_trend_feed(
+        user_id=user_id,
+        limit=limit,
+        offset=offset,
+        time_range=time_range,
+        min_score=min_score,
+    )
+
+    # Build response
+    response_items = [
+        TrendFeedItem(
+            content=ContentResponse(
+                id=item.content.id,
+                platform=item.content.platform,
+                content_type=item.content.content_type,
+                url=item.content.url,
+                title=item.content.title,
+                author=item.content.author,
+                status=item.content.status,
+                created_at=item.content.created_at.isoformat(),
+                updated_at=(
+                    item.content.updated_at.isoformat()
+                    if item.content.updated_at
+                    else None
+                ),
+            ),
+            relevance_score=item.relevance_score,
+            matched_interests=item.matched_interests,
+            top_tags=item.top_tags,
+        )
+        for item in items
+    ]
+
+    return TrendFeedResponse(
+        items=response_items,
+        total=total,
+        has_more=offset + limit < total,
     )

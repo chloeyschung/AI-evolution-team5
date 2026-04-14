@@ -428,3 +428,23 @@ class LinkedInImportRequest(BaseModel):
     """Schema for manual LinkedIn post import."""
 
     url: str = Field(..., min_length=1, description="LinkedIn post URL")
+
+
+# ADV-001: Personalized Trend Feed schemas
+
+
+class TrendFeedItem(BaseModel):
+    """Item in trend feed."""
+
+    content: ContentResponse
+    relevance_score: float = Field(..., ge=0, le=1, description="Relevance score (0-1)")
+    matched_interests: List[str] = Field(default_factory=list, description="User interests that matched")
+    top_tags: List[str] = Field(default_factory=list, max_length=3, description="Top contributing tags")
+
+
+class TrendFeedResponse(BaseModel):
+    """Trend feed response."""
+
+    items: List[TrendFeedItem]
+    total: int = Field(..., ge=0, description="Total matching items")
+    has_more: bool = Field(..., description="Whether more items available")
