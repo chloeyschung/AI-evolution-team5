@@ -17,7 +17,10 @@ class Settings:
     """Application settings."""
 
     # JWT Settings
-    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "dev-secret-key-change-in-production")
+    _jwt_secret_key: str | None = os.getenv("JWT_SECRET_KEY")
+    if _jwt_secret_key is None:
+        raise RuntimeError("JWT_SECRET_KEY environment variable is required")
+    JWT_SECRET_KEY: str = _jwt_secret_key
     JWT_ALGORITHM: str = "HS256"
 
     # API Settings
