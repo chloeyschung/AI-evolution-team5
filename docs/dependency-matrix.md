@@ -51,8 +51,8 @@ Feature dependency mapping for optimal implementation order.
 
 | Feature | Depends On | Blocked By | Notes | F-xxx Mapping |
 |---------|------------|------------|-------|---------------|
-| **DAT-001** Hybrid Storage | AI-002 | - | Stores metadata + summary. ⚠️ Requires `status` field for INBOX/ARCHIVED (F-012). | F-018 |
-| **DAT-002** User Profile | DAT-001 | - | Preferences, stats, interest tags. ⚠️ `InterestTag` is for user-created tags, not AI-generated tags (F-014 gap). | F-017, F-015 |
+| **DAT-001** Hybrid Storage | AI-002 | - | Stores metadata + summary. ✅ `status` field (INBOX/ARCHIVED) implemented for F-012. | F-018 |
+| **DAT-002** User Profile | DAT-001 | - | Preferences, stats, interest tags. ✅ `InterestTag` for user-created tags; F-014 uses `ContentTag` (AI-generated). | F-017, F-015 |
 
 *DAT-002 provides data models for F-015 (default_sort preference). F-014 AI category filtering requires AI-003 first.
 
@@ -112,7 +112,7 @@ ING-001 → ING-002 → AI-001 → UX-001 → UX-002
 | ING-001 | ✅ [`ING-001.md`](specs/ING-001.md) | ✅ [`ING-001-record.md`](records/ING-001-record.md) | ✅ Implemented | `src/ingestion/share_handler.py` | F-004 | - |
 | ING-002 | ✅ [`ING-002.md`](specs/ING-002.md) | ✅ [`ING-002-record.md`](records/ING-002-record.md) | ✅ Implemented | `src/ingestion/extractor.py` | F-005 | - |
 | DAT-001 | ✅ [`DAT-001.md`](specs/DAT-001.md) | ✅ [`DAT-001-record.md`](records/DAT-001-record.md) | ✅ Implemented | `src/data/models.py`, `src/data/repository.py` | F-018, F-012 | ✅ ContentStatus enum (INBOX/ARCHIVED) implemented
-| DAT-002 | ✅ [`DAT-002.md`](specs/DAT-002.md) | ✅ [`DAT-002-record.md`](records/DAT-002-record.md) | ✅ Implemented | `src/data/models.py`, `src/data/repository.py`, `src/api/routes.py` | F-017, F-015 | ⚠️ `InterestTag` is user-created, not AI-generated (F-014 gap) |
+| DAT-002 | ✅ [`DAT-002.md`](specs/DAT-002.md) | ✅ [`DAT-002-record.md`](records/DAT-002-record.md) | ✅ Implemented | `src/data/models.py`, `src/data/repository.py`, `src/api/routes.py` | F-017, F-015 | ✅ `InterestTag` is user-created; F-014 AI tag filtering implemented via `tags` query param |
 | UX-001 | ✅ [`UX-001.md`](specs/UX-001.md) | ✅ [`UX-001-record.md`](records/UX-001-record.md) | ✅ Backend | `src/api/routes.py` (/content/pending) | F-008, F-009, F-010 | - |
 | UX-002 | ✅ [`UX-002.md`](specs/UX-002.md) | ✅ [`UX-002-record.md`](records/UX-002-record.md) | ✅ Implemented | `src/api/routes.py` (/swipe, /content/kept, /content/discarded, /stats) | F-009, F-011 | ✅ status field integration complete (DISCARD → ARCHIVED) |
 | UX-003 | ✅ [`UX-003.md`](specs/UX-003.md) | ✅ [`UX-003-record.md`](records/UX-003-record.md) | ✅ Implemented | `src/api/routes.py` (GET /content/{id}) | F-012 | ✅ Content detail with swipe history |

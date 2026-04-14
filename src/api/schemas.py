@@ -29,6 +29,7 @@ class ContentResponse(BaseModel):
     url: str
     title: Optional[str] = None
     author: Optional[str] = None
+    thumbnail_url: Optional[str] = None
     status: ContentStatus = ContentStatus.INBOX
     created_at: str
     updated_at: Optional[str] = None

@@ -131,6 +131,7 @@ async def create_content(
         url=content.url,
         title=content.title,
         author=content.author,
+        thumbnail_url=content.thumbnail_url,
         created_at=content.created_at.isoformat(),
     )
 
@@ -154,6 +155,7 @@ async def list_content(
             url=c.url,
             title=c.title,
             author=c.author,
+            thumbnail_url=c.thumbnail_url,
             created_at=c.created_at.isoformat(),
         )
         for c in contents
@@ -210,6 +212,7 @@ async def list_pending_content(
             url=c.url,
             title=c.title,
             author=c.author,
+            thumbnail_url=c.thumbnail_url,
             created_at=c.created_at.isoformat(),
         )
         for c in contents
@@ -240,6 +243,7 @@ async def list_kept_content(
             url=c.url,
             title=c.title,
             author=c.author,
+            thumbnail_url=c.thumbnail_url,
             created_at=c.created_at.isoformat(),
         )
         for c in contents
@@ -270,6 +274,7 @@ async def list_discarded_content(
             url=c.url,
             title=c.title,
             author=c.author,
+            thumbnail_url=c.thumbnail_url,
             created_at=c.created_at.isoformat(),
         )
         for c in contents
@@ -348,6 +353,7 @@ async def update_content_status(
             url=content.url,
             title=content.title,
             author=content.author,
+            thumbnail_url=content.thumbnail_url,
             status=content.status,
             created_at=content.created_at.isoformat(),
             updated_at=content.updated_at.isoformat(),
@@ -546,6 +552,7 @@ async def search_content(
             url=c.url,
             title=c.title,
             author=c.author,
+            thumbnail_url=c.thumbnail_url,
             created_at=c.created_at.isoformat(),
         )
         for c in results
@@ -1963,7 +1970,7 @@ async def get_linkedin_sync_logs(
     return [
         LinkedInSyncLogResponse(
             id=log.id,
-            resource_id=log.playlist_id,
+            resource_id=log.resource_id,
             status=log.status,
             ingested_count=log.ingested_count,
             skipped_count=log.skipped_count,
@@ -2018,7 +2025,7 @@ async def import_linkedin_post(
         raise HTTPException(status_code=500, detail="failed_to_get_content_id")
 
     content_repo = ContentRepository(db)
-    content = await content_repo.get(content_id)
+    content = await content_repo.get_by_id(content_id)
     if not content:
         raise HTTPException(status_code=404, detail="content_not_found")
 
@@ -2096,6 +2103,7 @@ async def get_trend_feed(
                 url=item.content.url,
                 title=item.content.title,
                 author=item.content.author,
+                thumbnail_url=item.content.thumbnail_url,
                 status=item.content.status,
                 created_at=item.content.created_at.isoformat(),
                 updated_at=(
