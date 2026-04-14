@@ -610,13 +610,16 @@ async def update_profile(
 
 
 @router.get("/preferences", response_model=UserPreferencesResponse)
-async def get_preferences(db: AsyncSession = Depends(get_db)) -> UserPreferencesResponse:
+async def get_preferences(
+    user_id: int = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UserPreferencesResponse:
     """Get user preferences.
 
     Auto-creates preferences with defaults if they don't exist.
     """
     repo = UserProfileRepository(db)
-    preferences = await repo.get_preferences()
+    preferences = await repo.get_preferences(user_id)
 
     return UserPreferencesResponse(
         theme=preferences.theme,
@@ -629,11 +632,13 @@ async def get_preferences(db: AsyncSession = Depends(get_db)) -> UserPreferences
 @router.patch("/preferences", response_model=UserPreferencesResponse)
 async def update_preferences(
     data: UserPreferencesUpdate,
+    user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> UserPreferencesResponse:
     """Update user preferences."""
     repo = UserProfileRepository(db)
     preferences = await repo.update_preferences(
+        user_id=user_id,
         theme=data.theme,
         notifications_enabled=data.notifications_enabled,
         daily_goal=data.daily_goal,
@@ -669,15 +674,19 @@ async def get_user_statistics(db: AsyncSession = Depends(get_db)) -> UserStatist
 
 
 @router.get("/interests", response_model=list[str])
-async def get_interests(db: AsyncSession = Depends(get_db)) -> list[str]:
+async def get_interests(
+    user_id: int = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[str]:
     """Get all user interest tags."""
     repo = UserProfileRepository(db)
-    return await repo.get_interest_tags()
+    return await repo.get_interest_tags(user_id)
 
 
 @router.post("/interests", status_code=201, response_model=InterestTagResponse)
 async def add_interest(
     data: InterestTagRequest,
+    user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> InterestTagResponse:
     """Add an interest tag.
@@ -685,16 +694,20 @@ async def add_interest(
     Tags are case-insensitive and unique per user.
     """
     repo = UserProfileRepository(db)
-    tag = await repo.add_interest_tag(data.tag)
+    tag = await repo.add_interest_tag(user_id, data.tag)
 
     return InterestTagResponse(id=tag.id, tag=tag.tag)
 
 
 @router.delete("/interests/{tag}")
-async def remove_interest(tag: str, db: AsyncSession = Depends(get_db)) -> dict:
+async def remove_interest(
+    tag: str,
+    user_id: int = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
     """Remove an interest tag."""
     repo = UserProfileRepository(db)
-    await repo.remove_interest_tag(tag)
+    await repo.remove_interest_tag(user_id, tag)
 
     return {"message": f"Interest tag '{tag}' removed successfully"}
 

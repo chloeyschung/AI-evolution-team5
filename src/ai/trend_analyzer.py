@@ -85,7 +85,7 @@ class TrendAnalyzer:
             return [], 0
 
         # Get user context
-        user_interests = await self._user_profile_repo.get_interest_tags()
+        user_interests = await self._user_profile_repo.get_interest_tags(user_id)
         preferred_tags = await self._get_preferred_tags(user_id)
 
         # Filter by time range

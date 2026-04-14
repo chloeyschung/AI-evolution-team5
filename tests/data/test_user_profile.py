@@ -92,7 +92,7 @@ class TestUserPreferencesRepository:
     async def test_get_preferences_creates_with_defaults(self, db_session):
         """Test that get_preferences creates preferences with defaults."""
         repo = UserProfileRepository(db_session)
-        preferences = await repo.get_preferences()
+        preferences = await repo.get_preferences(user_id=1)
 
         assert preferences is not None
         assert preferences.user_id == 1
@@ -106,11 +106,11 @@ class TestUserPreferencesRepository:
         repo = UserProfileRepository(db_session)
 
         # Create preferences
-        prefs1 = await repo.get_preferences()
-        await repo.update_preferences(theme=Theme.DARK, daily_goal=30)
+        prefs1 = await repo.get_preferences(user_id=1)
+        await repo.update_preferences(user_id=1, theme=Theme.DARK, daily_goal=30)
 
         # Get preferences again
-        prefs2 = await repo.get_preferences()
+        prefs2 = await repo.get_preferences(user_id=1)
 
         assert prefs1.id == prefs2.id
         assert prefs2.theme == Theme.DARK
@@ -121,11 +121,12 @@ class TestUserPreferencesRepository:
         repo = UserProfileRepository(db_session)
 
         # Get preferences
-        preferences = await repo.get_preferences()
+        preferences = await repo.get_preferences(user_id=1)
         original_updated_at = preferences.updated_at
 
         # Update preferences
         updated = await repo.update_preferences(
+            user_id=1,
             theme=Theme.DARK,
             notifications_enabled=False,
             daily_goal=50,
@@ -143,10 +144,10 @@ class TestUserPreferencesRepository:
         repo = UserProfileRepository(db_session)
 
         # Create preferences
-        preferences = await repo.get_preferences()
+        preferences = await repo.get_preferences(user_id=1)
 
         # Update only theme
-        updated = await repo.update_preferences(theme=Theme.LIGHT)
+        updated = await repo.update_preferences(user_id=1, theme=Theme.LIGHT)
 
         assert updated.theme == Theme.LIGHT
         assert updated.notifications_enabled == 1  # Should remain default (SQLite bool as int)
@@ -247,7 +248,7 @@ class TestInterestTagRepository:
     async def test_add_interest_tag_creates_new(self, db_session):
         """Test adding a new interest tag."""
         repo = UserProfileRepository(db_session)
-        tag = await repo.add_interest_tag("Technology")
+        tag = await repo.add_interest_tag(user_id=1, tag="Technology")
 
         assert tag is not None
         assert tag.user_id == 1
@@ -258,10 +259,10 @@ class TestInterestTagRepository:
         repo = UserProfileRepository(db_session)
 
         # Add tag
-        tag1 = await repo.add_interest_tag("Technology")
+        tag1 = await repo.add_interest_tag(user_id=1, tag="Technology")
 
         # Add same tag with different case
-        tag2 = await repo.add_interest_tag("TECHNOLOGY")
+        tag2 = await repo.add_interest_tag(user_id=1, tag="TECHNOLOGY")
 
         assert tag1.id == tag2.id
 
@@ -269,8 +270,8 @@ class TestInterestTagRepository:
         """Test that tag whitespace is trimmed."""
         repo = UserProfileRepository(db_session)
 
-        tag1 = await repo.add_interest_tag("  Design  ")
-        tag2 = await repo.add_interest_tag("Design")
+        tag1 = await repo.add_interest_tag(user_id=1, tag="  Design  ")
+        tag2 = await repo.add_interest_tag(user_id=1, tag="Design")
 
         assert tag1.id == tag2.id
 
@@ -279,17 +280,17 @@ class TestInterestTagRepository:
         repo = UserProfileRepository(db_session)
 
         # Add tag
-        await repo.add_interest_tag("Technology")
+        await repo.add_interest_tag(user_id=1, tag="Technology")
 
         # Verify it exists
-        tags = await repo.get_interest_tags()
+        tags = await repo.get_interest_tags(user_id=1)
         assert "technology" in tags
 
         # Remove tag
-        await repo.remove_interest_tag("Technology")
+        await repo.remove_interest_tag(user_id=1, tag="Technology")
 
         # Verify it's removed
-        tags = await repo.get_interest_tags()
+        tags = await repo.get_interest_tags(user_id=1)
         assert "technology" not in tags
 
     async def test_get_interest_tags(self, db_session):
@@ -297,11 +298,11 @@ class TestInterestTagRepository:
         repo = UserProfileRepository(db_session)
 
         # Add multiple tags
-        await repo.add_interest_tag("Technology")
-        await repo.add_interest_tag("Design")
-        await repo.add_interest_tag("Productivity")
+        await repo.add_interest_tag(user_id=1, tag="Technology")
+        await repo.add_interest_tag(user_id=1, tag="Design")
+        await repo.add_interest_tag(user_id=1, tag="Productivity")
 
-        tags = await repo.get_interest_tags()
+        tags = await repo.get_interest_tags(user_id=1)
 
         assert len(tags) == 3
         assert "technology" in tags

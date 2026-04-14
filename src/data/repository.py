@@ -528,22 +528,21 @@ class UserProfileRepository(BaseRepository[UserProfile]):
 
         return profile
 
-    async def get_preferences(self) -> UserPreferences:
+    async def get_preferences(self, user_id: int) -> UserPreferences:
         """Get user preferences with defaults.
+
+        Args:
+            user_id: The user ID to get preferences for.
 
         Returns:
             UserPreferences object (existing or newly created with defaults).
-
-        Note:
-            MVP: Single-user system (user_id=1 hardcoded).
-            TODO: Replace with authenticated user_id from token for multi-user support.
         """
-        result = await self.session.execute(select(UserPreferences).where(UserPreferences.user_id == 1))
+        result = await self.session.execute(select(UserPreferences).where(UserPreferences.user_id == user_id))
         preferences = result.scalar_one_or_none()
 
         if preferences is None:
             preferences = UserPreferences(
-                user_id=1,
+                user_id=user_id,
                 theme=Theme.SYSTEM,
                 notifications_enabled=True,
                 daily_goal=20,
@@ -557,6 +556,7 @@ class UserProfileRepository(BaseRepository[UserProfile]):
 
     async def update_preferences(
         self,
+        user_id: int,
         theme: Theme | None = None,
         notifications_enabled: bool | None = None,
         daily_goal: int | None = None,
@@ -565,6 +565,7 @@ class UserProfileRepository(BaseRepository[UserProfile]):
         """Update preferences fields.
 
         Args:
+            user_id: The user ID to update preferences for.
             theme: Optional theme to update.
             notifications_enabled: Optional notifications setting to update.
             daily_goal: Optional daily goal to update.
@@ -573,7 +574,7 @@ class UserProfileRepository(BaseRepository[UserProfile]):
         Returns:
             Updated UserPreferences object.
         """
-        preferences = await self.get_preferences()
+        preferences = await self.get_preferences(user_id)
 
         if theme is not None:
             preferences.theme = theme
@@ -653,25 +654,22 @@ class UserProfileRepository(BaseRepository[UserProfile]):
             "last_swipe_at": last_swipe_at,
         }
 
-    async def add_interest_tag(self, tag: str) -> InterestTag:
+    async def add_interest_tag(self, user_id: int, tag: str) -> InterestTag:
         """Add an interest tag (unique per user).
 
         Args:
+            user_id: The user ID to add the tag for.
             tag: The tag to add (case-insensitive, trimmed).
 
         Returns:
             InterestTag object (existing or newly created).
-
-        Note:
-            MVP: Single-user system (user_id=1 hardcoded).
-            TODO: Replace with authenticated user_id from token for multi-user support.
         """
         tag_normalized = tag.strip().lower()
 
         # Check if tag already exists (case-insensitive)
         result = await self.session.execute(
             select(InterestTag).where(
-                InterestTag.user_id == 1, InterestTag.tag.ilike(tag_normalized)
+                InterestTag.user_id == user_id, InterestTag.tag.ilike(tag_normalized)
             )
         )
         existing = result.scalar_one_or_none()
@@ -680,44 +678,40 @@ class UserProfileRepository(BaseRepository[UserProfile]):
             return existing
 
         # Create new tag
-        interest_tag = InterestTag(user_id=1, tag=tag_normalized)
+        interest_tag = InterestTag(user_id=user_id, tag=tag_normalized)
         self.session.add(interest_tag)
         await self.session.commit()
         await self.session.refresh(interest_tag)
 
         return interest_tag
 
-    async def remove_interest_tag(self, tag: str) -> None:
+    async def remove_interest_tag(self, user_id: int, tag: str) -> None:
         """Remove an interest tag.
 
         Args:
+            user_id: The user ID to remove the tag for.
             tag: The tag to remove (case-insensitive).
-
-        Note:
-            MVP: Single-user system (user_id=1 hardcoded).
-            TODO: Replace with authenticated user_id from token for multi-user support.
         """
         tag_normalized = tag.strip().lower()
 
         await self.session.execute(
             delete(InterestTag).where(
-                InterestTag.user_id == 1, InterestTag.tag.ilike(tag_normalized)
+                InterestTag.user_id == user_id, InterestTag.tag.ilike(tag_normalized)
             )
         )
         await self.session.commit()
 
-    async def get_interest_tags(self) -> List[str]:
+    async def get_interest_tags(self, user_id: int) -> List[str]:
         """Get all user interest tags.
+
+        Args:
+            user_id: The user ID to get tags for.
 
         Returns:
             List of tag strings.
-
-        Note:
-            MVP: Single-user system (user_id=1 hardcoded).
-            TODO: Replace with authenticated user_id from token for multi-user support.
         """
         result = await self.session.execute(
-            select(InterestTag.tag).where(InterestTag.user_id == 1).order_by(InterestTag.tag)
+            select(InterestTag.tag).where(InterestTag.user_id == user_id).order_by(InterestTag.tag)
         )
         return [row[0] for row in result.fetchall()]
 

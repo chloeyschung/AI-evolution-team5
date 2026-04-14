@@ -80,9 +80,9 @@ class TestProfileEndpoints:
 class TestPreferencesEndpoints:
     """Tests for /preferences endpoints."""
 
-    async def test_get_preferences_creates_default(self, client):
+    async def test_get_preferences_creates_default(self, authenticated_client):
         """Test GET /preferences creates default preferences."""
-        response = await client.get("/api/v1/preferences")
+        response = await authenticated_client.get("/api/v1/preferences")
 
         assert response.status_code == 200
         data = response.json()
@@ -91,9 +91,9 @@ class TestPreferencesEndpoints:
         assert data["daily_goal"] == 20
         assert data["default_sort"] == "recency"
 
-    async def test_update_preferences(self, client):
+    async def test_update_preferences(self, authenticated_client):
         """Test PATCH /preferences updates all fields."""
-        response = await client.patch(
+        response = await authenticated_client.patch(
             "/api/v1/preferences",
             json={"theme": "dark", "notifications_enabled": False, "daily_goal": 50, "default_sort": "platform"}
         )
@@ -105,13 +105,13 @@ class TestPreferencesEndpoints:
         assert data["daily_goal"] == 50
         assert data["default_sort"] == "platform"
 
-    async def test_update_preferences_partial(self, client):
+    async def test_update_preferences_partial(self, authenticated_client):
         """Test PATCH /preferences with partial update."""
         # First create preferences
-        await client.get("/api/v1/preferences")
+        await authenticated_client.get("/api/v1/preferences")
 
         # Update only theme
-        response = await client.patch(
+        response = await authenticated_client.patch(
             "/api/v1/preferences",
             json={"theme": "light"}
         )
@@ -122,9 +122,9 @@ class TestPreferencesEndpoints:
         assert data["notifications_enabled"] is True  # Should remain default
         assert data["daily_goal"] == 20  # Should remain default
 
-    async def test_update_preferences_invalid_daily_goal(self, client):
+    async def test_update_preferences_invalid_daily_goal(self, authenticated_client):
         """Test PATCH /preferences rejects invalid daily_goal."""
-        response = await client.patch(
+        response = await authenticated_client.patch(
             "/api/v1/preferences",
             json={"daily_goal": -10}
         )
@@ -153,16 +153,16 @@ class TestStatisticsEndpoints:
 class TestInterestsEndpoints:
     """Tests for /interests endpoints."""
 
-    async def test_get_interests_empty(self, client):
+    async def test_get_interests_empty(self, authenticated_client):
         """Test GET /interests with no tags."""
-        response = await client.get("/api/v1/interests")
+        response = await authenticated_client.get("/api/v1/interests")
 
         assert response.status_code == 200
         assert response.json() == []
 
-    async def test_add_interest(self, client):
+    async def test_add_interest(self, authenticated_client):
         """Test POST /interests adds a tag."""
-        response = await client.post(
+        response = await authenticated_client.post(
             "/api/v1/interests",
             json={"tag": "Technology"}
         )
@@ -171,13 +171,13 @@ class TestInterestsEndpoints:
         data = response.json()
         assert data["tag"] == "technology"  # Should be normalized to lowercase
 
-    async def test_add_interest_case_insensitive(self, client):
+    async def test_add_interest_case_insensitive(self, authenticated_client):
         """Test POST /interests is case-insensitive."""
         # Add tag
-        await client.post("/api/v1/interests", json={"tag": "Technology"})
+        await authenticated_client.post("/api/v1/interests", json={"tag": "Technology"})
 
         # Add same tag with different case
-        response = await client.post(
+        response = await authenticated_client.post(
             "/api/v1/interests",
             json={"tag": "TECHNOLOGY"}
         )
@@ -186,9 +186,9 @@ class TestInterestsEndpoints:
         # Should return existing tag
         assert response.json()["tag"] == "technology"
 
-    async def test_add_interest_trim_whitespace(self, client):
+    async def test_add_interest_trim_whitespace(self, authenticated_client):
         """Test POST /interests trims whitespace."""
-        response = await client.post(
+        response = await authenticated_client.post(
             "/api/v1/interests",
             json={"tag": "  Design  "}
         )
@@ -196,14 +196,14 @@ class TestInterestsEndpoints:
         assert response.status_code == 201
         assert response.json()["tag"] == "design"
 
-    async def test_get_interests_after_add(self, client):
+    async def test_get_interests_after_add(self, authenticated_client):
         """Test GET /interests returns added tags."""
         # Add multiple tags
-        await client.post("/api/v1/interests", json={"tag": "Technology"})
-        await client.post("/api/v1/interests", json={"tag": "Design"})
-        await client.post("/api/v1/interests", json={"tag": "Productivity"})
+        await authenticated_client.post("/api/v1/interests", json={"tag": "Technology"})
+        await authenticated_client.post("/api/v1/interests", json={"tag": "Design"})
+        await authenticated_client.post("/api/v1/interests", json={"tag": "Productivity"})
 
-        response = await client.get("/api/v1/interests")
+        response = await authenticated_client.get("/api/v1/interests")
 
         assert response.status_code == 200
         data = response.json()
@@ -212,31 +212,31 @@ class TestInterestsEndpoints:
         assert "design" in data
         assert "productivity" in data
 
-    async def test_remove_interest(self, client):
+    async def test_remove_interest(self, authenticated_client):
         """Test DELETE /interests/{tag} removes a tag."""
         # Add tag
-        await client.post("/api/v1/interests", json={"tag": "TestTag"})
+        await authenticated_client.post("/api/v1/interests", json={"tag": "TestTag"})
 
         # Verify it exists
-        tags = await client.get("/api/v1/interests")
+        tags = await authenticated_client.get("/api/v1/interests")
         assert "testtag" in tags.json()
 
         # Remove tag
-        response = await client.delete("/api/v1/interests/TestTag")
+        response = await authenticated_client.delete("/api/v1/interests/TestTag")
 
         assert response.status_code == 200
         assert "message" in response.json()
 
         # Verify it's removed
-        tags = await client.get("/api/v1/interests")
+        tags = await authenticated_client.get("/api/v1/interests")
         assert "testtag" not in tags.json()
 
-    async def test_remove_interest_case_insensitive(self, client):
+    async def test_remove_interest_case_insensitive(self, authenticated_client):
         """Test DELETE /interests/{tag} is case-insensitive."""
         # Add tag
-        await client.post("/api/v1/interests", json={"tag": "TestTag"})
+        await authenticated_client.post("/api/v1/interests", json={"tag": "TestTag"})
 
         # Remove with different case
-        response = await client.delete("/api/v1/interests/testtag")
+        response = await authenticated_client.delete("/api/v1/interests/testtag")
 
         assert response.status_code == 200
