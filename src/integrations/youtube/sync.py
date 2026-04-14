@@ -154,7 +154,8 @@ class YouTubeSyncService:
                 )
             except Exception as e:
                 # Log but don't fail - summary can be generated later
-                print(f"Failed to generate summary for video {video.video_id}: {e}")
+                import logging
+                logging.warning(f"Failed to generate summary for video {video.video_id}: {e}")
 
         # Create content metadata
         metadata = ContentMetadata(

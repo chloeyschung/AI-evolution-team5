@@ -71,10 +71,10 @@ async def test_youtube_client_refresh_token():
         "expires_in": 3600,
     }
 
-    with patch("httpx.AsyncClient") as mock_client_class:
+    with patch("src.integrations.youtube.client.async_client_context") as mock_context:
         mock_instance = AsyncMock()
         mock_instance.post = AsyncMock(return_value=mock_response)
-        mock_client_class.return_value.__aenter__.return_value = mock_instance
+        mock_context.return_value.__aenter__.return_value = mock_instance
 
         token = await client._refresh_token()
 

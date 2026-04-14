@@ -1658,7 +1658,7 @@ async def youtube_callback(
     )
 
     # Exchange code for tokens
-    async with httpx.AsyncClient() as client:
+    async with async_client_context() as client:
         response = await client.post(
             "https://oauth2.googleapis.com/token",
             data={
@@ -1668,6 +1668,7 @@ async def youtube_callback(
                 "redirect_uri": redirect_uri,
                 "grant_type": "authorization_code",
             },
+            timeout=10.0,
         )
 
     if response.status_code != 200:
@@ -1677,7 +1678,7 @@ async def youtube_callback(
 
     # Store tokens
     repo = IntegrationRepository(db)
-    expires_at = datetime.now(timezone.utc) + timedelta(seconds=token_data.get("expires_in", 3600))
+    expires_at = utc_now() + timedelta(seconds=token_data.get("expires_in", 3600))
 
     await repo.save_tokens(
         user_id=user_id,

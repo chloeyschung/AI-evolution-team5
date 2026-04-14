@@ -14,6 +14,8 @@ from src.integrations.youtube.models import (
     YouTubePlaylist,
     YouTubeVideo,
 )
+from src.utils.http_client import async_client_context
+from src.utils.datetime_utils import utc_now
 
 
 class YouTubeClientError(Exception):
@@ -82,7 +84,7 @@ class YouTubeClient:
         # Check if token is still valid (with 5 minute buffer)
         if (
             self.token_expires_at
-            and datetime.now(timezone.utc)
+            and utc_now()
             < self.token_expires_at - timedelta(minutes=5)
         ):
             return self.access_token or ""
@@ -103,7 +105,7 @@ class YouTubeClient:
         Raises:
             YouTubeAuthError: If refresh fails.
         """
-        async with httpx.AsyncClient() as client:
+        async with async_client_context() as client:
             response = await client.post(
                 f"{self.OAUTH_BASE_URL}/token",
                 data={
@@ -112,6 +114,7 @@ class YouTubeClient:
                     "refresh_token": self.refresh_token,
                     "grant_type": "refresh_token",
                 },
+                timeout=10.0,
             )
 
             if response.status_code != 200:
@@ -119,7 +122,7 @@ class YouTubeClient:
 
             data = response.json()
             self.access_token = data["access_token"]
-            self.token_expires_at = datetime.now(timezone.utc) + timedelta(
+            self.token_expires_at = utc_now() + timedelta(
                 seconds=data.get("expires_in", 3600)
             )
 
@@ -136,11 +139,12 @@ class YouTubeClient:
         """
         access_token = await self.get_access_token()
 
-        async with httpx.AsyncClient() as client:
+        async with async_client_context() as client:
             response = await client.get(
                 f"{self.API_BASE_URL}/channels",
                 params={"part": "id", "mine": True},
                 headers={"Authorization": f"Bearer {access_token}"},
+                timeout=10.0,
             )
 
             if response.status_code != 200:
@@ -164,11 +168,12 @@ class YouTubeClient:
         """
         access_token = await self.get_access_token()
 
-        async with httpx.AsyncClient() as client:
+        async with async_client_context() as client:
             response = await client.get(
                 f"{self.API_BASE_URL}/playlists",
                 params={"part": "id,snippet,contentDetails", "mine": True, "maxResults": max_results},
                 headers={"Authorization": f"Bearer {access_token}"},
+                timeout=10.0,
             )
 
             if response.status_code != 200:
@@ -194,7 +199,7 @@ class YouTubeClient:
         videos = []
         page_token: Optional[str] = None
 
-        async with httpx.AsyncClient() as client:
+        async with async_client_context() as client:
             while True:
                 response = await client.get(
                     f"{self.API_BASE_URL}/playlistItems",
@@ -205,6 +210,7 @@ class YouTubeClient:
                         "pageToken": page_token or "",
                     },
                     headers={"Authorization": f"Bearer {access_token}"},
+                    timeout=10.0,
                 )
 
                 if response.status_code != 200:
@@ -278,10 +284,11 @@ class YouTubeClient:
         if not self.access_token:
             return True
 
-        async with httpx.AsyncClient() as client:
+        async with async_client_context() as client:
             response = await client.post(
                 "https://oauth2.googleapis.com/revoke",
                 data={"token": self.access_token},
+                timeout=10.0,
             )
 
             return response.status_code == 200

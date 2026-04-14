@@ -7,6 +7,8 @@ import httpx
 
 from ...ai.metadata_extractor import MetadataExtractor
 from .models import LinkedInPost, LinkedInSavedItem
+from src.utils.http_client import async_client_context
+from src.utils.datetime_utils import utc_now
 
 
 class LinkedInClientError(Exception):
@@ -63,7 +65,7 @@ class LinkedInClient:
         # Note: LinkedIn API for saved items requires specific permissions
         # This is a placeholder implementation - actual API endpoint may vary
         # LinkedIn's saved items API: GET /v2/me/savedItems
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with async_client_context() as client:
             headers = {
                 "Authorization": f"Bearer {self.access_token}",
                 "Linkedin-Version": "202401",
@@ -77,6 +79,7 @@ class LinkedInClient:
                     f"{self.BASE_URL}/me/savedItems",
                     headers=headers,
                     params={"count": count},
+                    timeout=30.0,
                 )
 
                 if response.status_code == 401:
@@ -109,7 +112,7 @@ class LinkedInClient:
                 item = LinkedInSavedItem(
                     urn=element.get("urn", ""),
                     saved_at=datetime.fromisoformat(
-                        element.get("savedAt", datetime.now(timezone.utc).isoformat())
+                        element.get("savedAt", utc_now().isoformat())
                     ).replace(tzinfo=timezone.utc),
                     target_urn=element.get("target", {}).get("urn", ""),
                 )
@@ -134,8 +137,8 @@ class LinkedInClient:
         """
         try:
             # Use metadata extractor to get post data from HTML
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(url)
+            async with async_client_context() as client:
+                response = await client.get(url, timeout=30.0)
                 if response.status_code != 200:
                     return None
 

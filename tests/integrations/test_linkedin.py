@@ -61,10 +61,10 @@ async def test_linkedin_client_get_saved_items_success():
         ]
     }
 
-    with patch("httpx.AsyncClient") as mock_client_class:
+    with patch("src.integrations.linkedin.client.async_client_context") as mock_context:
         mock_instance = AsyncMock()
         mock_instance.get = AsyncMock(return_value=mock_response)
-        mock_client_class.return_value.__aenter__.return_value = mock_instance
+        mock_context.return_value.__aenter__.return_value = mock_instance
 
         items = await client.get_saved_items(count=10)
 
@@ -81,10 +81,10 @@ async def test_linkedin_client_get_saved_items_auth_error():
     mock_response = MagicMock()
     mock_response.status_code = 401
 
-    with patch("httpx.AsyncClient") as mock_client_class:
+    with patch("src.integrations.linkedin.client.async_client_context") as mock_context:
         mock_instance = AsyncMock()
         mock_instance.get = AsyncMock(return_value=mock_response)
-        mock_client_class.return_value.__aenter__.return_value = mock_instance
+        mock_context.return_value.__aenter__.return_value = mock_instance
 
         with pytest.raises(LinkedInAuthError, match="Invalid or expired access token"):
             await client.get_saved_items()
@@ -98,10 +98,10 @@ async def test_linkedin_client_get_saved_items_rate_limit():
     mock_response = MagicMock()
     mock_response.status_code = 429
 
-    with patch("httpx.AsyncClient") as mock_client_class:
+    with patch("src.integrations.linkedin.client.async_client_context") as mock_context:
         mock_instance = AsyncMock()
         mock_instance.get = AsyncMock(return_value=mock_response)
-        mock_client_class.return_value.__aenter__.return_value = mock_instance
+        mock_context.return_value.__aenter__.return_value = mock_instance
 
         with pytest.raises(LinkedInRateLimitError, match="Rate limit exceeded"):
             await client.get_saved_items()
@@ -116,10 +116,10 @@ async def test_linkedin_client_get_saved_items_api_error():
     mock_response.status_code = 500
     mock_response.text = "Internal Server Error"
 
-    with patch("httpx.AsyncClient") as mock_client_class:
+    with patch("src.integrations.linkedin.client.async_client_context") as mock_context:
         mock_instance = AsyncMock()
         mock_instance.get = AsyncMock(return_value=mock_response)
-        mock_client_class.return_value.__aenter__.return_value = mock_instance
+        mock_context.return_value.__aenter__.return_value = mock_instance
 
         with pytest.raises(LinkedInAPIError):
             await client.get_saved_items()
@@ -144,10 +144,10 @@ async def test_linkedin_client_get_post_from_url_success():
     </html>
     """
 
-    with patch("httpx.AsyncClient") as mock_client_class:
+    with patch("src.integrations.linkedin.client.async_client_context") as mock_context:
         mock_instance = AsyncMock()
         mock_instance.get = AsyncMock(return_value=mock_response)
-        mock_client_class.return_value.__aenter__.return_value = mock_instance
+        mock_context.return_value.__aenter__.return_value = mock_instance
 
         post = await client.get_post_from_url("https://www.linkedin.com/feed/update/urn:li:share:123/")
 
@@ -164,10 +164,10 @@ async def test_linkedin_client_get_post_from_url_not_found():
     mock_response = MagicMock()
     mock_response.status_code = 404
 
-    with patch("httpx.AsyncClient") as mock_client_class:
+    with patch("src.integrations.linkedin.client.async_client_context") as mock_context:
         mock_instance = AsyncMock()
         mock_instance.get = AsyncMock(return_value=mock_response)
-        mock_client_class.return_value.__aenter__.return_value = mock_instance
+        mock_context.return_value.__aenter__.return_value = mock_instance
 
         post = await client.get_post_from_url("https://www.linkedin.com/feed/update/urn:li:share:999/")
 

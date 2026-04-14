@@ -60,7 +60,8 @@ class Categorizer:
 
         except Exception as e:
             # Log error and return empty list (don't block content save)
-            print(f"Tag generation failed: {e}")
+            import logging
+            logging.warning(f"Tag generation failed: {e}")
             return []
 
     def _build_tag_prompt(self, title: str, summary: Optional[str]) -> str:
