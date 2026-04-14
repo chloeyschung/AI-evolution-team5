@@ -756,13 +756,15 @@ async def refresh_auth_token(
     auth_repo = AuthenticationRepository(db)
 
     # Refresh token (includes token rotation)
-    token_record = await auth_repo.refresh_access_token(data.refresh_token)
+    refresh_result = await auth_repo.refresh_access_token(data.refresh_token)
 
-    if not token_record:
+    if not refresh_result:
         raise HTTPException(status_code=401, detail="invalid_refresh_token")
 
+    token_record, access_token = refresh_result
+
     return TokenRefreshResponse(
-        access_token=token_record.access_token,
+        access_token=access_token,  # Plaintext JWT for client
         expires_at=token_record.expires_at.isoformat(),
     )
 
@@ -847,11 +849,11 @@ async def google_login(
         )
         is_new_user = True
 
-    # Create authentication tokens
-    token_record = await auth_repo.create_tokens(existing_user.id)
+    # Create authentication tokens (returns tuple of record and plaintext JWT)
+    token_record, access_token = await auth_repo.create_tokens(existing_user.id)
 
     return GoogleLoginResponse(
-        access_token=token_record.access_token,
+        access_token=access_token,  # Plaintext JWT for client
         refresh_token=token_record.refresh_token,
         expires_at=token_record.expires_at.isoformat(),
         user=UserProfileResponse(

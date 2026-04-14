@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.data.models import AuthenticationToken, UserProfile
 from src.auth import tokens as token_utils
 from src.utils.datetime_utils import utc_now
+from src.utils.token_hashing import hash_access_token, verify_access_token
 
 
 class AuthenticationRepository:
@@ -23,7 +24,7 @@ class AuthenticationRepository:
         user_id: int,
         access_expires_in: int = 3600,  # 1 hour
         refresh_expires_in: int = 604800,  # 7 days
-    ) -> AuthenticationToken:
+    ) -> tuple[AuthenticationToken, str]:
         """Create new access and refresh tokens for a user.
 
         Args:
@@ -32,7 +33,7 @@ class AuthenticationRepository:
             refresh_expires_in: Refresh token expiry in seconds (default: 7 days)
 
         Returns:
-            AuthenticationToken with generated tokens
+            Tuple of (AuthenticationToken with hashed access token, plaintext JWT access token)
         """
         # Generate JWT access token
         access_token = token_utils.create_access_token(user_id)
@@ -47,10 +48,10 @@ class AuthenticationRepository:
         # Check if tokens already exist and revoke them (token rotation)
         await self._revoke_existing_tokens(user_id)
 
-        # Create new token record
+        # Create new token record with hashed access token
         token = AuthenticationToken(
             user_id=user_id,
-            access_token=access_token,
+            access_token=hash_access_token(access_token),  # Hash for secure storage
             refresh_token=refresh_token,
             expires_at=expires_at,
         )
@@ -59,7 +60,7 @@ class AuthenticationRepository:
         await self.db.commit()
         await self.db.refresh(token)
 
-        return token
+        return token, access_token  # Return both hashed record and plaintext JWT
 
     async def get_token_by_user_id(self, user_id: int) -> Optional[AuthenticationToken]:
         """Get authentication token by user ID.
@@ -86,9 +87,12 @@ class AuthenticationRepository:
         Returns:
             AuthenticationToken if found and valid, None otherwise
         """
+        # Hash the access token for comparison
+        hashed_token = hash_access_token(access_token)
+
         result = await self.db.execute(
             select(AuthenticationToken)
-            .where(AuthenticationToken.access_token == access_token)
+            .where(AuthenticationToken.access_token == hashed_token)
             .where(AuthenticationToken.revoked_at.is_(None))
         )
         token = result.scalar_one_or_default(None)
@@ -120,7 +124,7 @@ class AuthenticationRepository:
         self,
         refresh_token: str,
         access_expires_in: int = 3600,
-    ) -> Optional[AuthenticationToken]:
+    ) -> Optional[tuple[AuthenticationToken, str]]:
         """Refresh access token using refresh token.
 
         Implements token rotation: issues new refresh token on each refresh.
@@ -130,7 +134,7 @@ class AuthenticationRepository:
             access_expires_in: New access token expiry in seconds
 
         Returns:
-            Updated AuthenticationToken with new tokens, None if refresh failed
+            Tuple of (Updated AuthenticationToken, plaintext JWT access token) or None if refresh failed
         """
         # Get existing token by refresh token
         existing_token = await self.get_token_by_refresh_token(refresh_token)
@@ -142,15 +146,15 @@ class AuthenticationRepository:
         new_refresh_token = token_utils.create_refresh_token()
         new_expires_at = utc_now() + timedelta(seconds=access_expires_in)
 
-        # Update token record
-        existing_token.access_token = new_access_token
+        # Update token record with hashed access token
+        existing_token.access_token = hash_access_token(new_access_token)
         existing_token.refresh_token = new_refresh_token
         existing_token.expires_at = new_expires_at
 
         await self.db.commit()
         await self.db.refresh(existing_token)
 
-        return existing_token
+        return existing_token, new_access_token  # Return both record and plaintext JWT
 
     async def revoke_token_by_user_id(self, user_id: int) -> bool:
         """Revoke all tokens for a user (logout or account delete).
