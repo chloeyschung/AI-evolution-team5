@@ -1,11 +1,15 @@
 """API route handlers for content and swipe operations."""
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Union
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+# Track background tasks for proper lifecycle management
+_background_tasks: set[asyncio.Task] = set()
 
 from src.ai.metadata_extractor import ContentMetadata
 from src.ingestion.share_handler import ShareHandler
@@ -359,8 +363,17 @@ async def categorize_content(
         raise HTTPException(status_code=404, detail="content_not_found")
 
     # Initialize categorizer
+    import os
     from src.ai.summarizer import Summarizer
-    summarizer = Summarizer()
+
+    summarizer_api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not summarizer_api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="anthropic_api_key_not_configured"
+        )
+
+    summarizer = Summarizer(api_key=summarizer_api_key)
     categorizer = Categorizer(summarizer)
 
     # Generate tags
@@ -407,7 +420,10 @@ async def delete_content(
     if not content:
         raise HTTPException(status_code=404, detail="content_not_found")
 
-    # Delete swipe history first (foreign key constraint)
+    from ..data.models import ContentTag
+
+    # Delete associated records first (foreign key constraints)
+    await db.execute(delete(ContentTag).where(ContentTag.content_id == content_id))
     await db.execute(delete(SwipeHistory).where(SwipeHistory.content_id == content_id))
 
     # Delete content
@@ -1482,7 +1498,16 @@ async def trigger_youtube_sync(
     )
 
     content_repo = ContentRepository(db)
-    summarizer = Summarizer()
+
+    # Initialize summarizer with API key
+    summarizer_api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not summarizer_api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="anthropic_api_key_not_configured"
+        )
+
+    summarizer = Summarizer(api_key=summarizer_api_key)
     sync_service = YouTubeSyncService(
         youtube_client=youtube_client,
         content_repo=content_repo,
@@ -1530,19 +1555,24 @@ async def trigger_youtube_sync(
                 error_message=str(e),
             )
 
-    # Schedule background task with exception handling
-    import asyncio
+    # Schedule background task with exception handling and tracking
+    import logging
 
-    async def background_task_wrapper():
+    async def background_task_wrapper(task: asyncio.Task):
         """Wrapper to ensure exceptions don't crash the process."""
         try:
+            logging.info("YouTube sync background task started")
             await do_sync()
+            logging.info("YouTube sync background task completed")
         except Exception as e:
             # Log unhandled exceptions (should not happen due to do_sync try/except)
-            import logging
             logging.error(f"Uncaught exception in YouTube sync background task: {e}")
+        finally:
+            _background_tasks.discard(task)
 
-    asyncio.create_task(background_task_wrapper())
+    task = asyncio.create_task(background_task_wrapper(task))
+    _background_tasks.add(task)
+    logging.info(f"YouTube sync background task scheduled (task id: {id(task)})")
 
     return {
         "message": "Sync triggered",

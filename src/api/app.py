@@ -9,6 +9,7 @@ from ..ai.summarizer import Summarizer
 from ..data.database import init_db
 from ..ingestion.extractor import ContentExtractor
 from ..ingestion.share_handler import ShareHandler
+from ..utils.http_client import HttpClientPool
 from .routes import router, _set_share_handler, get_share_handler
 
 
@@ -31,6 +32,9 @@ async def lifespan(app: FastAPI):
     _set_share_handler(share_handler)
 
     yield
+
+    # Shutdown: close HTTP client pool
+    await HttpClientPool.close()
 
 
 app = FastAPI(
