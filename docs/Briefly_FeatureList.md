@@ -18,19 +18,19 @@
 | F-011 | ARCHIVE 탭 | Archive 탭 — 읽은 목록 | 읽었어요 처리된 콘텐츠를 최신순으로 표시 | 아카이브된 콘텐츠는 INBOX 에서 제거. 아카이브 내 재읽기 가능. 아카이브 해제 (INBOX 복구) 가능. | Phase 1 | iOS+Web | P0 | - | 정의완료 | - |
 | F-012 | 공통 컴포넌트 | 콘텐츠 상세 화면 | INBOX 전체보기 리스트 또는 Archive 리스트에서 카드 탭 시 진입하는 공통 상세 화면<br>화면 구성: 썸네일, 제목, AI 요약 (max 300 자), 출처, 바로가기 URL, 하단 읽었어요 버튼 노출 | 1. '읽었어요' 버튼 분기 처리:<br>  - INBOX 리스트에서 진입 → 버튼 활성 → 탭 시 INBOX → ARCHIVED 변경 (iOS+Web 공통)<br>  - Archive 에서 진입 → 버튼명 변경 (이미 읽었어요!) & 비활성화 처리<br>2. 웹앱 정책: 새 콘텐츠 저장 불가 / 읽음 처리·삭제 등 상태 변경은 가능. | Phase 1 | iOS+Web | P0 | - | 정의완료 | - |
 | F-013 | 필터/검색 탭 | 필터 — 출처 (플랫폼) 별 | 저장된 콘텐츠를 출처 (사이트명/앱명) 기준으로 필터링 | 출처는 공유 시 URL 도메인에서 자동 추출. 출처 목록은 사용자 저장 이력 기반 동적 생성. | Phase 1 | iOS+Web | P1 | [TBD] 다중선택 여부 | 정의완료 | - |
-| F-014 | 필터/검색 탭 | 필터 — 주제 (AI 카테고리) 별 | AI 가 자동 분류한 카테고리 태그 기준 필터링 | 사용자가 저장한 콘텐츠에 달린 태그 목록 동적 표시. 태그 없는 콘텐츠는 '미분류'로 표기. | Phase 1 | iOS+Web | P1 | - | 미구현 | F-014 gap: InterestTag is for user-created tags, not AI-generated tags |
+| F-014 | 필터/검색 탭 | 필터 — 주제 (AI 카테고리) 별 | AI 가 자동 분류한 카테고리 태그 기준 필터링 | 사용자가 저장한 콘텐츠에 달린 태그 목록 동적 표시. 태그 없는 콘텐츠는 '미분류'로 표기. | Phase 1 | iOS+Web | P1 | - | 미구현 | ⚠️ Gap: InterestTag is for user-created tags, not AI-generated tags. ContentTag table exists but filter API endpoint needs verification. |
 | F-015 | 필터/검색 탭 | 정렬 — 날짜 (년/월 단위) | 콘텐츠를 저장 날짜 기준 년도/월 단위로 그룹 정렬 | 기본 정렬: 최신순. 년/월 그룹 헤더 표시. 그룹 내 순서는 서버 저장 시간순. | Phase 1 | iOS+Web | P2 | - | 정의완료 | - |
-| F-016 | 필터/검색 탭 | 검색 — 제목/필터명 | 제목 텍스트 또는 카테고리 태그명으로 검색 | 실시간 검색, 검색 범위: 각 INBOX & Archive 통합. 검색어 하이라이팅. 결과 없음 Empty State 처리. | Phase 1 | iOS+Web | P1 | - | 정의완료 | - |
+| F-016 | 필터/검색 탭 | 검색 — 제목/필터명 | 제목 텍스트 또는 카테고리 태그명으로 검색 | 실시간 검색, 검색 범위: 각 INBOX & Archive 통합. 검색어 하이라이팅. 결과 없음 Empty State 처리. | Phase 1 | iOS+Web | P1 | - | 정의완료 | ✅ 구현: 제목, 작성자, AI 생성 태그 검색 지원 |
 | F-017 | 설정 | 프로필 — 로그인 계정 정보 표시 | 현재 로그인된 소셜 계정 이름/이메일 표시 | 프로필 사진 표시 X | Phase 1 | iOS+Web | P1 | - | 정의완료 | - |
 | F-018 | 데이터 동기화 | iOS ↔ 웹 실시간 동기화 | 소셜 로그인 계정 기준으로 iOS 와 웹앱 간 콘텐츠 동기화 | 저장/아카이브/삭제 액션 즉시 서버 반영. 오프라인 상태에서의 처리 정책 [TBD]. | Phase 1 | iOS+Web | P0 | [TBD] 오프라인 처리 | 정의완료 | - |
 | F-019 | 데이터 동기화 | 콘텐츠 삭제 | 저장된 콘텐츠 개별 영구 삭제 | 삭제 확인 팝업 1 회. 삭제 시 양 플랫폼 즉시 반영. 삭제 후 복구 불가. | Phase 1 | iOS+Web | P1 | - | 정의완료 | - |
-| F-020 | 브라우저 확장 | 브라우저 확장 프로그램 (Chrome/Whale) | 데스크톱에서 한 번의 클릭으로 콘텐츠 저장 | Manifest V3, 컨텍스트 메뉴, 토큰 기반 인증, 메타데이터 자동 추출 | Phase 2 | Web | P0 | - | 정의완료 | ✅ 구현됨 (browser-extension/) |
-| F-021 | 웹 대시보드 | 웹 기반 지식 라이브러리 관리 | 큰 화면에서 저장된 콘텐츠 관리, 필터링, 분석 | Vue 3 기반 SPA, Google OAuth, 그리드/리스트 뷰, 분석 대시보드 | Phase 2 | Web | P0 | - | 정의완료 | ✅ 구현됨 (web-dashboard/) |
-| F-022 | 플랫폼 연동 | YouTube 자동 동기화 | YouTube Watch Later/Playlist 를 자동으로 가져와 저장 | OAuth 2.0, 플레이리스트 선택, 자동/수동 동기화, 동기화 로그 | Phase 3 | iOS+Web | P1 | - | 정의완료 | ✅ 구현됨 (src/integrations/youtube/) |
-| F-023 | 플랫폼 연동 | LinkedIn/Social 자동 동기화 | LinkedIn 저장된 포스팅을 자동으로 가져와 저장 | OAuth 2.0 (준비됨), 수동 import (MVP), 자동 동기화 (향후) | Phase 3 | iOS+Web | P1 | - | 정의완료 | ✅ 구현됨 (src/integrations/linkedin/) |
-| F-024 | 지능형 기능 | 개인화 트렌드 피드 | 사용자의 관심사와 스와이프 이력을 기반으로 추천하는 아카이브 콘텐츠 | 관심사 매칭 (35%), 태그 유사도 (30%), 최신성 (20%), 참여도 (15%) | Phase 3 | iOS+Web | P2 | - | 정의완료 | ✅ 구현됨 (src/ai/trend_analyzer.py) |
-| F-025 | 지능형 기능 | 게이미피케이션 성취 시스템 | 스와이프 활동을 기반으로 한 업적 시스템 (16 개 업적) | 연속 기록, 총 스와이프 수, 플랫폼 다양성, 큐레이션 4 가지 카테고리 | Phase 3 | iOS+Web | P2 | - | 정의완료 | ✅ 구현됨 (src/ai/achievement_checker.py) |
-| F-026 | 지능형 기능 | 스마트 리마인더 | 사용자 패턴을 학습하여 최적의 타이밍에 콘텐츠 소비 유도 | 백로그, 기록 유지, 시간 기반, 재참여 4 가지 리마인더 타입 | Phase 3 | iOS+Web | P2 | - | 정의완료 | ✅ 구현됨 (src/ai/reminder_engine.py) |
+| F-020 | 브라우저 확장 | 브라우저 확장 프로그램 (Chrome/Whale) | 데스크톱에서 한 번의 클릭으로 콘텐츠 저장 | Manifest V3, 컨텍스트 메뉴, 토큰 기반 인증, 메타데이터 자동 추출 | Phase 2 | Web | P0 | - | 정의완료 | ⚠️ Backend API ready; browser-extension/ not in repo |
+| F-021 | 웹 대시보드 | 웹 기반 지식 라이브러리 관리 | 큰 화면에서 저장된 콘텐츠 관리, 필터링, 분석 | Vue 3 기반 SPA, Google OAuth, 그리드/리스트 뷰, 분석 대시보드 | Phase 2 | Web | P0 | - | 정의완료 | ⚠️ Backend API ready; web-dashboard/ not in repo |
+| F-022 | 플랫폼 연동 | YouTube 자동 동기화 | YouTube Watch Later/Playlist 를 자동으로 가져와 저장 | OAuth 2.0, 플레이리스트 선택, 자동/수동 동기화, 동기화 로그 | Phase 3 | iOS+Web | P1 | - | 정의완료 | ⚠️ Backend API ready (src/integrations/youtube/) |
+| F-023 | 플랫폼 연동 | LinkedIn/Social 자동 동기화 | LinkedIn 저장된 포스팅을 자동으로 가져와 저장 | OAuth 2.0 (준비됨), 수동 import (MVP), 자동 동기화 (향후) | Phase 3 | iOS+Web | P1 | - | 정의완료 | ⚠️ Backend API ready (src/integrations/linkedin/) |
+| F-024 | 지능형 기능 | 개인화 트렌드 피드 | 사용자의 관심사와 스와이프 이력을 기반으로 추천하는 아카이브 콘텐츠 | 관심사 매칭 (35%), 태그 유사도 (30%), 최신성 (20%), 참여도 (15%) | Phase 3 | iOS+Web | P2 | - | 정의완료 | ⚠️ Backend API ready (src/ai/trend_analyzer.py) |
+| F-025 | 지능형 기능 | 게이미피케이션 성취 시스템 | 스와이프 활동을 기반으로 한 업적 시스템 (16 개 업적) | 연속 기록, 총 스와이프 수, 플랫폼 다양성, 큐레이션 4 가지 카테고리 | Phase 3 | iOS+Web | P2 | - | 정의완료 | ⚠️ Backend API ready (src/ai/achievement_checker.py) |
+| F-026 | 지능형 기능 | 스마트 리마인더 | 사용자 패턴을 학습하여 최적의 타이밍에 콘텐츠 소비 유도 | 백로그, 기록 유지, 시간 기반, 재참여 4 가지 리마인더 타입 | Phase 3 | iOS+Web | P2 | - | 정의완료 | ⚠️ Backend API ready (src/ai/reminder_engine.py) |
 
 ---
 

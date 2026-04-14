@@ -26,7 +26,7 @@ This document tracks all identified features for the **Briefly** project, catego
 - [x] **[UX-002] Swipe Actions (Keep/Discard)** (F-009, F-011): Implementation of the Right-Swipe (Keep) and Left-Swipe (Discard/Archive) logic. ✅ Implemented
 - [x] **[UX-003] Summary Detail View** (F-012): An "On-Demand" expansion view to see more details with swipe history. ✅ Implemented (`GET /content/{id}`)
 - [x] **[UX-004] Filter by Platform** (F-013): Filter saved content by source platform (YouTube, LinkedIn, etc.). Platform list dynamically generated from user's save history. ✅ Implemented
-- [x] **[UX-005] Search by Title/Tag** (F-016): Real-time search across content titles and category tags. Search scope: INBOX + Archive integrated. ✅ Implemented
+- [x] **[UX-005] Search by Title/Tag** (F-016): Real-time search across content titles, authors, and AI-generated tags. Search scope: INBOX + Archive integrated. ✅ Implemented
 - [x] **[UX-006] Delete Content** (F-019): Permanently delete individual saved content. 1-step confirmation popup. Irreversible. ✅ Implemented
 
 ### Data & Sync
