@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from typing import Union
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
+
+from ..middleware.rate_limiter import limiter
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -513,6 +515,7 @@ def get_share_handler() -> ShareHandler:
 
 
 @router.post("/share", status_code=201, response_model=ShareResponse)
+@limiter.limit("10/minute")  # Rate limit: 10 requests per minute per IP
 async def share_content(
     data: ShareRequest,
     db: AsyncSession = Depends(get_db),
