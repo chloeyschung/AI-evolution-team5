@@ -499,8 +499,6 @@ class UserProfileRepository:
             MVP: Single-user system (user_id=1 hardcoded).
             TODO: Replace with authenticated user_id from token for multi-user support.
         """
-        # MVP: Single-user system (user_id=1 hardcoded)
-        # TODO: Replace with authenticated user_id from token for multi-user support
         result = await self.session.execute(select(UserPreferences).where(UserPreferences.user_id == 1))
         preferences = result.scalar_one_or_none()
 
@@ -632,8 +630,6 @@ class UserProfileRepository:
         tag_normalized = tag.strip().lower()
 
         # Check if tag already exists (case-insensitive)
-        # MVP: Single-user system (user_id=1 hardcoded)
-        # TODO: Replace with authenticated user_id from token for multi-user support
         result = await self.session.execute(
             select(InterestTag).where(
                 InterestTag.user_id == 1, InterestTag.tag.ilike(tag_normalized)
@@ -664,8 +660,6 @@ class UserProfileRepository:
         """
         tag_normalized = tag.strip().lower()
 
-        # MVP: Single-user system (user_id=1 hardcoded)
-        # TODO: Replace with authenticated user_id from token for multi-user support
         await self.session.execute(
             delete(InterestTag).where(
                 InterestTag.user_id == 1, InterestTag.tag.ilike(tag_normalized)
@@ -683,8 +677,6 @@ class UserProfileRepository:
             MVP: Single-user system (user_id=1 hardcoded).
             TODO: Replace with authenticated user_id from token for multi-user support.
         """
-        # MVP: Single-user system (user_id=1 hardcoded)
-        # TODO: Replace with authenticated user_id from token for multi-user support
         result = await self.session.execute(
             select(InterestTag.tag).where(InterestTag.user_id == 1).order_by(InterestTag.tag)
         )
