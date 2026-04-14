@@ -1,7 +1,7 @@
 """Smart reminder engine for nudging content consumption (ADV-003)."""
 
 from dataclasses import dataclass
-from datetime import datetime, time as time_type, timedelta
+from datetime import time as time_type, timedelta
 from enum import Enum
 from typing import List, Optional
 
@@ -15,6 +15,7 @@ from ..data.remind_repository import (
     UserActivityPatternRepository,
 )
 from ..data.repository import ContentRepository, SwipeRepository
+from ..utils.datetime_utils import utc_now, is_quiet_hours
 
 
 class ReminderType(str, Enum):
@@ -84,22 +85,13 @@ class ReminderEngine:
 
     def _is_quiet_hours(self, preferences: "ReminderPreference") -> bool:
         """Check if current time is within quiet hours."""
-        now = datetime.now(time_type.min.tzinfo)  # Current local time
-        current_time = now.time()
-
         quiet_start = preferences.quiet_hours_start.time() if preferences.quiet_hours_start else None
         quiet_end = preferences.quiet_hours_end.time() if preferences.quiet_hours_end else None
 
         if not quiet_start or not quiet_end:
             return False
 
-        # Handle overnight quiet hours (e.g., 22:00 to 08:00)
-        if quiet_start > quiet_end:
-            # Quiet hours span midnight
-            return current_time >= quiet_start or current_time <= quiet_end
-        else:
-            # Quiet hours within same day
-            return quiet_start <= current_time <= quiet_end
+        return is_quiet_hours(utc_now(), quiet_start, quiet_end)
 
     async def _can_send_reminder(
         self, user_id: int, preferences: "ReminderPreference"
@@ -112,7 +104,7 @@ class ReminderEngine:
         if not last_reminder:
             return True  # No previous reminders, can send
 
-        now = datetime.now(time_type.min.tzinfo)
+        now = utc_now()
 
         if preferences.frequency == "daily":
             # Allow 1 reminder per day
@@ -168,7 +160,7 @@ class ReminderEngine:
             return None
 
         # Check if user has activity today
-        today_start = datetime.now(time_type.min.tzinfo).replace(
+        today_start = utc_now().replace(
             hour=0, minute=0, second=0, microsecond=0
         )
         last_activity = streak.last_activity_date
@@ -233,7 +225,7 @@ class ReminderEngine:
         if not preferred_time:
             return None
 
-        now = datetime.now(time_type.min.tzinfo)
+        now = utc_now()
         preferred_hour = preferred_time.hour
         preferred_minute = preferred_time.minute
 
@@ -273,7 +265,7 @@ class ReminderEngine:
         if not streak or not streak.last_activity_date:
             return None
 
-        now = datetime.now(time_type.min.tzinfo)
+        now = utc_now()
 
         # Normalize timezone
         if streak.last_activity_date.tzinfo:
@@ -306,7 +298,7 @@ class ReminderEngine:
 
     async def _get_new_items_count(self, user_id: int, days: int) -> int:
         """Get count of items kept in last N days."""
-        cutoff = datetime.now(time_type.min.tzinfo) - timedelta(days=days)
+        cutoff = utc_now() - timedelta(days=days)
 
         # Get swipe history in last N days with KEEP action
         result = await self._log_repo.session.execute(
@@ -377,7 +369,7 @@ class ActivityPatternLearner:
 
     async def _get_recent_swipes(self, user_id: int, days: int) -> List[SwipeHistory]:
         """Get swipe history for user in last N days."""
-        cutoff = datetime.now(time_type.min.tzinfo) - timedelta(days=days)
+        cutoff = utc_now() - timedelta(days=days)
 
         result = await self._pattern_repo.session.execute(
             select(SwipeHistory)
