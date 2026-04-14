@@ -21,6 +21,9 @@ from src.data.models import (
     IntegrationTokens,
     IntegrationSyncConfig,
     IntegrationSyncLog,
+    AchievementDefinition,
+    UserAchievement,
+    UserStreak,
 )
 from src.data import database as db_module
 
@@ -73,6 +76,9 @@ async def setup_test_database():
 
     # Cleanup: drop all data after test (keep tables for next test)
     async with AsyncTestingSessionLocal() as session:
+        await session.execute(delete(UserAchievement))
+        await session.execute(delete(UserStreak))
+        await session.execute(delete(AchievementDefinition))
         await session.execute(delete(IntegrationSyncLog))
         await session.execute(delete(IntegrationSyncConfig))
         await session.execute(delete(IntegrationTokens))
@@ -94,6 +100,21 @@ async def test_db_session():
     # Create tables if they don't exist
     async with test_async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # Clear all data before test
+    async with AsyncTestingSessionLocal() as session:
+        await session.execute(delete(UserAchievement))
+        await session.execute(delete(UserStreak))
+        await session.execute(delete(AchievementDefinition))
+        await session.execute(delete(IntegrationSyncLog))
+        await session.execute(delete(IntegrationSyncConfig))
+        await session.execute(delete(IntegrationTokens))
+        await session.execute(delete(InterestTag))
+        await session.execute(delete(UserPreferences))
+        await session.execute(delete(UserProfile))
+        await session.execute(delete(SwipeHistory))
+        await session.execute(delete(Content))
+        await session.commit()
 
     async with AsyncTestingSessionLocal() as session:
         try:

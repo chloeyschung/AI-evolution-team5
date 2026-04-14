@@ -230,3 +230,59 @@ class IntegrationSyncLog(Base):
     skipped_count = Column(Integer, nullable=False, default=0)
     error_message = Column(Text, nullable=True)
     executed_at = Column(DateTime, default=utc_now, nullable=False, index=True)
+
+
+# ADV-002: Gamified Achievement System models
+
+
+class AchievementDefinition(Base):
+    """Definition of unlockable achievements (ADV-002)."""
+
+    __tablename__ = "achievement_definitions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String(50), unique=True, nullable=False, index=True)  # 'streak_1', 'volume_10', etc.
+    type = Column(String(20), nullable=False, index=True)  # 'streak', 'volume', 'diversity', 'curation'
+    name = Column(String(100), nullable=False)  # 'First Steps', 'Beginner', etc.
+    description = Column(String(500), nullable=False)
+    icon = Column(String(20), nullable=False)  # Emoji icon
+    trigger_value = Column(Integer, nullable=False)  # Days for streak, count for volume, etc.
+    is_active = Column(Integer, nullable=False, default=1)  # SQLite boolean as integer
+
+
+class UserAchievement(Base):
+    """User's unlocked achievements (ADV-002)."""
+
+    __tablename__ = "user_achievements"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("user_profile.id"), nullable=False, index=True)
+    achievement_id = Column(Integer, ForeignKey("achievement_definitions.id"), nullable=False, index=True)
+    unlocked_at = Column(DateTime, default=utc_now, nullable=False, index=True)
+    metadata_json = Column(Text)  # JSON: {"streak_days": 7, "platform_count": 5, etc.}
+
+    # Relationships
+    user = relationship("UserProfile", backref="achievements")
+    achievement_definition = relationship("AchievementDefinition", backref="user_achievements")
+
+    # Unique constraint for user_id + achievement_id combination
+    __table_args__ = (
+        sqlalchemy.UniqueConstraint("user_id", "achievement_id", name="unique_user_achievement"),
+    )
+
+
+class UserStreak(Base):
+    """Track user's daily activity streak (ADV-002)."""
+
+    __tablename__ = "user_streaks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("user_profile.id"), unique=True, nullable=False, index=True)
+    current_streak = Column(Integer, nullable=False, default=0)
+    longest_streak = Column(Integer, nullable=False, default=0)
+    last_activity_date = Column(DateTime, nullable=True)
+    total_active_days = Column(Integer, nullable=False, default=0)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, index=True)
+
+    # Relationship
+    user = relationship("UserProfile", backref="streak")

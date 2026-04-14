@@ -448,3 +448,75 @@ class TrendFeedResponse(BaseModel):
     items: List[TrendFeedItem]
     total: int = Field(..., ge=0, description="Total matching items")
     has_more: bool = Field(..., description="Whether more items available")
+
+
+# ADV-002: Gamified Achievement System schemas
+
+
+class AchievementDefinitionResponse(BaseModel):
+    """Schema for achievement definition."""
+
+    model_config = {"from_attributes": True}
+
+    id: int
+    key: str
+    type: str
+    name: str
+    description: str
+    icon: str
+    trigger_value: int
+
+
+class AchievementProgress(BaseModel):
+    """Schema for achievement with progress info."""
+
+    id: int
+    key: str
+    type: str
+    name: str
+    description: str
+    icon: str
+    trigger_value: int
+    is_unlocked: bool
+    progress: int
+    progress_percent: int
+    unlocked_at: Optional[str] = None
+
+
+class AchievementsListResponse(BaseModel):
+    """Schema for achievements list response."""
+
+    achievements: List[AchievementProgress]
+
+
+class StreakStats(BaseModel):
+    """Schema for streak statistics."""
+
+    current_streak: int
+    longest_streak: int
+    total_active_days: int
+
+
+class AchievementsStatsResponse(BaseModel):
+    """Schema for achievements statistics response."""
+
+    total_unlocked: int
+    total_available: int
+    completion_percent: int
+    streak: StreakStats
+    recent_achievements: List[AchievementProgress]
+
+
+class NewAchievement(BaseModel):
+    """Schema for newly unlocked achievement."""
+
+    id: int
+    name: str
+    icon: str
+    unlocked_at: str
+
+
+class CheckAchievementsResponse(BaseModel):
+    """Schema for check achievements response."""
+
+    new_achievements: List[NewAchievement]

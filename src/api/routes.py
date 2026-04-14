@@ -59,6 +59,9 @@ from .schemas import (
     LinkedInImportRequest,
     TrendFeedResponse,
     TrendFeedItem,
+    AchievementsListResponse,
+    AchievementsStatsResponse,
+    CheckAchievementsResponse,
 )
 from src.data.models import ContentStatus, IntegrationTokens, IntegrationSyncConfig, IntegrationSyncLog
 
@@ -2096,4 +2099,143 @@ async def get_trend_feed(
         items=response_items,
         total=total,
         has_more=offset + limit < total,
+    )
+
+
+# ADV-002: Gamified Achievement System endpoints
+
+
+@router.get("/achievements", response_model=AchievementsListResponse)
+async def get_achievements(
+    achievement_type: str | None = Query(
+        None,
+        pattern="^(streak|volume|diversity|curation)$",
+        description="Filter by achievement type",
+    ),
+    user_id: int = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> AchievementsListResponse:
+    """Get all achievement definitions with user progress.
+
+    Args:
+        achievement_type: Optional filter by type
+        user_id: Current user ID (from auth)
+        db: Database session
+
+    Returns:
+        List of achievements with progress info
+    """
+    from src.ai.achievement_checker import AchievementChecker
+
+    checker = AchievementChecker(db)
+    stats = await checker._calculate_user_stats(user_id)
+    achievements = await checker._achievement_repo.get_achievements_with_progress(
+        user_id, stats
+    )
+
+    # Filter by type if specified
+    if achievement_type:
+        achievements = [a for a in achievements if a["type"] == achievement_type]
+
+    return AchievementsListResponse(achievements=achievements)
+
+
+@router.get("/achievements/stats", response_model=AchievementsStatsResponse)
+async def get_achievements_stats(
+    user_id: int = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> AchievementsStatsResponse:
+    """Get user's achievement statistics.
+
+    Args:
+        user_id: Current user ID (from auth)
+        db: Database session
+
+    Returns:
+        Achievement statistics and progress
+    """
+    from src.ai.achievement_checker import AchievementChecker
+
+    checker = AchievementChecker(db)
+    stats = await checker._calculate_user_stats(user_id)
+
+    # Get streak info
+    streak = await checker._streak_repo.get_or_create_streak(user_id)
+
+    # Get all definitions and user achievements
+    all_definitions = await checker._achievement_repo.get_all_definitions()
+    user_achievements = await checker._achievement_repo.get_user_achievements(user_id)
+
+    total_unlocked = len(user_achievements)
+    total_available = len(all_definitions)
+    completion_percent = (
+        int((total_unlocked / total_available) * 100)
+        if total_available > 0
+        else 0
+    )
+
+    # Build recent achievements list (last 5)
+    recent = []
+    for ua in user_achievements[:5]:
+        definition = ua.achievement_definition
+        recent.append(
+            AchievementProgress(
+                id=definition.id,
+                key=definition.key,
+                type=definition.type,
+                name=definition.name,
+                description=definition.description,
+                icon=definition.icon,
+                trigger_value=definition.trigger_value,
+                is_unlocked=True,
+                progress=definition.trigger_value,
+                progress_percent=100,
+                unlocked_at=ua.unlocked_at.isoformat(),
+            )
+        )
+
+    return AchievementsStatsResponse(
+        total_unlocked=total_unlocked,
+        total_available=total_available,
+        completion_percent=completion_percent,
+        streak=StreakStats(
+            current_streak=streak.current_streak,
+            longest_streak=streak.longest_streak,
+            total_active_days=streak.total_active_days,
+        ),
+        recent_achievements=recent,
+    )
+
+
+@router.post("/achievements/check", response_model=CheckAchievementsResponse)
+async def check_achievements(
+    user_id: int = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> CheckAchievementsResponse:
+    """Check and award any newly unlocked achievements.
+
+    Called after swipe actions to check for new achievements.
+
+    Args:
+        user_id: Current user ID (from auth)
+        db: Database session
+
+    Returns:
+        List of newly unlocked achievements
+    """
+    from src.ai.achievement_checker import AchievementChecker
+
+    checker = AchievementChecker(db)
+    new_achievements = await checker.check_and_award(user_id)
+
+    return CheckAchievementsResponse(
+        new_achievements=[
+            NewAchievement(
+                id=ach["id"],
+                name=ach["name"],
+                icon=ach["icon"],
+                unlocked_at=ach["unlocked_at"],
+            )
+            for ach in new_achievements
+        ]
     )

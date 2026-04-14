@@ -365,6 +365,15 @@ class SwipeRepository:
         )
         return list(result.scalars().all())
 
+    async def get_all_history(self) -> List[SwipeHistory]:
+        """Get all swipe history (for achievement tracking).
+
+        Returns:
+            List of all SwipeHistory objects.
+        """
+        result = await self.session.execute(select(SwipeHistory))
+        return list(result.scalars().all())
+
     async def record_swipes_batch(
         self, actions: List[tuple[int, SwipeAction]]
     ) -> List[SwipeHistory]:
