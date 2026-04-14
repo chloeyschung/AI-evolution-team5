@@ -854,12 +854,14 @@ async def google_login(
         access_token=token_record.access_token,
         refresh_token=token_record.refresh_token,
         expires_at=token_record.expires_at.isoformat(),
-        user={
-            "id": existing_user.id,
-            "email": existing_user.email,
-            "display_name": existing_user.display_name,
-            "avatar_url": existing_user.avatar_url,
-        },
+        user=UserProfileResponse(
+            id=existing_user.id,
+            display_name=existing_user.display_name,
+            avatar_url=existing_user.avatar_url,
+            bio=existing_user.bio,
+            created_at=existing_user.created_at.isoformat(),
+            updated_at=existing_user.updated_at.isoformat(),
+        ),
         is_new_user=is_new_user,
     )
 
