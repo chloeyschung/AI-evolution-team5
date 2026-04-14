@@ -303,7 +303,7 @@ class GoogleLoginResponse(BaseModel):
     access_token: str
     refresh_token: str
     expires_at: str
-    user: dict  # User info
+    user: "UserProfileResponse"  # User info
     is_new_user: bool
 
 
