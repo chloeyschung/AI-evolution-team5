@@ -59,6 +59,19 @@
 - [⚠️] Smart Reminders (ADV-003) - **Backend API ready**.
 - [ ] Advanced AI personalization based on swipe history.
 
+### Security & Infrastructure
+- [x] Security Hardening (SEC-001) - **Fully implemented**.
+  - JWT token hashing (SHA-256)
+  - OAuth token encryption (Fernet)
+  - Rate limiting (token bucket)
+  - SSRF protection (DNS rebinding prevention)
+  - Multi-user data isolation
+- [x] Code Quality Improvements (QOL-001) - **Fully implemented**.
+  - Enum consolidation to `constants.py`
+  - Type hint standardization (Python 3.10+)
+  - Constants centralization (20+ constants)
+  - Error code standardization
+
 ## 5. Development Process (Spec-Driven Development)
 Briefly follows a strict **Spec-Driven Development** workflow to eliminate "vibe coding" and technical debt.
 

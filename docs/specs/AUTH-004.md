@@ -1,48 +1,79 @@
 # AUTH-004: Account Delete
 
-**F-003 Mapping**: Account Delete
-**Phase**: Phase 1 - MVP (Mobile Focus)
-**Priority**: High - User data control
+**Status**: Implemented | **Created**: 2026-04-14 | **Author**: abraxaspark
+**F-xxx Mapping**: F-003 (Account Delete) | **Phase**: Phase 1 - MVP (Mobile Focus) | **Priority**: High
 
-## Overview
+---
 
-Permanent deletion of account and all data. 2-step confirmation. 30-day re-registration block. Full server + local data deletion.
+## 1. Overview
 
-## Requirements
+**Problem**: Users need complete control over their data with the ability to permanently delete their account and all associated data.
 
-### 1. 2-Step Confirmation
+**Solution**: Two-step confirmation account deletion with permanent data removal and 30-day re-registration block.
+
+**Goals**: Irreversible deletion with clear warnings, complete data removal (server + client), prevent accidental re-registration
+
+**Non-Goals**: Account deactivation/pause, data export before deletion, grace period for recovery
+
+---
+
+## 2. Requirements
+
+| ID | Requirement | Priority |
+|----|-------------|----------|
+| FR-1 | Two-step confirmation before deletion | P0 |
+| FR-2 | Delete all server-side user data | P0 |
+| FR-3 | Prompt client to clear local data | P0 |
+| FR-4 | Block re-registration for 30 days | P0 |
+| FR-5 | Irreversible action (no undo) | P0 |
+| NFR-1 | Cascade delete all related data | P0 |
+| NFR-2 | Clear warning messages before confirmation | P0 |
+
+---
+
+## 3. User Story / Behavior
+
+As a Briefly user who no longer wants to use the service, I want to permanently delete my account and all data, so that my information is completely removed and I cannot accidentally re-register.
+
+### Key Behaviors
+
+- User initiates account deletion from settings
 - First confirmation: "Are you sure you want to delete your account?"
 - Second confirmation: "This action is irreversible. All data will be permanently deleted."
-- Both confirmations required before deletion proceeds
+- On final confirmation: all data deleted, 30-day block applied
+- Client clears all local data and shows login screen
 
-### 2. Permanent Data Deletion
-- **Server-side**: All user data deleted from database
-  - User profile
-  - Authentication tokens
-  - All content (saved URLs, summaries)
-  - Swipe history
-  - User preferences
-  - Interest tags
-- **Client-side**: App prompts user to clear local data
+---
 
-### 3. 30-Day Re-Registration Block
-- Deleted account cannot be re-registered for 30 days
-- Same email or Google account blocked
-- Block tracked in `account_deletions` table
-- After 30 days: new account can be created
+## 4. Data Models
 
-### 4. Irreversible Action
-- No undo or recovery option
-- Data permanently deleted (no soft delete)
-- Clear warning before confirmation
+### New Tables
 
-## API Design
+None (uses existing AccountDeletion from AUTH-002)
 
-### POST /api/v1/auth/account/delete
+### Existing Used
 
-Permanently delete user account and all data.
+- `AccountDeletion` (records deletion for 30-day block)
+- `UserProfile` (deleted)
+- `AuthenticationToken` (deleted)
+- `Content` (all user's content deleted)
+- `SwipeHistory` (all user's swipes deleted)
+- `UserPreferences` (deleted)
+- `InterestTag` (all user's tags deleted)
 
-**Request:**
+---
+
+## 5. API Design
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/auth/account/delete` | POST | Permanently delete user account and all data |
+
+### Request/Response Examples
+
+**POST /api/v1/auth/account/delete**
+
+Request:
 ```
 Authorization: Bearer <access_token>
 Content-Type: application/json
@@ -53,7 +84,7 @@ Content-Type: application/json
 }
 ```
 
-**Response (200 OK):**
+Response (200 OK):
 ```json
 {
   "message": "Account deleted successfully",
@@ -61,7 +92,7 @@ Content-Type: application/json
 }
 ```
 
-**Response (400 Bad Request - Missing Confirmation):**
+Response (400 Bad Request - Missing Confirmation):
 ```json
 {
   "error": "confirmation_required",
@@ -69,81 +100,95 @@ Content-Type: application/json
 }
 ```
 
-**Response (401 Unauthorized):**
+Response (401 Unauthorized):
 ```json
 {
   "error": "unauthorized"
 }
 ```
 
-## Implementation Details
+---
 
-### Deletion Order
+## 6. Implementation
 
-1. Revoke authentication tokens
-2. Record account deletion (30-day block)
-3. Delete user preferences
-4. Delete interest tags
-5. Delete swipe history
-6. Delete content
-7. Delete user profile
+### Files
 
-### 2-Step Confirmation Flow
+- `src/data/auth_repository.py` - Account deletion logic
+- `src/data/models.py` - AccountDeletion model (from AUTH-002)
+- `src/api/routes.py` - Account delete endpoint
 
-**Step 1: Request Confirmation Token**
-- Client calls POST /auth/account/delete with `{"confirm": true}`
-- Server validates token, returns confirmation token
-- Client shows second confirmation dialog
+### Key Logic
 
-**Step 2: Confirm Deletion**
-- Client calls POST /auth/account/delete with confirmation token
-- Server validates confirmation token
-- Server proceeds with deletion
+1. **Deletion Order** (cascade):
+   1. Revoke authentication tokens
+   2. Record account deletion (30-day block in AccountDeletion table)
+   3. Delete user preferences
+   4. Delete interest tags
+   5. Delete swipe history
+   6. Delete content (all user's saved content)
+   7. Delete user profile
 
-### Client-Side Behavior
+2. **Two-Step Confirmation Flow**:
+   - Step 1: Client sends `{"confirm": true}`, server validates and returns confirmation_token
+   - Step 2: Client shows irreversible warning, user confirms
+   - Step 3: Client sends confirmation_token, server proceeds with deletion
 
-1. User initiates account deletion
-2. Show first confirmation dialog
-3. If confirmed, show second confirmation (irreversible warning)
-4. If confirmed, call API
-5. On success:
-   - Clear all local data
-   - Clear stored tokens
-   - Navigate to login screen
-   - Show "Account deleted" message
+3. **Client-Side Behavior**:
+   - On success: clear all local data, clear tokens, navigate to login screen
+   - Show "Account deleted" message with 30-day block notice
 
-## Data Models
+### Dependencies
 
-Uses existing `AccountDeletion` table (created in AUTH-002):
+**Requires** (satisfied by):
+- AUTH-001 - Token revocation
+- AUTH-002 - AccountDeletion table for 30-day block tracking
 
-```python
-class AccountDeletion(Base):
-    __tablename__ = "account_deletions"
+**Provides** (for future):
+- GDPR compliance - Data deletion capability
+- Account recovery flow - Check AccountDeletion before allowing re-registration
 
-    id = Column(Integer, primary_key=True)
-    email = Column(String(320), unique=True, nullable=False)
-    google_sub = Column(String(100), unique=True, nullable=True)
-    deleted_at = Column(DateTime, nullable=False)
-    block_expires_at = Column(DateTime, nullable=False)  # deleted_at + 30 days
-```
+---
 
-## Dependencies
+## 7. Edge Cases
 
-- **Depends on**: AUTH-001 (token management), AUTH-002 (account deletion tracking)
-- **Required by**: None
+| Scenario | Handling |
+|----------|----------|
+| Invalid/expired token | 401 Unauthorized |
+| Missing confirmation | 400 Bad Request with message |
+| Invalid confirmation token | 400 Bad Request |
+| Concurrent delete requests | Second request fails with 401 (token revoked) |
+| Re-login within 30 days | 403 Forbidden (handled by AUTH-002) |
+| Re-login after 30 days | Allowed, new account created |
 
-## Security Considerations
+---
 
-1. Valid authentication token required
-2. Two-step confirmation prevents accidental deletion
-3. 30-day block prevents immediate re-registration
-4. All data permanently deleted (no recovery)
+## 8. Testing
 
-## Testing
+- **Unit**: Deletion order, cascade delete verification, 30-day block calculation
+- **Integration**: Full deletion flow, re-registration block, data verification
+- **Acceptance**: Valid deletion, all data removed, 30-day block enforced, after-30-days allowed
 
-1. Valid token + confirmation → account deleted
-2. Invalid token → 401 Unauthorized
-3. Missing confirmation → 400 Bad Request
-4. Deleted account → re-login within 30 days → 403 Forbidden
-5. Deleted account → re-login after 30 days → new account created
-6. All user data deleted from database
+---
+
+## 9. Sensory Verification
+
+- **Visual (시각)**: Clear two-step confirmation dialogs, "Account deleted" success message
+- **Auditory (청각)**: Deletion events logged, cascade delete completion confirmed
+- **Tactile (촉각)**: < 2s deletion completion, immediate navigation to login screen
+
+---
+
+## 10. Future Enhancements
+
+1. Data export before deletion (GDPR right to data portability)
+2. Account deactivation/pause option (soft delete)
+3. 7-day grace period with recovery option
+4. Scheduled deletion (delete after X days)
+
+---
+
+## 11. References
+
+- [AUTH-001.md](specs/AUTH-001.md) - Token revocation on deletion
+- [AUTH-002.md](specs/AUTH-002.md) - 30-day block enforcement on re-login
+- GDPR Article 17 - Right to erasure

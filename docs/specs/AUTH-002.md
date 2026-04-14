@@ -1,45 +1,74 @@
 # AUTH-002: Social Login - Google
 
-**F-001 Mapping**: Social Login - Google
-**Phase**: Phase 1 - MVP (Mobile Focus)
-**Priority**: Critical - Primary user onboarding path
+**Status**: Implemented | **Created**: 2026-04-14 | **Author**: abraxaspark
+**F-xxx Mapping**: F-001 (Social Login - Google) | **Phase**: Phase 1 - MVP (Mobile Focus) | **Priority**: Critical
 
-## Overview
+---
 
-One-tap Google sign-in. Auto-create account on first login. Rejection of re-registration for deleted accounts within 30 days.
+## 1. Overview
 
-## Requirements
+**Problem**: Users need frictionless onboarding without manual account creation and password management.
 
-### 1. One-Tap Google Sign-In
-- Use Google Sign-In SDK (iOS/Android)
-- Single tap to authenticate with Google
-- Request minimal scopes: email, profile
-- Handle sign-in errors gracefully
+**Solution**: One-tap Google sign-in with automatic account creation and 30-day re-registration block for deleted accounts.
 
-### 2. Auto-Create Account on First Login
-- If user doesn't exist, create new account automatically
-- Extract from Google: email, display name, profile picture
-- Generate authentication tokens (AUTH-001)
-- Create default user profile and preferences
+**Goals**: Single-tap authentication, zero manual registration steps, prevent immediate re-registration after account deletion
 
-### 3. Rejection of Re-Registration (30-Day Block)
-- Track account deletion timestamp
-- If user attempts to re-login within 30 days of deletion: reject
-- Error message: "Account recently deleted. Please wait 30 days before re-registering."
-- After 30 days: allow new account creation
+**Non-Goals**: Other OAuth providers (Phase 2), email/password login, SSO for enterprise
 
-### 4. Existing User Login
-- If user exists with same Google email: login
-- Issue new authentication tokens
-- Update last login timestamp
+---
 
-## API Design
+## 2. Requirements
 
-### POST /api/v1/auth/google
+| ID | Requirement | Priority |
+|----|-------------|----------|
+| FR-1 | One-tap Google sign-in using platform SDK | P0 |
+| FR-2 | Auto-create account on first login | P0 |
+| FR-3 | Block re-registration for 30 days after deletion | P0 |
+| FR-4 | Login existing users by email/google_sub | P0 |
+| FR-5 | Verify Google ID token signature | P0 |
+| NFR-1 | Minimal scopes: email, profile only | P0 |
+| NFR-2 | Handle sign-in errors gracefully | P0 |
 
-Authenticate with Google and get access tokens.
+---
 
-**Request:**
+## 3. User Story / Behavior
+
+As a new Briefly user, I want to sign in with my Google account in one tap, so that I can start using the app immediately without creating a password.
+
+### Key Behaviors
+
+- User taps "Sign in with Google" button
+- Google SDK presents account selection (if multiple)
+- User selects account, Google returns ID token + user info
+- Server verifies token, creates account if new, issues auth tokens
+- User sees INBOX (existing) or onboarding (new)
+
+---
+
+## 4. Data Models
+
+### New Tables
+
+**AccountDeletion**: id, email (unique), google_sub (unique), deleted_at, block_expires_at
+
+### Existing Used
+
+- `UserProfile` (add: email, google_sub, last_login_at fields)
+- `AuthenticationToken` (from AUTH-001)
+
+---
+
+## 5. API Design
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/auth/google` | POST | Authenticate with Google and get access tokens |
+
+### Request/Response Examples
+
+**POST /api/v1/auth/google**
+
+Request:
 ```json
 {
   "google_id_token": "<google_id_token_from_sdk>",
@@ -52,7 +81,7 @@ Authenticate with Google and get access tokens.
 }
 ```
 
-**Response (200 OK - Success):**
+Response (200 OK - Success):
 ```json
 {
   "access_token": "<jwt_access_token>",
@@ -68,7 +97,7 @@ Authenticate with Google and get access tokens.
 }
 ```
 
-**Response (403 Forbidden - 30-Day Block):**
+Response (403 Forbidden - 30-Day Block):
 ```json
 {
   "error": "account_restriction",
@@ -77,91 +106,90 @@ Authenticate with Google and get access tokens.
 }
 ```
 
-## Data Models
+---
 
-### Updates to UserProfile
+## 6. Implementation
 
-Add Google OAuth fields:
+### Files
 
-```python
-class UserProfile(Base):
-    __tablename__ = "user_profile"
+- `src/auth/google_oauth.py` - Google OAuth flow and token verification
+- `src/data/models.py` - UserProfile updates, AccountDeletion model
+- `src/data/auth_repository.py` - Account creation, deletion tracking
+- `src/api/routes.py` - Google login endpoint
 
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(320), unique=True, nullable=False, index=True)  # NEW
-    google_sub = Column(String(100), unique=True, nullable=True, index=True)  # NEW
-    display_name = Column(String(100))
-    avatar_url = Column(String(500))
-    bio = Column(String(500))
-    last_login_at = Column(DateTime, nullable=True, index=True)  # NEW
-    created_at = Column(DateTime, default=utc_now, index=True)
-    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, index=True)
-```
+### Key Logic
 
-### New: AccountDeletion table
+1. **First-Time User**:
+   - Verify Google ID token signature and claims
+   - Check if email/google_sub exists in UserProfile or AccountDeletion
+   - If in AccountDeletion and block not expired: return 403
+   - Create new UserProfile with Google data
+   - Issue auth tokens (AUTH-001)
+   - Return `is_new_user: true`
 
-Track deleted accounts for 30-day block:
+2. **Existing User**:
+   - Verify Google ID token
+   - Find existing account by email or google_sub
+   - Issue new auth tokens
+   - Update last_login_at
+   - Return `is_new_user: false`
 
-```python
-class AccountDeletion(Base):
-    __tablename__ = "account_deletions"
+3. **Deleted Account (Within 30 Days)**:
+   - Verify Google ID token
+   - Check AccountDeletion table
+   - If block_expires_at > now: return 403 with available_at
+   - Client shows error with countdown
 
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(320), unique=True, nullable=False, index=True)
-    google_sub = Column(String(100), unique=True, nullable=True, index=True)
-    deleted_at = Column(DateTime, default=utc_now, nullable=False, index=True)
-    block_expires_at = Column(DateTime, nullable=False, index=True)  # deleted_at + 30 days
-```
+### Dependencies
 
-## Flow
+**Requires** (satisfied by):
+- AUTH-001 - Token management infrastructure
 
-### First-Time User
+**Provides** (for future):
+- AUTH-003, AUTH-004 - User account existence
+- DAT-002 - User profile data from Google
 
-1. User taps "Sign in with Google"
-2. Google SDK returns ID token + user info
-3. Mobile app calls POST /auth/google
-4. Server verifies Google ID token
-5. Server checks if email/google_sub exists:
-   - **No existing account**: Create new account, issue tokens, return `is_new_user: true`
-6. Mobile app shows onboarding (if new user) or INBOX
+---
 
-### Existing User
+## 7. Edge Cases
 
-1. User taps "Sign in with Google"
-2. Google SDK returns ID token + user info
-3. Mobile app calls POST /auth/google
-4. Server verifies Google ID token
-5. Server finds existing account by email or google_sub
-6. Server issues new tokens, updates last_login_at
-7. Mobile app shows INBOX
+| Scenario | Handling |
+|----------|----------|
+| Invalid Google ID token | 401 Unauthorized |
+| Email already exists | Login to existing account |
+| Account deleted within 30 days | 403 with available_at timestamp |
+| Account deleted after 30 days | Allow new account creation |
+| Google API error | Graceful error message, retry option |
 
-### Deleted Account (Within 30 Days)
+---
 
-1. User taps "Sign in with Google"
-2. Google SDK returns ID token + user info
-3. Mobile app calls POST /auth/google
-4. Server verifies Google ID token
-5. Server checks account_deletions table
-6. If block not expired: return 403 with available_at timestamp
-7. Mobile app shows error message with countdown
+## 8. Testing
 
-## Security Considerations
+- **Unit**: Google token verification, account creation logic, 30-day block check
+- **Integration**: Full login flow, existing user login, blocked account scenarios
+- **Acceptance**: First-time login, existing user, deleted account within/after 30 days
 
-1. **Google ID Token Verification**: Verify signature and claims
-2. **Email Uniqueness**: Prevent duplicate accounts
-3. **30-Day Block Enforcement**: Database check on every login attempt
-4. **Token Security**: Use AUTH-001 token system
+---
 
-## Dependencies
+## 9. Sensory Verification
 
-- **Depends on**: AUTH-001 (token management)
-- **Required by**: AUTH-003, AUTH-004
+- **Visual (시각)**: One-tap Google button, seamless transition to INBOX or onboarding
+- **Auditory (청각)**: OAuth flow logs, token verification results, account creation events
+- **Tactile (촉각)**: < 2s total login time, immediate INBOX access after authentication
 
-## Testing
+---
 
-1. First-time login → new account created, tokens issued
-2. Existing user login → tokens issued, last_login updated
-3. Deleted account (within 30 days) → 403 error
-4. Deleted account (after 30 days) → new account created
-5. Invalid Google ID token → 401 error
-6. Email already exists → login to existing account
+## 10. Future Enhancements
+
+1. Additional OAuth providers (Apple, Microsoft)
+2. Email verification after Google login
+3. Account linking (merge multiple Google accounts)
+4. SSO for enterprise/education domains
+
+---
+
+## 11. References
+
+- [AUTH-001.md](specs/AUTH-001.md) - Token management used by this feature
+- [AUTH-004.md](specs/AUTH-004.md) - Account deletion (populates AccountDeletion table)
+- Google OAuth 2.0 Documentation

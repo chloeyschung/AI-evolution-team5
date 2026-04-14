@@ -28,9 +28,11 @@
 | F-021 | 웹 대시보드 | 웹 기반 지식 라이브러리 관리 | 큰 화면에서 저장된 콘텐츠 관리, 필터링, 분석 | Vue 3 기반 SPA, Google OAuth, 그리드/리스트 뷰, 분석 대시보드 | Phase 2 | Web | P0 | - | 정의완료 | ⚠️ Backend API ready; web-dashboard/ not in repo |
 | F-022 | 플랫폼 연동 | YouTube 자동 동기화 | YouTube Watch Later/Playlist 를 자동으로 가져와 저장 | OAuth 2.0, 플레이리스트 선택, 자동/수동 동기화, 동기화 로그 | Phase 3 | iOS+Web | P1 | - | 정의완료 | ⚠️ Backend API ready (src/integrations/youtube/) |
 | F-023 | 플랫폼 연동 | LinkedIn/Social 자동 동기화 | LinkedIn 저장된 포스팅을 자동으로 가져와 저장 | OAuth 2.0 (준비됨), 수동 import (MVP), 자동 동기화 (향후) | Phase 3 | iOS+Web | P1 | - | 정의완료 | ⚠️ Backend API ready (src/integrations/linkedin/) |
-| F-024 | 지능형 기능 | 개인화 트렌드 피드 | 사용자의 관심사와 스와이프 이력을 기반으로 추천하는 아카이브 콘텐츠 | 관심사 매칭 (35%), 태그 유사도 (30%), 최신성 (20%), 참여도 (15%) | Phase 3 | iOS+Web | P2 | - | 정의완료 | ⚠️ Backend API ready (src/ai/trend_analyzer.py) |
+| F-024 | 지능형 기능 | 개인화 트렌드 피드 | 사용자의 관심사와 스와이프 이력을 기반으로 추천하는 아카이브 콘텐츠 | 관심사 매칭 (35%), 태그 유사도 (30%), 최신성 (20%), 참여도 (15%), 하드 리미트 1000 개 | Phase 3 | iOS+Web | P2 | - | 정의완료 | ⚠️ Backend API ready (src/ai/trend_analyzer.py) |
 | F-025 | 지능형 기능 | 게이미피케이션 성취 시스템 | 스와이프 활동을 기반으로 한 업적 시스템 (16 개 업적) | 연속 기록, 총 스와이프 수, 플랫폼 다양성, 큐레이션 4 가지 카테고리 | Phase 3 | iOS+Web | P2 | - | 정의완료 | ⚠️ Backend API ready (src/ai/achievement_checker.py) |
-| F-026 | 지능형 기능 | 스마트 리마인더 | 사용자 패턴을 학습하여 최적의 타이밍에 콘텐츠 소비 유도 | 백로그, 기록 유지, 시간 기반, 재참여 4 가지 리마인더 타입 | Phase 3 | iOS+Web | P2 | - | 정의완료 | ⚠️ Backend API ready (src/ai/reminder_engine.py) |
+| F-026 | 지능형 기능 | 스마트 리마인더 | 사용자 패턴을 학습하여 최적의 타이밍에 콘텐츠 소비 유도 | 백로그, 기록 유지, 시간 기반, 재참여 4 가지 리마인더 타입; 조용한 시간, 빈도 제한 | Phase 3 | iOS+Web | P2 | - | 정의완료 | ⚠️ Backend API ready (src/ai/reminder_engine.py) |
+| SEC-001 | 보안 | 보안 강화 | 인증, 데이터 보호, 액세스 제어를 위한 포괄적인 보안 조치 | JWT 해싱, OAuth 암호화, 속도 제한, SSRF 보호, 다중 사용자 격리 | Infrastructure | Backend | P0 | - | ✅ 구현완료 | ✅ Fully implemented (src/utils/token_hashing.py, src/utils/token_encryption.py, etc.) |
+| QOL-001 | 코드 품질 | 코드 품질 개선 | 중앙 집중화 된 상수, 표준화된 타입 힌트, 개선된 유지보수성 | 열거형 통합, 타입 힌트 표준화, 상수 중앙 집중화, 에러 코드 표준화 | Infrastructure | Backend | P1 | - | ✅ 구현완료 | ✅ Fully implemented (src/constants.py, refactored files) |
 
 ---
 
