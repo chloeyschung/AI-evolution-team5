@@ -124,16 +124,7 @@ async def create_content(
     repo = ContentRepository(db)
     content = await repo.save(metadata)
 
-    return ContentResponse(
-        id=content.id,
-        platform=content.platform,
-        content_type=content.content_type,
-        url=content.url,
-        title=content.title,
-        author=content.author,
-        thumbnail_url=content.thumbnail_url,
-        created_at=content.created_at.isoformat(),
-    )
+    return ContentResponse.from_content(content)
 
 
 @router.get("/content", response_model=list[ContentResponse])
@@ -298,18 +289,7 @@ async def update_content_status(
 
     try:
         content = await repo.update_status(content_id, new_status)
-        return ContentResponse(
-            id=content.id,
-            platform=content.platform,
-            content_type=content.content_type,
-            url=content.url,
-            title=content.title,
-            author=content.author,
-            thumbnail_url=content.thumbnail_url,
-            status=content.status,
-            created_at=content.created_at.isoformat(),
-            updated_at=content.updated_at.isoformat(),
-        )
+        return ContentResponse.from_content(content)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
@@ -496,19 +476,7 @@ async def search_content(
     repo = ContentRepository(db)
     results = await repo.search_content(q, limit=limit, offset=offset)
 
-    return [
-        ContentResponse(
-            id=c.id,
-            platform=c.platform,
-            content_type=c.content_type,
-            url=c.url,
-            title=c.title,
-            author=c.author,
-            thumbnail_url=c.thumbnail_url,
-            created_at=c.created_at.isoformat(),
-        )
-        for c in results
-    ]
+    return [ContentResponse.from_content(c) for c in results]
 
 
 # Share handler dependency - initialized in app.py
@@ -1562,10 +1530,19 @@ async def trigger_youtube_sync(
                 error_message=str(e),
             )
 
-    # Schedule background task
+    # Schedule background task with exception handling
     import asyncio
 
-    asyncio.create_task(do_sync())
+    async def background_task_wrapper():
+        """Wrapper to ensure exceptions don't crash the process."""
+        try:
+            await do_sync()
+        except Exception as e:
+            # Log unhandled exceptions (should not happen due to do_sync try/except)
+            import logging
+            logging.error(f"Uncaught exception in YouTube sync background task: {e}")
+
+    asyncio.create_task(background_task_wrapper())
 
     return {
         "message": "Sync triggered",
@@ -2048,22 +2025,7 @@ async def get_trend_feed(
     # Build response
     response_items = [
         TrendFeedItem(
-            content=ContentResponse(
-                id=item.content.id,
-                platform=item.content.platform,
-                content_type=item.content.content_type,
-                url=item.content.url,
-                title=item.content.title,
-                author=item.content.author,
-                thumbnail_url=item.content.thumbnail_url,
-                status=item.content.status,
-                created_at=item.content.created_at.isoformat(),
-                updated_at=(
-                    item.content.updated_at.isoformat()
-                    if item.content.updated_at
-                    else None
-                ),
-            ),
+            content=ContentResponse.from_content(item.content),
             relevance_score=item.relevance_score,
             matched_interests=item.matched_interests,
             top_tags=item.top_tags,

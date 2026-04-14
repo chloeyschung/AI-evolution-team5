@@ -1,6 +1,7 @@
 import asyncio
 import httpx
 from .exceptions import SummarizationError, APIConnectionError, InvalidResponseError
+from src.utils.http_client import async_client_context
 
 
 class Summarizer:
@@ -55,7 +56,7 @@ class Summarizer:
 
         last_error = None
 
-        async with httpx.AsyncClient() as client:
+        async with async_client_context() as client:
             for attempt in range(max_retries):
                 try:
                     response = await client.post(

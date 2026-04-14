@@ -6,6 +6,8 @@ from typing import List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.utils.datetime_utils import utc_now
+
 from .models import AchievementDefinition, UserAchievement, UserStreak
 
 
@@ -270,7 +272,7 @@ class StreakRepository:
         streak.longest_streak = max(streak.longest_streak, new_streak)
         streak.last_activity_date = datetime.combine(activity_date, datetime.min.time()).replace(tzinfo=None)
         streak.total_active_days += 1
-        streak.updated_at = datetime.now()
+        streak.updated_at = utc_now()
 
         await self._db.flush()
 

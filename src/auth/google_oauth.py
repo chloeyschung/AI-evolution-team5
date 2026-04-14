@@ -6,6 +6,8 @@ Provides Google ID token verification and user info extraction.
 import httpx
 from typing import Optional, Dict, Any
 
+from src.utils.http_client import async_client_context
+
 
 # Google OAuth configuration
 GOOGLE_TOKEN_INFO_URL = "https://oauth2.googleapis.com/tokeninfo"
@@ -45,8 +47,8 @@ async def verify_google_id_token(id_token: str, client_id: Optional[str] = None)
         params["audience"] = client_id
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(GOOGLE_TOKEN_INFO_URL, params=params)
+        async with async_client_context() as client:
+            response = await client.get(GOOGLE_TOKEN_INFO_URL, params=params, timeout=10.0)
 
             if response.status_code != 200:
                 raise GoogleTokenVerificationError(
@@ -84,8 +86,8 @@ async def get_google_user_info(access_token: str) -> Dict[str, Any]:
     headers = {"Authorization": f"Bearer {access_token}"}
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(GOOGLE_USER_INFO_URL, headers=headers)
+        async with async_client_context() as client:
+            response = await client.get(GOOGLE_USER_INFO_URL, headers=headers, timeout=10.0)
 
             if response.status_code != 200:
                 raise GoogleUserInfoError(

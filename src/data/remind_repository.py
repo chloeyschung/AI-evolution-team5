@@ -6,11 +6,12 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.utils.datetime_utils import utc_now
+
 from .models import (
     ReminderPreference,
     ReminderLog,
     UserActivityPattern,
-    utc_now,
 )
 
 

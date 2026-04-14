@@ -52,7 +52,9 @@ class ContentResponse(BaseModel):
             title=content.title,
             author=content.author,
             thumbnail_url=content.thumbnail_url,
+            status=content.status,
             created_at=content.created_at.isoformat(),
+            updated_at=content.updated_at.isoformat() if content.updated_at else None,
         )
 
 

@@ -22,13 +22,14 @@ from .models import (
     AccountDeletion,
     ContentTag,
 )
+from .base_repository import BaseRepository
 
 
-class ContentRepository:
+class ContentRepository(BaseRepository[Content]):
     """Repository for Content CRUD operations."""
 
     def __init__(self, session: AsyncSession):
-        self.session = session
+        super().__init__(session)
 
     async def save(
         self,
@@ -102,10 +103,7 @@ class ContentRepository:
         Returns:
             Content object if found, None otherwise.
         """
-        result = await self.session.execute(
-            select(Content).where(Content.id == content_id)
-        )
-        return result.scalar_one_or_none()
+        return await super().get_by_id(Content, content_id)
 
     async def get_all(self, limit: int = 50, offset: int = 0,
                      status: ContentStatus | None = None) -> List[Content]:
@@ -154,6 +152,33 @@ class ContentRepository:
         await self.session.refresh(content)
         return content
 
+    def _build_content_query_with_filters(
+        self,
+        base_query: select,
+        platform: str | None = None,
+        tags: List[str] | None = None,
+    ) -> select:
+        """Apply common filters to a content query.
+
+        Args:
+            base_query: The base SQLAlchemy select query.
+            platform: Optional platform filter (case-insensitive).
+            tags: Optional list of AI-generated tags to filter by (F-014).
+
+        Returns:
+            The query with filters applied.
+        """
+        query = base_query
+
+        if platform:
+            query = query.where(Content.platform.ilike(platform))
+
+        # F-014: Filter by AI-generated tags (ContentTag)
+        if tags:
+            query = query.join(ContentTag).where(ContentTag.tag.in_(tags))
+
+        return query
+
     async def get_pending(
         self, limit: int = 50, platform: str | None = None, tags: List[str] | None = None
     ) -> List[Content]:
@@ -167,7 +192,7 @@ class ContentRepository:
         Returns:
             List of Content objects that have no swipe history.
         """
-        query = (
+        base_query = (
             select(Content)
             .outerjoin(SwipeHistory, Content.id == SwipeHistory.content_id)
             .where(SwipeHistory.id.is_(None))
@@ -175,12 +200,7 @@ class ContentRepository:
             .limit(limit)
         )
 
-        if platform:
-            query = query.where(Content.platform.ilike(platform))
-
-        # F-014: Filter by AI-generated tags (ContentTag)
-        if tags:
-            query = query.join(ContentTag).where(ContentTag.tag.in_(tags))
+        query = self._build_content_query_with_filters(base_query, platform, tags)
 
         result = await self.session.execute(query)
         return list(result.scalars().unique().all())
@@ -199,7 +219,7 @@ class ContentRepository:
         Returns:
             List of Content objects that were kept, ordered by recency.
         """
-        query = (
+        base_query = (
             select(Content)
             .join(SwipeHistory, Content.id == SwipeHistory.content_id)
             .where(SwipeHistory.action == SwipeAction.KEEP)
@@ -208,12 +228,7 @@ class ContentRepository:
             .limit(limit)
         )
 
-        if platform:
-            query = query.where(Content.platform.ilike(platform))
-
-        # F-014: Filter by AI-generated tags (ContentTag)
-        if tags:
-            query = query.join(ContentTag).where(ContentTag.tag.in_(tags))
+        query = self._build_content_query_with_filters(base_query, platform, tags)
 
         result = await self.session.execute(query)
         return list(result.scalars().unique().all())
@@ -232,7 +247,7 @@ class ContentRepository:
         Returns:
             List of Content objects that were discarded, ordered by recency.
         """
-        query = (
+        base_query = (
             select(Content)
             .join(SwipeHistory, Content.id == SwipeHistory.content_id)
             .where(SwipeHistory.action == SwipeAction.DISCARD)
@@ -241,12 +256,7 @@ class ContentRepository:
             .limit(limit)
         )
 
-        if platform:
-            query = query.where(Content.platform.ilike(platform))
-
-        # F-014: Filter by AI-generated tags (ContentTag)
-        if tags:
-            query = query.join(ContentTag).where(ContentTag.tag.in_(tags))
+        query = self._build_content_query_with_filters(base_query, platform, tags)
 
         result = await self.session.execute(query)
         return list(result.scalars().unique().all())
@@ -434,11 +444,11 @@ class SwipeRepository:
         return histories
 
 
-class UserProfileRepository:
+class UserProfileRepository(BaseRepository[UserProfile]):
     """Repository for user profile and preferences operations."""
 
     def __init__(self, session: AsyncSession):
-        self.session = session
+        super().__init__(session)
 
     async def get_or_create_profile(self) -> UserProfile:
         """Get existing profile or create default.
@@ -446,20 +456,11 @@ class UserProfileRepository:
         Returns:
             UserProfile object (existing or newly created).
         """
-        result = await self.session.execute(select(UserProfile).limit(1))
-        profile = result.scalar_one_or_none()
-
-        if profile is None:
-            profile = UserProfile(
-                display_name=None,
-                avatar_url=None,
-                bio=None,
-            )
-            self.session.add(profile)
-            await self.session.commit()
-            await self.session.refresh(profile)
-
-        return profile
+        return await self._get_or_create_base(
+            UserProfile,
+            True,  # Get first record
+            lambda: {"display_name": None, "avatar_url": None, "bio": None},
+        )
 
     async def update_profile(
         self, display_name: str | None = None, avatar_url: str | None = None, bio: str | None = None

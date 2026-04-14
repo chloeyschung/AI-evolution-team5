@@ -43,7 +43,7 @@ class BaseRepository(Generic[ModelType]):
     async def _get_or_create_base(
         self,
         model: type[ModelType],
-        where_clause: any,
+        where_clause,
         defaults: Callable[[], dict],
     ) -> ModelType:
         """Get existing record or create new one with defaults (internal).

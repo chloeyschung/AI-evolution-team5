@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.data.models import AuthenticationToken, UserProfile
 from src.auth import tokens as token_utils
+from src.utils.datetime_utils import utc_now
 
 
 class AuthenticationRepository:
@@ -40,7 +41,7 @@ class AuthenticationRepository:
         refresh_token = token_utils.create_refresh_token()
 
         # Calculate expiry times
-        now = datetime.now(timezone.utc)
+        now = utc_now()
         expires_at = now + timedelta(seconds=access_expires_in)
 
         # Check if tokens already exist and revoke them (token rotation)
@@ -94,7 +95,7 @@ class AuthenticationRepository:
 
         if token:
             # Check if token is expired
-            if token.expires_at < datetime.now(timezone.utc):
+            if token.expires_at < utc_now():
                 return None
 
         return token
@@ -139,7 +140,7 @@ class AuthenticationRepository:
         # Generate new tokens (token rotation)
         new_access_token = token_utils.create_access_token(existing_token.user_id)
         new_refresh_token = token_utils.create_refresh_token()
-        new_expires_at = datetime.now(timezone.utc) + timedelta(seconds=access_expires_in)
+        new_expires_at = utc_now() + timedelta(seconds=access_expires_in)
 
         # Update token record
         existing_token.access_token = new_access_token
@@ -168,8 +169,7 @@ class AuthenticationRepository:
         token = result.scalar_one_or_default(None)
 
         if token:
-            now = datetime.now(timezone.utc)
-            token.revoked_at = now
+            token.revoked_at = utc_now()
             await self.db.commit()
             return True
 

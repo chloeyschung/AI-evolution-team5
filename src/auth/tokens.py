@@ -5,10 +5,11 @@ Provides JWT access token and opaque refresh token generation/validation.
 
 import jwt
 import secrets
-from datetime import datetime, timezone, timedelta
+from datetime import timedelta
 from typing import Optional
 
 from src.config import settings
+from src.utils.datetime_utils import utc_now
 
 
 # Token configuration
@@ -25,7 +26,7 @@ def create_access_token(user_id: int) -> str:
     Returns:
         JWT access token string
     """
-    now = datetime.now(timezone.utc)
+    now = utc_now()
     expire = now + timedelta(minutes=ACCESS_TOKEN_EXPIRY_MINUTES)
 
     payload = {

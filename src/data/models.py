@@ -1,11 +1,13 @@
 """SQLAlchemy ORM models for Briefly storage engine."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 
 import sqlalchemy
 from sqlalchemy import Column, DateTime, ForeignKey, Float, Integer, String, Text, Enum as SQLEnum
 from sqlalchemy.orm import declarative_base, relationship
+
+from src.utils.datetime_utils import utc_now
 
 Base = declarative_base()
 
@@ -30,11 +32,6 @@ class DefaultSort(str, Enum):
 
     RECENCY = "recency"
     PLATFORM = "platform"
-
-
-def utc_now() -> datetime:
-    """Return current UTC time as timezone-aware datetime."""
-    return datetime.now(timezone.utc)
 
 
 class ContentStatus(str, Enum):

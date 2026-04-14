@@ -20,10 +20,16 @@ async def get_db() -> AsyncSession:
     """Dependency for FastAPI routes.
 
     Yields an async database session for use in API routes.
+    Session is automatically committed on success, rolled back on error,
+    and always closed properly.
     """
     async with AsyncSessionLocal() as session:
         try:
             yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
         finally:
             await session.close()
 

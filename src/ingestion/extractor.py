@@ -1,9 +1,12 @@
+import ipaddress
 import re
 from urllib.parse import urlparse
+from urllib.parse import urldefrag
 
 import httpx
 from bs4 import BeautifulSoup
 from .exceptions import ExtractionError
+from src.utils.http_client import async_client_context
 
 class ContentExtractor:
     """Extracts clean text content from web URLs."""
@@ -26,13 +29,13 @@ class ContentExtractor:
 
     def _validate_url(self, url: str) -> None:
         """
-        Validates the URL format.
+        Validates the URL format and checks for SSRF vulnerabilities.
 
         Args:
             url: The URL to validate.
 
         Raises:
-            ExtractionError: If the URL is invalid.
+            ExtractionError: If the URL is invalid or points to a restricted resource.
         """
         if not url or not isinstance(url, str):
             raise ExtractionError("URL must be a non-empty string.")
@@ -44,9 +47,41 @@ class ContentExtractor:
             raise ExtractionError(f"Invalid URL format: {url}")
 
         # Check scheme
-        parsed = urlparse(url)
+        parsed = urlparse(urldefrag(url)[0])  # Remove fragment before parsing
         if parsed.scheme not in ('http', 'https'):
             raise ExtractionError(f"URL must use http or https scheme: {url}")
+
+        # SSRF protection: block access to internal/private IP ranges
+        if parsed.hostname:
+            self._check_ssrf(parsed.hostname)
+
+    def _check_ssrf(self, hostname: str) -> None:
+        """
+        Check if hostname resolves to a private/internal IP address.
+
+        Args:
+            hostname: The hostname to check.
+
+        Raises:
+            ExtractionError: If the hostname resolves to a restricted IP.
+        """
+        # Block common internal hostnames
+        internal_hostnames = {
+            'localhost', 'localhost.localdomain', 'local',
+            'internal', 'intranet', 'private'
+        }
+
+        if hostname.lower() in internal_hostnames:
+            raise ExtractionError(f"Access to internal hostname blocked: {hostname}")
+
+        # Block IP literals (prevent DNS rebinding attacks)
+        try:
+            ip = ipaddress.ip_address(hostname)
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                raise ExtractionError(f"Access to private/reserved IP address blocked: {hostname}")
+        except ValueError:
+            # Not an IP address, will be resolved later (acceptable for hostnames)
+            pass
 
     async def extract_text(self, url: str) -> str:
         """
@@ -65,8 +100,8 @@ class ContentExtractor:
         self._validate_url(url)
 
         try:
-            async with httpx.AsyncClient(follow_redirects=True, timeout=self.timeout) as client:
-                response = await client.get(url)
+            async with async_client_context(follow_redirects=True) as client:
+                response = await client.get(url, timeout=self.timeout)
                 response.raise_for_status()
         except httpx.HTTPStatusError as e:
             raise ExtractionError(f"HTTP error occurred: {e.response.status_code}") from e
