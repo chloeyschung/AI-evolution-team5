@@ -12,7 +12,12 @@ from src.ingestion.share_handler import ShareHandler
 
 from ..data.database import get_db
 from ..data.models import Content
-from ..data.repository import ContentRepository, SwipeRepository, UserProfileRepository
+from ..data.repository import (
+    ContentRepository,
+    SwipeRepository,
+    UserProfileRepository,
+    ContentTagRepository,
+)
 from ..data.auth_repository import AuthenticationRepository
 from .schemas import (
     ContentCreate,
@@ -186,15 +191,16 @@ async def record_swipe(
 async def list_pending_content(
     limit: int = Query(50, gt=0, le=100),
     platform: str | None = Query(None),  # UX-004: Filter by platform
+    tags: list[str] | None = Query(None),  # F-014: Filter by AI-generated tags
     db: AsyncSession = Depends(get_db),
 ) -> list[ContentResponse]:
     """Fetch content that hasn't been swiped yet.
 
     Returns content ordered by recency (newest first).
-    Optionally filter by platform.
+    Optionally filter by platform and AI-generated tags.
     """
     repo = ContentRepository(db)
-    contents = await repo.get_pending(limit=limit, platform=platform)
+    contents = await repo.get_pending(limit=limit, platform=platform, tags=tags)
 
     return [
         ContentResponse(
@@ -215,15 +221,16 @@ async def list_kept_content(
     limit: int = Query(50, gt=0, le=100),
     offset: int = Query(0, ge=0),
     platform: str | None = Query(None),  # UX-004: Filter by platform
+    tags: list[str] | None = Query(None),  # F-014: Filter by AI-generated tags
     db: AsyncSession = Depends(get_db),
 ) -> list[ContentResponse]:
     """Get content that was swiped Keep.
 
     Returns kept content ordered by swipe recency (newest first).
-    Optionally filter by platform.
+    Optionally filter by platform and AI-generated tags.
     """
     repo = ContentRepository(db)
-    contents = await repo.get_kept(limit=limit, offset=offset, platform=platform)
+    contents = await repo.get_kept(limit=limit, offset=offset, platform=platform, tags=tags)
 
     return [
         ContentResponse(
@@ -244,15 +251,16 @@ async def list_discarded_content(
     limit: int = Query(50, gt=0, le=100),
     offset: int = Query(0, ge=0),
     platform: str | None = Query(None),  # UX-004: Filter by platform
+    tags: list[str] | None = Query(None),  # F-014: Filter by AI-generated tags
     db: AsyncSession = Depends(get_db),
 ) -> list[ContentResponse]:
     """Get content that was swiped Discard.
 
     Returns discarded content ordered by swipe recency (newest first).
-    Optionally filter by platform.
+    Optionally filter by platform and AI-generated tags.
     """
     repo = ContentRepository(db)
-    contents = await repo.get_discarded(limit=limit, offset=offset, platform=platform)
+    contents = await repo.get_discarded(limit=limit, offset=offset, platform=platform, tags=tags)
 
     return [
         ContentResponse(
@@ -370,8 +378,6 @@ async def get_content_tags(
     Raises:
         404: Content not found.
     """
-    from src.data.repository import ContentTagRepository, ContentRepository
-
     # Check if content exists
     content_repo = ContentRepository(db)
     content = await content_repo.get_by_id(content_id)
@@ -406,7 +412,6 @@ async def categorize_content(
         404: Content not found.
     """
     from src.ai.categorizer import Categorizer
-    from src.data.repository import ContentTagRepository, ContentRepository
 
     # Check if content exists and get title/summary
     content_repo = ContentRepository(db)
@@ -1053,10 +1058,11 @@ async def delete_account(
     )
 
     # 3. Delete all user data (order matters for foreign keys)
+    # Note: Content and SwipeHistory don't have user_id (single-user MVP design)
     await db.execute(delete(UserPreferences).where(UserPreferences.user_id == user_id))
     await db.execute(delete(InterestTag).where(InterestTag.user_id == user_id))
-    await db.execute(delete(SwipeHistory).where(SwipeHistory.id.isnot(None)))  # All swipes
-    await db.execute(delete(Content).where(Content.id.isnot(None)))  # All content
+    await db.execute(delete(SwipeHistory).where(SwipeHistory.id.isnot(None)))  # All swipes (single-user system)
+    await db.execute(delete(Content).where(Content.id.isnot(None)))  # All content (single-user system)
     await db.execute(delete(AuthenticationToken).where(AuthenticationToken.user_id == user_id))
     await db.execute(delete(UserProfile).where(UserProfile.id == user_id))
 
@@ -1971,6 +1977,7 @@ async def get_linkedin_sync_logs(
 @router.post("/integrations/linkedin/import", status_code=201, response_model=ShareResponse)
 async def import_linkedin_post(
     data: LinkedInImportRequest,
+    user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ShareResponse:
     """Import a single LinkedIn post by URL.
@@ -1980,10 +1987,14 @@ async def import_linkedin_post(
 
     Args:
         data: Import request with LinkedIn post URL.
+        user_id: Current user ID (from auth).
         db: Database session.
 
     Returns:
         Share response with imported content.
+
+    Raises:
+        401: Not authenticated.
     """
     from src.integrations.linkedin.client import LinkedInClient
     from src.integrations.linkedin.sync import LinkedInSyncService
@@ -1993,7 +2004,7 @@ async def import_linkedin_post(
 
     # Use sync service to import the post
     result = await LinkedInSyncService(db).sync_single_post(
-        user_id=1,  # Default for MVP
+        user_id=user_id,
         url=data.url,
         client=client,
     )

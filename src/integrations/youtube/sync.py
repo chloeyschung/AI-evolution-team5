@@ -4,8 +4,9 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Optional
 
+from src.ai.metadata_extractor import ContentMetadata, ContentType
 from src.ai.summarizer import Summarizer
-from src.data.models import ContentStatus, Provider
+from src.data.models import ContentStatus, Provider, utc_now
 from src.data.repository import ContentRepository
 from src.integrations.repositories.integration import IntegrationRepository
 from src.integrations.youtube.client import YouTubeClient, YouTubeClientError
@@ -60,7 +61,7 @@ class YouTubeSyncService:
         Raises:
             YouTubeSyncError: If sync fails completely.
         """
-        start_time = datetime.now(timezone.utc)
+        start_time = utc_now()
         errors = []
 
         try:
@@ -102,11 +103,11 @@ class YouTubeSyncService:
                     })
 
             # Calculate duration
-            duration = (datetime.now(timezone.utc) - start_time).total_seconds()
+            duration = (utc_now() - start_time).total_seconds()
 
             # Update last sync timestamp
             await self.integration_repo.update_last_sync(
-                user_id, Provider.YOUTUBE.value, playlist_id, datetime.now(timezone.utc)
+                user_id, Provider.YOUTUBE.value, playlist_id, utc_now()
             )
 
             return SyncResult(
@@ -143,29 +144,32 @@ class YouTubeSyncService:
         if existing:
             return "skipped"
 
-        # Create content record
-        content = await self.content_repo.save(
+        # Generate summary if summarizer is available
+        summary = None
+        if self.summarizer and video.description:
+            try:
+                summary = await self.summarizer.summarize(
+                    f"Title: {video.title}\nDescription: {video.description}",
+                    max_lines=3,
+                )
+            except Exception as e:
+                # Log but don't fail - summary can be generated later
+                print(f"Failed to generate summary for video {video.video_id}: {e}")
+
+        # Create content metadata
+        metadata = ContentMetadata(
             platform=Provider.YOUTUBE.value,
-            content_type="video",
+            content_type=ContentType.VIDEO,
             url=url,
             title=video.title,
             author=video.channel_title,
             timestamp=video.published_at,
             thumbnail_url=video.thumbnail_url,
-            status=ContentStatus.INBOX,
+            summary=summary,
         )
 
-        # Generate summary if summarizer is available
-        if self.summarizer and video.description:
-            try:
-                summary = await self.summarizer.summarize(
-                    f"Title: {video.title}\nDescription: {video.description}",
-                    video.url,
-                )
-                await self.content_repo.update_summary(content.id, summary)
-            except Exception as e:
-                # Log but don't fail - summary can be generated later
-                print(f"Failed to generate summary for video {video.video_id}: {e}")
+        # Create content record
+        content = await self.content_repo.save(metadata, status=ContentStatus.INBOX)
 
         return "ingested"
 

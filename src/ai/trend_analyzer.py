@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .categorizer import Categorizer
 from .summarizer import Summarizer
-from ..data.models import Content, SwipeAction
+from ..data.models import Content, SwipeAction, utc_now
 from ..data.repository import ContentRepository, SwipeRepository, ContentTagRepository, UserProfileRepository
 
 
@@ -252,7 +252,7 @@ class TrendAnalyzer:
         """
         # Use updated_at (when kept) or created_at
         kept_at = self._get_datetime_utc(content.updated_at) or self._get_datetime_utc(content.created_at)
-        now = datetime.now(timezone.utc)
+        now = utc_now()
 
         # Calculate days since kept
         delta = now - kept_at
@@ -276,39 +276,32 @@ class TrendAnalyzer:
         if not content_tags:
             return self.DEFAULT_NEUTRAL_SCORE
 
-        # Get swipe history for user
-        swipe_history = await self._swipe_repo.get_history(user_id)
+        # Get all swipe history (single-user system, no user_id filter needed)
+        swipe_history = await self._swipe_repo.get_all_history()
 
         if not swipe_history:
             return self.DEFAULT_NEUTRAL_SCORE
 
-        # Calculate keep ratio per tag
-        tag_ratios: List[float] = []
-        for tag in content_tags:
-            tag_ratios.append(
-                self._calculate_tag_keep_ratio(tag, swipe_history, content_tags)
-            )
+        # Use overall keep ratio as approximation for engagement score
+        # This is acceptable because:
+        # 1. The engagement score is only 15% of total relevance score
+        # 2. Overall keep ratio still provides useful signal about user preferences
+        return self._calculate_overall_keep_ratio(swipe_history)
 
-        # Average across all tags
-        if not tag_ratios:
-            return self.DEFAULT_NEUTRAL_SCORE
-
-        return sum(tag_ratios) / len(tag_ratios)
-
-    def _calculate_tag_keep_ratio(
+    def _calculate_overall_keep_ratio(
         self,
-        tag: str,
         swipe_history: List,
-        content_tags: List[str],
     ) -> float:
-        """Calculate keep ratio for a specific tag.
+        """Calculate overall keep ratio from swipe history.
 
-        Ratio = kept_content_with_tag / total_content_with_tag
+        This is used as an approximation for per-tag engagement scoring.
+
+        Ratio = kept_swipes / total_swipes
 
         Note: This is a simplified calculation. In production, we'd query the
-        database with a proper join to ContentTag for accurate counts.
+        database with a proper join to ContentTag for accurate per-tag counts.
         """
-        # For now, use overall keep ratio as approximation
+        # Use overall keep ratio as approximation
         # This is acceptable because:
         # 1. The engagement score is only 15% of total relevance score
         # 2. Overall keep ratio still provides useful signal about user preferences
@@ -324,6 +317,9 @@ class TrendAnalyzer:
         """Get preferred tags from user's most-kept content.
 
         Returns top tags from content user has kept (max 10 tags).
+
+        Optimization:
+            Uses batch query to avoid N+1 pattern. All tags fetched in single query.
         """
         # Get kept content
         kept_contents = await self._content_repo.get_kept(
@@ -334,10 +330,13 @@ class TrendAnalyzer:
         if not kept_contents:
             return []
 
-        # Count tag frequency
+        # Batch optimization: Get all tags in single query (avoids N+1)
+        content_ids = [c.id for c in kept_contents]
+        tags_by_content = await self._tag_repo.get_tags_for_content_ids(content_ids)
+
+        # Count tag frequency across all content
         tag_counts: dict[str, int] = {}
-        for content in kept_contents:
-            tags = await self._tag_repo.get_tags(content.id)
+        for content_id, tags in tags_by_content.items():
             for tag in tags:
                 tag_counts[tag] = tag_counts.get(tag, 0) + 1
 
@@ -378,7 +377,7 @@ class TrendAnalyzer:
         if time_range == "all":
             return contents
 
-        now = datetime.now(timezone.utc)
+        now = utc_now()
         if time_range == "week":
             cutoff = now - timedelta(days=7)
         elif time_range == "month":

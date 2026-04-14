@@ -27,18 +27,20 @@ class LinkedInSyncService:
     def __init__(
         self,
         db_session: AsyncSession,
+        summarizer: Optional[Summarizer] = None,
     ):
         """Initialize LinkedIn sync service.
 
         Args:
             db_session: Async database session.
+            summarizer: Optional Summarizer instance (must have api_key configured).
         """
         self.db_session = db_session
         self._content_repo = ContentRepository(db_session)
         self._tag_repo = ContentTagRepository(db_session)
         self._integration_repo = IntegrationRepository(db_session)
-        self._summarizer = Summarizer()
-        self._categorizer = Categorizer(self._summarizer)
+        self._summarizer = summarizer
+        self._categorizer = Categorizer(summarizer) if summarizer else None
 
     async def create_client(self, user_id: int) -> Optional[LinkedInClient]:
         """Create LinkedIn client with user's tokens.
@@ -174,16 +176,22 @@ class LinkedInSyncService:
         # Save content
         content = await self._content_repo.save(metadata)
 
-        # Generate summary and tags in parallel if text content available
-        if post.text_content:
+        # Generate summary and tags in parallel if AI services available
+        if self._summarizer and post.text_content:
             try:
-                summary_task = self._summarizer.summarize(post.text_content)
-                tags_task = self._categorizer.generate_tags(
-                    title=post.title or "",
-                    summary=post.text_content[:500],
-                )
-
-                summary, tags = await asyncio.gather(summary_task, tags_task)
+                if self._categorizer:
+                    # Run both tasks in parallel
+                    summary, tags = await asyncio.gather(
+                        self._summarizer.summarize(post.text_content),
+                        self._categorizer.generate_tags(
+                            title=post.title or "",
+                            summary=post.text_content[:500],
+                        ),
+                    )
+                else:
+                    # Only generate summary
+                    summary = await self._summarizer.summarize(post.text_content)
+                    tags = []
 
                 # Update content with summary and tags
                 content.summary = summary

@@ -83,9 +83,16 @@ class Summarizer:
                     if len(lines) > max_lines:
                         summary = "\n".join(lines[:max_lines])
 
-                    # Enforce 300-character limit (AI-001 spec)
+                    # Enforce 300-character limit with word-boundary truncation (AI-001 spec)
                     if len(summary) > 300:
-                        summary = summary[:300]
+                        # Truncate to word boundary, no trailing ellipsis
+                        truncated = summary[:300]
+                        # Find last space to avoid cutting words
+                        last_space = truncated.rfind(' ')
+                        if last_space > 200:  # Ensure we have at least 200 chars
+                            summary = truncated[:last_space]
+                        else:
+                            summary = truncated
 
                     return summary
 

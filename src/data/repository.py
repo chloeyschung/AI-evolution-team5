@@ -154,12 +154,15 @@ class ContentRepository:
         await self.session.refresh(content)
         return content
 
-    async def get_pending(self, limit: int = 50, platform: str | None = None) -> List[Content]:
+    async def get_pending(
+        self, limit: int = 50, platform: str | None = None, tags: List[str] | None = None
+    ) -> List[Content]:
         """Get content that hasn't been swiped yet.
 
         Args:
             limit: Maximum number of results.
             platform: Optional platform filter (case-insensitive).
+            tags: Optional list of AI-generated tags to filter by (F-014).
 
         Returns:
             List of Content objects that have no swipe history.
@@ -175,16 +178,23 @@ class ContentRepository:
         if platform:
             query = query.where(Content.platform.ilike(platform))
 
-        result = await self.session.execute(query)
-        return list(result.scalars().all())
+        # F-014: Filter by AI-generated tags (ContentTag)
+        if tags:
+            query = query.join(ContentTag).where(ContentTag.tag.in_(tags))
 
-    async def get_kept(self, limit: int = 50, offset: int = 0, platform: str | None = None) -> List[Content]:
+        result = await self.session.execute(query)
+        return list(result.scalars().unique().all())
+
+    async def get_kept(
+        self, limit: int = 50, offset: int = 0, platform: str | None = None, tags: List[str] | None = None
+    ) -> List[Content]:
         """Get content that was swiped Keep.
 
         Args:
             limit: Maximum number of results.
             offset: Pagination offset.
             platform: Optional platform filter (case-insensitive).
+            tags: Optional list of AI-generated tags to filter by (F-014).
 
         Returns:
             List of Content objects that were kept, ordered by recency.
@@ -201,16 +211,23 @@ class ContentRepository:
         if platform:
             query = query.where(Content.platform.ilike(platform))
 
+        # F-014: Filter by AI-generated tags (ContentTag)
+        if tags:
+            query = query.join(ContentTag).where(ContentTag.tag.in_(tags))
+
         result = await self.session.execute(query)
         return list(result.scalars().unique().all())
 
-    async def get_discarded(self, limit: int = 50, offset: int = 0, platform: str | None = None) -> List[Content]:
+    async def get_discarded(
+        self, limit: int = 50, offset: int = 0, platform: str | None = None, tags: List[str] | None = None
+    ) -> List[Content]:
         """Get content that was swiped Discard.
 
         Args:
             limit: Maximum number of results.
             offset: Pagination offset.
             platform: Optional platform filter (case-insensitive).
+            tags: Optional list of AI-generated tags to filter by (F-014).
 
         Returns:
             List of Content objects that were discarded, ordered by recency.
@@ -226,6 +243,10 @@ class ContentRepository:
 
         if platform:
             query = query.where(Content.platform.ilike(platform))
+
+        # F-014: Filter by AI-generated tags (ContentTag)
+        if tags:
+            query = query.join(ContentTag).where(ContentTag.tag.in_(tags))
 
         result = await self.session.execute(query)
         return list(result.scalars().unique().all())
@@ -246,7 +267,7 @@ class ContentRepository:
     async def search_content(
         self, query: str, limit: int = 50, offset: int = 0
     ) -> List[Content]:
-        """Search content by title, author, or tags.
+        """Search content by title, author, or AI-generated tags (F-016).
 
         Args:
             query: Search query string (case-insensitive).
@@ -254,17 +275,23 @@ class ContentRepository:
             offset: Pagination offset.
 
         Returns:
-            List of matching Content objects, sorted by relevance then recency.
+            List of matching Content objects, sorted by recency.
         """
-        # Build search query with OR conditions for title and author
+        # Build search query with OR conditions for title, author, and tags
         query_pattern = f"%{query}%"
 
-        # Search in title and author (case-insensitive)
+        # Search in title, author, and AI-generated tags (case-insensitive)
+        # F-016: Added ContentTag JOIN to enable tag-based search
         query_stmt = (
             select(Content)
+            .outerjoin(ContentTag, Content.id == ContentTag.content_id)
             .where(
                 (Content.title.isnot(None)) &  # Must have title
-                ((Content.title.ilike(query_pattern)) | (Content.author.ilike(query_pattern)))
+                (
+                    (Content.title.ilike(query_pattern)) |
+                    (Content.author.ilike(query_pattern)) |
+                    (ContentTag.tag.ilike(query_pattern))  # F-016: Tag search
+                )
             )
             .order_by(Content.created_at.desc())
             .offset(offset)
@@ -467,7 +494,13 @@ class UserProfileRepository:
 
         Returns:
             UserPreferences object (existing or newly created with defaults).
+
+        Note:
+            MVP: Single-user system (user_id=1 hardcoded).
+            TODO: Replace with authenticated user_id from token for multi-user support.
         """
+        # MVP: Single-user system (user_id=1 hardcoded)
+        # TODO: Replace with authenticated user_id from token for multi-user support
         result = await self.session.execute(select(UserPreferences).where(UserPreferences.user_id == 1))
         preferences = result.scalar_one_or_none()
 
@@ -591,10 +624,16 @@ class UserProfileRepository:
 
         Returns:
             InterestTag object (existing or newly created).
+
+        Note:
+            MVP: Single-user system (user_id=1 hardcoded).
+            TODO: Replace with authenticated user_id from token for multi-user support.
         """
         tag_normalized = tag.strip().lower()
 
         # Check if tag already exists (case-insensitive)
+        # MVP: Single-user system (user_id=1 hardcoded)
+        # TODO: Replace with authenticated user_id from token for multi-user support
         result = await self.session.execute(
             select(InterestTag).where(
                 InterestTag.user_id == 1, InterestTag.tag.ilike(tag_normalized)
@@ -618,9 +657,15 @@ class UserProfileRepository:
 
         Args:
             tag: The tag to remove (case-insensitive).
+
+        Note:
+            MVP: Single-user system (user_id=1 hardcoded).
+            TODO: Replace with authenticated user_id from token for multi-user support.
         """
         tag_normalized = tag.strip().lower()
 
+        # MVP: Single-user system (user_id=1 hardcoded)
+        # TODO: Replace with authenticated user_id from token for multi-user support
         await self.session.execute(
             delete(InterestTag).where(
                 InterestTag.user_id == 1, InterestTag.tag.ilike(tag_normalized)
@@ -633,7 +678,13 @@ class UserProfileRepository:
 
         Returns:
             List of tag strings.
+
+        Note:
+            MVP: Single-user system (user_id=1 hardcoded).
+            TODO: Replace with authenticated user_id from token for multi-user support.
         """
+        # MVP: Single-user system (user_id=1 hardcoded)
+        # TODO: Replace with authenticated user_id from token for multi-user support
         result = await self.session.execute(
             select(InterestTag.tag).where(InterestTag.user_id == 1).order_by(InterestTag.tag)
         )
@@ -860,6 +911,39 @@ class ContentTagRepository:
             .order_by(ContentTag.tag)
         )
         return [row[0] for row in result.fetchall()]
+
+    async def get_tags_for_content_ids(
+        self, content_ids: List[int]
+    ) -> dict[int, List[str]]:
+        """Get all tags for multiple content IDs in a single query (batch optimization).
+
+        This method avoids N+1 query pattern by fetching all tags in one query.
+
+        Args:
+            content_ids: List of content IDs.
+
+        Returns:
+            Dictionary mapping content_id to list of tag strings.
+        """
+        if not content_ids:
+            return {}
+
+        # Single query to get all tags for all content IDs
+        result = await self.session.execute(
+            select(ContentTag.content_id, ContentTag.tag)
+            .where(ContentTag.content_id.in_(content_ids))
+            .order_by(ContentTag.content_id, ContentTag.tag)
+        )
+
+        # Build dictionary mapping content_id -> list of tags
+        tags_by_content: dict[int, List[str]] = {}
+        for row in result.fetchall():
+            cid, tag = row[0], row[1]
+            if cid not in tags_by_content:
+                tags_by_content[cid] = []
+            tags_by_content[cid].append(tag)
+
+        return tags_by_content
 
     async def delete_tags(self, content_id: int) -> None:
         """Delete all tags for content.
