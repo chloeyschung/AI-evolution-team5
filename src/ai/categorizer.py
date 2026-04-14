@@ -51,7 +51,7 @@ class Categorizer:
 
         try:
             # Call LLM for tag generation
-            response = await self.summarizer.generate_summary(prompt)
+            response = await self.summarizer.summarize(prompt)
 
             # Parse and clean tags from response
             tags = self._parse_tags(response)
