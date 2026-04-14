@@ -20,6 +20,10 @@ class Settings:
     _jwt_secret_key: str | None = os.getenv("JWT_SECRET_KEY")
     if _jwt_secret_key is None:
         raise RuntimeError("JWT_SECRET_KEY environment variable is required")
+    if len(_jwt_secret_key) < 32:
+        raise RuntimeError(
+            "JWT_SECRET_KEY must be at least 32 characters for security"
+        )
     JWT_SECRET_KEY: str = _jwt_secret_key
     JWT_ALGORITHM: str = "HS256"
 
