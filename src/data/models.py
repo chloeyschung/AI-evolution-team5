@@ -52,6 +52,7 @@ class Content(Base):
     __tablename__ = "content"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("user_profile.id"), nullable=False, default=1, index=True)
     platform = Column(String(100), nullable=False, index=True)
     content_type = Column(String(50), nullable=False)
     url = Column(Text, nullable=False, index=True)
@@ -66,6 +67,12 @@ class Content(Base):
 
     # Relationship to swipe history
     swipe_history = relationship("SwipeHistory", back_populates="content")
+    user = relationship("UserProfile", back_populates="content")
+
+    # Unique constraint for user_id + url combination
+    __table_args__ = (
+        sqlalchemy.UniqueConstraint("user_id", "url", name="unique_user_content_url"),
+    )
 
 
 class SwipeHistory(Base):
@@ -74,12 +81,14 @@ class SwipeHistory(Base):
     __tablename__ = "swipe_history"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("user_profile.id"), nullable=False, default=1, index=True)
     content_id = Column(Integer, ForeignKey("content.id"), nullable=False, index=True)
     action = Column(SQLEnum(SwipeAction), nullable=False)
     swiped_at = Column(DateTime, default=utc_now, index=True)
 
     # Relationship to content
     content = relationship("Content", back_populates="swipe_history")
+    user = relationship("UserProfile", back_populates="swipe_history")
 
 
 class UserProfile(Base):
@@ -96,6 +105,10 @@ class UserProfile(Base):
     last_login_at = Column(DateTime, nullable=True, index=True)  # AUTH-002
     created_at = Column(DateTime, default=utc_now, index=True)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, index=True)
+
+    # Relationships
+    content = relationship("Content", back_populates="user", cascade="all, delete-orphan")
+    swipe_history = relationship("SwipeHistory", back_populates="user", cascade="all, delete-orphan")
 
 
 class UserPreferences(Base):
