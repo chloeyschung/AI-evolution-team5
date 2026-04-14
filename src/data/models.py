@@ -1,43 +1,21 @@
 """SQLAlchemy ORM models for Briefly storage engine."""
 
 from datetime import datetime
-from enum import Enum
 
 import sqlalchemy
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Float, Integer, String, Text, Enum as SQLEnum
 from sqlalchemy.orm import declarative_base, relationship
 
-from src.constants import ContentStatus as ContentStatusEnum, Provider as ProviderEnum
+from src.constants import (
+    ContentStatus,
+    DefaultSort,
+    Provider,
+    SwipeAction,
+    Theme,
+)
 from src.utils.datetime_utils import utc_now
 
 Base = declarative_base()
-
-
-class SwipeAction(str, Enum):
-    """User swipe actions for content."""
-
-    KEEP = "keep"
-    DISCARD = "discard"
-
-
-class Theme(str, Enum):
-    """UI theme options."""
-
-    LIGHT = "light"
-    DARK = "dark"
-    SYSTEM = "system"
-
-
-class DefaultSort(str, Enum):
-    """Default sort order options."""
-
-    RECENCY = "recency"
-    PLATFORM = "platform"
-
-
-# Use constants module enums for ContentStatus and Provider
-ContentStatus = ContentStatusEnum
-Provider = ProviderEnum
 
 
 class Content(Base):

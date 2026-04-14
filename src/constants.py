@@ -23,6 +23,25 @@ class Provider(StrEnum):
     LINKEDIN = "linkedin"
 
 
+class SwipeAction(StrEnum):
+    """User swipe actions for content."""
+    KEEP = "keep"
+    DISCARD = "discard"
+
+
+class Theme(StrEnum):
+    """UI theme options."""
+    LIGHT = "light"
+    DARK = "dark"
+    SYSTEM = "system"
+
+
+class DefaultSort(StrEnum):
+    """Default sort order options."""
+    RECENCY = "recency"
+    PLATFORM = "platform"
+
+
 # Pagination constants
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
