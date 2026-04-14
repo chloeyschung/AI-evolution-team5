@@ -35,7 +35,7 @@ class Categorizer:
         self.summarizer = summarizer
 
     async def generate_tags(
-        self, title: str, summary: Optional[str] = None
+        self, title: str, summary: str | None = None
     ) -> List[str]:
         """Generate category tags for content.
 
@@ -64,7 +64,7 @@ class Categorizer:
             logging.warning(f"Tag generation failed: {e}")
             return []
 
-    def _build_tag_prompt(self, title: str, summary: Optional[str]) -> str:
+    def _build_tag_prompt(self, title: str, summary: str | None) -> str:
         """Build prompt for tag generation.
 
         Args:

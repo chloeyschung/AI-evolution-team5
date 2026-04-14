@@ -60,7 +60,7 @@ class ReminderEngine:
         self._content_repo = ContentRepository(db_session)
         self._swipe_repo = SwipeRepository(db_session)
 
-    async def get_suggestion(self, user_id: int) -> Optional[ReminderSuggestion]:
+    async def get_suggestion(self, user_id: int) -> ReminderSuggestion | None:
         """Get current reminder suggestion for user.
 
         Returns:
@@ -119,7 +119,7 @@ class ReminderEngine:
 
     async def _generate_reminder(
         self, user_id: int, preferences: "ReminderPreference"
-    ) -> Optional[ReminderSuggestion]:
+    ) -> ReminderSuggestion | None:
         """Generate appropriate reminder based on user state."""
         # Priority order: streak > backlog > time_based > reengagement
 
@@ -195,7 +195,7 @@ class ReminderEngine:
 
     async def _check_backlog_reminder(
         self, user_id: int, preferences: "ReminderPreference"
-    ) -> Optional[ReminderSuggestion]:
+    ) -> ReminderSuggestion | None:
         """Check if user needs a backlog reminder.
 
         Triggered when unread content exceeds threshold.
@@ -215,7 +215,7 @@ class ReminderEngine:
 
     async def _check_time_based_reminder(
         self, user_id: int, preferences: "ReminderPreference"
-    ) -> Optional[ReminderSuggestion]:
+    ) -> ReminderSuggestion | None:
         """Check if user needs a time-based reminder.
 
         Triggered at user's preferred consumption time.
@@ -251,7 +251,7 @@ class ReminderEngine:
 
     async def _check_reengagement_reminder(
         self, user_id: int
-    ) -> Optional[ReminderSuggestion]:
+    ) -> ReminderSuggestion | None:
         """Check if user needs a re-engagement reminder.
 
         Triggered after user hasn't used the app for N days.

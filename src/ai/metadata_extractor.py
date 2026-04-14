@@ -30,11 +30,11 @@ class ContentMetadata:
         platform: str,
         content_type: ContentType,
         url: str,
-        timestamp: Optional[datetime] = None,
-        author: Optional[str] = None,
-        title: Optional[str] = None,
-        summary: Optional[str] = None,
-        thumbnail_url: Optional[str] = None,
+        timestamp: datetime | None = None,
+        author: str | None = None,
+        title: str | None = None,
+        summary: str | None = None,
+        thumbnail_url: str | None = None,
     ):
         self.platform = platform
         self.content_type = content_type
@@ -107,7 +107,7 @@ class MetadataExtractor:
 
         return domain.split(".")[0].capitalize(), ContentType.ARTICLE
 
-    def _find_meta_tag(self, soup: BeautifulSoup, tag_name: str) -> Optional[Tag]:
+    def _find_meta_tag(self, soup: BeautifulSoup, tag_name: str) -> Tag | None:
         """Find a meta tag by property or name attribute."""
         meta = soup.find("meta", property=tag_name)
         if meta is None:
@@ -118,7 +118,7 @@ class MetadataExtractor:
         """Parse datetime string using dateutil."""
         return date_parser.parse(datetime_str)
 
-    def _extract_from_soup(self, soup: BeautifulSoup) -> tuple[Optional[datetime], Optional[str], Optional[str], Optional[str]]:
+    def _extract_from_soup(self, soup: BeautifulSoup) -> tuple[datetime | None, str | None, str | None, str | None]:
         """Extract timestamp, author, title, and thumbnail from a single soup instance."""
         timestamp = None
         author = None
@@ -181,7 +181,7 @@ class MetadataExtractor:
 
         return timestamp, author, title, thumbnail_url
 
-    async def extract_metadata(self, url: str, html_content: Optional[str] = None) -> ContentMetadata:
+    async def extract_metadata(self, url: str, html_content: str | None = None) -> ContentMetadata:
         """
         Extracts metadata from a URL and optionally HTML content.
 

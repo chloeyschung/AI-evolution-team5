@@ -5,7 +5,6 @@ All datetime operations should use these utilities for consistency and maintaina
 """
 
 from datetime import datetime, timedelta, time as time_type, timezone
-from typing import Optional
 
 
 def utc_now() -> datetime:
@@ -26,7 +25,7 @@ def get_local_now() -> datetime:
     return datetime.now(time_type.min.tzinfo)
 
 
-def convert_to_utc(dt: Optional[datetime]) -> Optional[datetime]:
+def convert_to_utc(dt: datetime | None) -> datetime | None:
     """Convert datetime to UTC if naive or in different timezone.
 
     Args:
@@ -43,7 +42,7 @@ def convert_to_utc(dt: Optional[datetime]) -> Optional[datetime]:
     return dt.astimezone(timezone.utc)
 
 
-def convert_to_local(dt: Optional[datetime]) -> Optional[datetime]:
+def convert_to_local(dt: datetime | None) -> datetime | None:
     """Convert datetime to local timezone.
 
     Args:
@@ -104,7 +103,7 @@ def subtract_timedelta(
     return dt - timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
 
 
-def days_since(dt: datetime, reference: Optional[datetime] = None) -> float:
+def days_since(dt: datetime, reference: datetime | None = None) -> float:
     """Calculate days since a datetime.
 
     Args:
@@ -172,7 +171,7 @@ def is_in_time_range(
     return start <= dt_utc <= end
 
 
-def get_start_of_day(dt: Optional[datetime] = None) -> datetime:
+def get_start_of_day(dt: datetime | None = None) -> datetime:
     """Get the start of the day for a datetime.
 
     Args:
@@ -186,7 +185,7 @@ def get_start_of_day(dt: Optional[datetime] = None) -> datetime:
     return dt.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
-def get_end_of_day(dt: Optional[datetime] = None) -> datetime:
+def get_end_of_day(dt: datetime | None = None) -> datetime:
     """Get the end of the day for a datetime.
 
     Args:
@@ -200,7 +199,7 @@ def get_end_of_day(dt: Optional[datetime] = None) -> datetime:
     return dt.replace(hour=23, minute=59, second=59, microsecond=999999)
 
 
-def is_same_day(dt1: datetime, dt2: Optional[datetime] = None) -> bool:
+def is_same_day(dt1: datetime, dt2: datetime | None = None) -> bool:
     """Check if two datetimes are on the same day.
 
     Args:
@@ -241,7 +240,7 @@ def is_quiet_hours(
         return quiet_start <= current <= quiet_end
 
 
-def time_ago(dt: datetime, reference: Optional[datetime] = None) -> str:
+def time_ago(dt: datetime, reference: datetime | None = None) -> str:
     """Format datetime as relative time ago string.
 
     Args:

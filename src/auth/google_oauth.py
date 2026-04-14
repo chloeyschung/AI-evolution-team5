@@ -29,7 +29,7 @@ class GoogleUserInfoError(GoogleOAuthError):
     pass
 
 
-async def verify_google_id_token(id_token: str, client_id: Optional[str] = None) -> Dict[str, Any]:
+async def verify_google_id_token(id_token: str, client_id: str | None = None) -> Dict[str, Any]:
     """Verify Google ID token and return decoded claims.
 
     Args:

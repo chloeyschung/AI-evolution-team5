@@ -40,7 +40,7 @@ def create_access_token(user_id: int) -> str:
     return token
 
 
-def verify_access_token(token: str) -> Optional[int]:
+def verify_access_token(token: str) -> int | None:
     """Verify JWT access token and extract user ID.
 
     Args:

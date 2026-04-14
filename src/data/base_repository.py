@@ -25,7 +25,7 @@ class BaseRepository(Generic[ModelType]):
         """
         self.session = db_session
 
-    async def get_by_id(self, model: type[ModelType], id_value: int) -> Optional[ModelType]:
+    async def get_by_id(self, model: type[ModelType], id_value: int) -> ModelType | None:
         """Get a record by its primary key.
 
         Args:

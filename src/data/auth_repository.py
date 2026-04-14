@@ -62,7 +62,7 @@ class AuthenticationRepository:
 
         return token, access_token  # Return both hashed record and plaintext JWT
 
-    async def get_token_by_user_id(self, user_id: int) -> Optional[AuthenticationToken]:
+    async def get_token_by_user_id(self, user_id: int) -> AuthenticationToken | None:
         """Get authentication token by user ID.
 
         Args:
@@ -78,7 +78,7 @@ class AuthenticationRepository:
         )
         return result.scalar_one_or_none()
 
-    async def get_token_by_access_token(self, access_token: str) -> Optional[AuthenticationToken]:
+    async def get_token_by_access_token(self, access_token: str) -> AuthenticationToken | None:
         """Get authentication token by access token.
 
         Args:
@@ -107,7 +107,7 @@ class AuthenticationRepository:
 
         return token
 
-    async def get_token_by_refresh_token(self, refresh_token: str) -> Optional[AuthenticationToken]:
+    async def get_token_by_refresh_token(self, refresh_token: str) -> AuthenticationToken | None:
         """Get authentication token by refresh token.
 
         Args:
@@ -127,7 +127,7 @@ class AuthenticationRepository:
         self,
         refresh_token: str,
         access_expires_in: int = 3600,
-    ) -> Optional[tuple[AuthenticationToken, str]]:
+    ) -> tuple[AuthenticationToken, str] | None:
         """Refresh access token using refresh token.
 
         Implements token rotation: issues new refresh token on each refresh.
