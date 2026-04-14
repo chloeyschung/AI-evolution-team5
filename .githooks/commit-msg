@@ -1,0 +1,45 @@
+#!/bin/bash
+#
+# commit-msg hook: Validate commit message format
+#
+# Enforces: type({ID}): {message} or type: {message}
+# Where type is one of: feat, fix, refactor, docs, test, chore, perf, style, ci, build
+#
+
+COMMIT_MSG_FILE=$1
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+
+# Extract the first line (subject)
+SUBJECT=$(echo "$COMMIT_MSG" | head -n 1)
+
+# Skip if empty
+if [ -z "$SUBJECT" ]; then
+    echo "Error: Empty commit message"
+    exit 1
+fi
+
+# Valid commit types
+VALID_TYPES="feat|fix|refactor|docs|test|chore|perf|style|ci|build"
+
+# Pattern: type({ID}): or type:
+PATTERN="^($VALID_TYPES)(\([a-zA-Z0-9_-]+\))?: .+"
+
+if echo "$SUBJECT" | grep -Eq "$PATTERN"; then
+    exit 0
+else
+    echo "Error: Invalid commit message format"
+    echo ""
+    echo "Expected format: type({ID}): {message}"
+    echo "               or: type: {message}"
+    echo ""
+    echo "Where type is one of: $VALID_TYPES"
+    echo "      and ID is a feature/issue ID (e.g., DAT-001, ADV-002)"
+    echo ""
+    echo "Examples:"
+    echo "  feat(DAT-001): add user profile endpoint"
+    echo "  fix: resolve authentication header casing issue"
+    echo "  refactor(DAT-002): consolidate enum definitions"
+    echo ""
+    echo "Current subject: $SUBJECT"
+    exit 1
+fi
