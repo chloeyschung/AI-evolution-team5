@@ -119,8 +119,8 @@ ING-001 → ING-002 → AI-001 → UX-001 → UX-002
 | UX-004 | ✅ [`UX-004.md`](specs/UX-004.md) | ✅ [`UX-004-record.md`](records/UX-004-record.md) | ✅ Implemented | `src/api/routes.py`, `src/data/repository.py` | F-013 | ✅ Filter by platform |
 | UX-005 | ✅ [`UX-005.md`](specs/UX-005.md) | ✅ [`UX-005-record.md`](records/UX-005-record.md) | ✅ Implemented | `src/api/routes.py`, `src/data/repository.py` | F-016 | ✅ Search by title/author |
 | UX-006 | ✅ [`UX-006.md`](specs/UX-006.md) | ✅ [`UX-006-record.md`](records/UX-006-record.md) | ✅ Implemented | `src/api/routes.py` | F-019 | ✅ Delete content |
-| EXT-001 | ✅ [`EXT-001.md`](specs/EXT-001.md) | ✅ [`EXT-001-record.md`](records/EXT-001-record.md) | ✅ Implemented | `browser-extension/` | F-020 | ✅ Chrome/Whale extension |
-| EXT-002 | ✅ [`EXT-002.md`](specs/EXT-002.md) | ✅ [`EXT-002-record.md`](records/EXT-002-record.md) | ✅ Implemented | `web-dashboard/` | F-021 | ✅ Vue 3 web dashboard |
+| EXT-001 | ✅ [`EXT-001.md`](specs/EXT-001.md) | ✅ [`EXT-001-record.md`](records/EXT-001-record.md) | ✅ Implemented | `browser-extension/` | - | ✅ Chrome/Whale extension (Phase 2) |
+| EXT-002 | ✅ [`EXT-002.md`](specs/EXT-002.md) | ✅ [`EXT-002-record.md`](records/EXT-002-record.md) | ✅ Implemented | `web-dashboard/` | - | ✅ Vue 3 web dashboard (Phase 2) |
 | INT-001 | ✅ [`INT-001.md`](specs/INT-001.md) | ✅ [`INT-001-record.md`](records/INT-001-record.md) | ✅ Implemented | `src/integrations/youtube/`, `src/integrations/repositories/` | - | ✅ OAuth, sync configs, manual trigger |
 | INT-002 | ✅ [`INT-002.md`](specs/INT-002.md) | ✅ [`INT-002-record.md`](records/INT-002-record.md) | ✅ Implemented (MVP) | `src/api/routes.py` | - | ✅ Manual import via public URLs; OAuth flow ready for future activation |
 | ADV-001 | ✅ [`ADV-001.md`](specs/ADV-001.md) | ✅ [`ADV-001-record.md`](records/ADV-001-record.md) | ✅ Implemented | `src/ai/trend_analyzer.py`, `src/api/routes.py` | - | ✅ Relevance scoring with interest match, tag similarity, recency, engagement |

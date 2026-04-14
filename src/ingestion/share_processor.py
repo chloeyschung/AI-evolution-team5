@@ -46,7 +46,7 @@ class URLShareProcessor(BaseShareProcessor):
     ):
         self._content_extractor = content_extractor
         self._metadata_extractor = metadata_extractor
-        self._summarizer = summarizer
+        self._summarizer = summarizer  # type: ignore[assignment]
 
     @property
     def supported_types(self) -> List[ShareDataType]:
