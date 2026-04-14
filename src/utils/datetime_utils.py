@@ -16,15 +16,6 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def get_local_now() -> datetime:
-    """Return current local time as timezone-aware datetime.
-
-    Returns:
-        Current local datetime with timezone info.
-    """
-    return datetime.now(time_type.min.tzinfo)
-
-
 def convert_to_utc(dt: datetime | None) -> datetime | None:
     """Convert datetime to UTC if naive or in different timezone.
 

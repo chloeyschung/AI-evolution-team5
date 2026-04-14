@@ -10,7 +10,6 @@ from .datetime_utils import (
     utc_now,
     convert_to_utc,
     convert_to_local,
-    get_local_now,
 )
 
 __all__ = [
@@ -20,5 +19,4 @@ __all__ = [
     "utc_now",
     "convert_to_utc",
     "convert_to_local",
-    "get_local_now",
 ]

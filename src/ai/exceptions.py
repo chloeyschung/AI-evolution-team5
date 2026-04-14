@@ -19,7 +19,3 @@ class MetadataExtractionError(Exception):
 class InvalidURLError(MetadataExtractionError):
     """Raised when the URL is invalid or cannot be parsed."""
     pass
-
-class UnsupportedPlatformError(MetadataExtractionError):
-    """Raised when the platform cannot be identified."""
-    pass
