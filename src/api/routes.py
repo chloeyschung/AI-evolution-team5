@@ -1451,6 +1451,7 @@ async def trigger_youtube_sync(
                     skipped_count=result.skipped,
                     error_message=None if not result.errors else str(result.errors),
                 )
+                await db.commit()  # Ensure sync log is persisted
             else:
                 results = await sync_service.sync_all_playlists(user_id)
                 for pid, result in results.items():
@@ -1464,6 +1465,7 @@ async def trigger_youtube_sync(
                         skipped_count=result.skipped,
                         error_message=None if not result.errors else str(result.errors),
                     )
+                    await db.commit()  # Ensure sync log is persisted
         except Exception as e:
             resource = playlist_id or "all"
             await integration_repo.log_sync(
@@ -1475,6 +1477,7 @@ async def trigger_youtube_sync(
                 skipped_count=0,
                 error_message=str(e),
             )
+            await db.commit()  # Ensure error log is persisted
 
     # Schedule background task with exception handling and tracking
     import logging
