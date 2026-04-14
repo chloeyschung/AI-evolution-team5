@@ -56,8 +56,8 @@ class IntegrationRepository:
             )
         )
 
-        # Insert new tokens
-        token_record = IntegrationTokens(
+        # Insert new tokens with encryption
+        token_record = IntegrationTokens.with_encrypted_tokens(
             user_id=user_id,
             provider=provider,
             access_token=access_token,

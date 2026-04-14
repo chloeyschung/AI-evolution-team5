@@ -416,12 +416,13 @@ async def test_integration_repo_linkedin_tokens(db_session):
 
     assert token.user_id == 1
     assert token.provider == "linkedin"
-    assert token.access_token == "test_linkedin_access_token"
+    # Tokens are now encrypted at rest, use getter methods
+    assert token.get_access_token() == "test_linkedin_access_token"
 
     # Get tokens
     retrieved = await repo.get_tokens(1, "linkedin")
     assert retrieved is not None
-    assert retrieved.access_token == "test_linkedin_access_token"
+    assert retrieved.get_access_token() == "test_linkedin_access_token"
 
 
 @pytest.mark.asyncio

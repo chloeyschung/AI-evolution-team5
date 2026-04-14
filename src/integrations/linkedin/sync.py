@@ -58,8 +58,8 @@ class LinkedInSyncService:
             return None
 
         return LinkedInClient(
-            access_token=tokens.access_token,
-            refresh_token=tokens.refresh_token,
+            access_token=tokens.get_access_token(),
+            refresh_token=tokens.get_refresh_token(),
         )
 
     async def sync_saved_posts(

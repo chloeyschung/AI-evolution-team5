@@ -181,8 +181,9 @@ async def test_integration_repo_save_tokens(db_session):
 
     assert token.user_id == 1
     assert token.provider == "youtube"
-    assert token.access_token == "test_access_token"
-    assert token.refresh_token == "test_refresh_token"
+    # Tokens are now encrypted at rest, use getter methods
+    assert token.get_access_token() == "test_access_token"
+    assert token.get_refresh_token() == "test_refresh_token"
 
 
 @pytest.mark.asyncio
@@ -204,7 +205,8 @@ async def test_integration_repo_get_tokens(db_session):
     token = await repo.get_tokens(1, "youtube")
 
     assert token is not None
-    assert token.access_token == "test_access_token"
+    # Tokens are now encrypted at rest, use getter methods
+    assert token.get_access_token() == "test_access_token"
 
 
 @pytest.mark.asyncio

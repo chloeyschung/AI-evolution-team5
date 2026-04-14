@@ -183,15 +183,18 @@ class ContentTag(Base):
 
 
 class IntegrationTokens(Base):
-    """OAuth tokens for third-party integrations (INT-001)."""
+    """OAuth tokens for third-party integrations (INT-001).
+
+    Tokens are encrypted at rest using Fernet symmetric encryption.
+    """
 
     __tablename__ = "integration_tokens"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, nullable=False, index=True)
     provider = Column(String(50), nullable=False, index=True)  # 'youtube', 'linkedin', etc.
-    access_token = Column(Text, nullable=False)
-    refresh_token = Column(Text, nullable=False)
+    access_token = Column(Text, nullable=False)  # Encrypted at rest
+    refresh_token = Column(Text, nullable=False)  # Encrypted at rest
     expires_at = Column(DateTime, nullable=False, index=True)
     created_at = Column(DateTime, default=utc_now, nullable=False)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
@@ -200,6 +203,57 @@ class IntegrationTokens(Base):
     __table_args__ = (
         sqlalchemy.UniqueConstraint("user_id", "provider", name="unique_user_provider_tokens"),
     )
+
+    @classmethod
+    def with_encrypted_tokens(
+        cls,
+        user_id: int,
+        provider: str,
+        access_token: str,
+        refresh_token: str,
+        expires_at: datetime,
+    ) -> "IntegrationTokens":
+        """Create IntegrationTokens with encrypted tokens.
+
+        Args:
+            user_id: User ID.
+            provider: Provider name (e.g., 'youtube', 'linkedin').
+            access_token: Plaintext access token.
+            refresh_token: Plaintext refresh token.
+            expires_at: Token expiry time.
+
+        Returns:
+            IntegrationTokens instance with encrypted tokens.
+        """
+        from src.utils.token_encryption import encrypt_token
+
+        return cls(
+            user_id=user_id,
+            provider=provider,
+            access_token=encrypt_token(access_token),
+            refresh_token=encrypt_token(refresh_token),
+            expires_at=expires_at,
+        )
+
+    def get_access_token(self) -> str:
+        """Get decrypted access token.
+
+        Returns:
+            Plaintext access token.
+        """
+        from src.utils.token_encryption import decrypt_token
+
+        return decrypt_token(self.access_token)
+
+    def get_refresh_token(self) -> str:
+        """Get decrypted refresh token.
+
+        Returns:
+            Plaintext refresh token.
+        """
+        from src.utils.token_encryption import decrypt_token
+
+        return decrypt_token(self.refresh_token)
 
 
 class IntegrationSyncConfig(Base):

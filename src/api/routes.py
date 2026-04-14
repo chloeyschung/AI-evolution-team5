@@ -1109,8 +1109,8 @@ async def list_youtube_playlists(
 
     # Create YouTube client and fetch playlists
     client = YouTubeClient(
-        access_token=youtube_tokens.access_token,
-        refresh_token=youtube_tokens.refresh_token,
+        access_token=youtube_tokens.get_access_token(),
+        refresh_token=youtube_tokens.get_refresh_token(),
         token_expires_at=youtube_tokens.expires_at,
     )
 
@@ -1416,8 +1416,8 @@ async def trigger_youtube_sync(
 
     # Create clients
     youtube_client = YouTubeClient(
-        access_token=youtube_tokens.access_token,
-        refresh_token=youtube_tokens.refresh_token,
+        access_token=youtube_tokens.get_access_token(),
+        refresh_token=youtube_tokens.get_refresh_token(),
         token_expires_at=youtube_tokens.expires_at,
     )
 
@@ -1671,8 +1671,8 @@ async def disconnect_youtube(
     if youtube_tokens:
         # Revoke tokens with YouTube
         client = YouTubeClient(
-            access_token=youtube_tokens.access_token,
-            refresh_token=youtube_tokens.refresh_token,
+            access_token=youtube_tokens.get_access_token(),
+            refresh_token=youtube_tokens.get_refresh_token(),
             token_expires_at=youtube_tokens.expires_at,
         )
         await client.disconnect()
