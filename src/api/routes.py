@@ -4,7 +4,7 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Union
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 
 from ..middleware.rate_limiter import limiter
 from sqlalchemy import delete, select
@@ -86,13 +86,13 @@ router = APIRouter()
 
 async def get_current_user(
     db: AsyncSession = Depends(get_db),
-    authorization: str | None = Header(None),
+    Authorization: str | None = Header(None),
 ) -> int:
     """Get current user ID from Bearer token.
 
     Args:
         db: Database session
-        authorization: Authorization header with Bearer token
+        Authorization: Authorization header with Bearer token
 
     Returns:
         User ID
@@ -102,10 +102,10 @@ async def get_current_user(
     """
     from src.auth.tokens import verify_access_token
 
-    if not authorization or not authorization.startswith("Bearer "):
+    if not Authorization or not Authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="unauthorized")
 
-    token = authorization[7:]  # Remove "Bearer " prefix
+    token = Authorization[7:]  # Remove "Bearer " prefix
 
     # First verify JWT signature
     user_id = verify_access_token(token)
@@ -523,9 +523,10 @@ def get_share_handler() -> ShareHandler:
     return _share_handler
 
 
-@router.post("/share", status_code=201, response_model=ShareResponse)
 @limiter.limit("10/minute")  # Rate limit: 10 requests per minute per IP
+@router.post("/share", status_code=201, response_model=ShareResponse)
 async def share_content(
+    request: Request,
     data: ShareRequest,
     db: AsyncSession = Depends(get_db),
     share_handler: ShareHandler = Depends(get_share_handler),

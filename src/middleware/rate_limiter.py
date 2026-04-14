@@ -4,13 +4,8 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-# Initialize rate limiter with default error handler
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_errors={
-        429: {"detail": "Rate limit exceeded. Please try again later."}
-    }
-)
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 
 def rate_limit_exceeded_handler(request, exc: RateLimitExceeded):
