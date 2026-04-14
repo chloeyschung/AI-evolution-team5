@@ -1558,8 +1558,9 @@ async def trigger_youtube_sync(
     # Schedule background task with exception handling and tracking
     import logging
 
-    async def background_task_wrapper(task: asyncio.Task):
+    async def background_task_wrapper():
         """Wrapper to ensure exceptions don't crash the process."""
+        current_task = asyncio.current_task()
         try:
             logging.info("YouTube sync background task started")
             await do_sync()
@@ -1568,9 +1569,10 @@ async def trigger_youtube_sync(
             # Log unhandled exceptions (should not happen due to do_sync try/except)
             logging.error(f"Uncaught exception in YouTube sync background task: {e}")
         finally:
-            _background_tasks.discard(task)
+            if current_task:
+                _background_tasks.discard(current_task)
 
-    task = asyncio.create_task(background_task_wrapper(task))
+    task = asyncio.create_task(background_task_wrapper())
     _background_tasks.add(task)
     logging.info(f"YouTube sync background task scheduled (task id: {id(task)})")
 
