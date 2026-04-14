@@ -4,9 +4,10 @@ from datetime import datetime
 from enum import Enum
 
 import sqlalchemy
-from sqlalchemy import Column, DateTime, ForeignKey, Float, Integer, String, Text, Enum as SQLEnum
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Float, Integer, String, Text, Enum as SQLEnum
 from sqlalchemy.orm import declarative_base, relationship
 
+from src.constants import ContentStatus as ContentStatusEnum, Provider as ProviderEnum
 from src.utils.datetime_utils import utc_now
 
 Base = declarative_base()
@@ -34,16 +35,9 @@ class DefaultSort(str, Enum):
     PLATFORM = "platform"
 
 
-class ContentStatus(str, Enum):
-    """Content consumption status."""
-    INBOX = "inbox"
-    ARCHIVED = "archived"
-
-
-class Provider(str, Enum):
-    """Third-party integration providers."""
-    YOUTUBE = "youtube"
-    LINKEDIN = "linkedin"
+# Use constants module enums for ContentStatus and Provider
+ContentStatus = ContentStatusEnum
+Provider = ProviderEnum
 
 
 class Content(Base):
@@ -119,7 +113,7 @@ class UserPreferences(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, nullable=False, default=1, unique=True)
     theme = Column(SQLEnum(Theme), nullable=False, default=Theme.SYSTEM)
-    notifications_enabled = Column(Integer, nullable=False, default=1)  # SQLite boolean as integer
+    notifications_enabled = Column(Boolean, nullable=False, default=True)
     daily_goal = Column(Integer, nullable=False, default=20)
     default_sort = Column(SQLEnum(DefaultSort), nullable=False, default=DefaultSort.RECENCY)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, index=True)
@@ -219,7 +213,7 @@ class IntegrationSyncConfig(Base):
     resource_id = Column(String(200), nullable=False, index=True)  # Playlist ID, group ID, etc.
     resource_name = Column(String(500), nullable=False)  # Human-readable name
     sync_frequency = Column(String(20), nullable=False)  # 'hourly', 'daily', 'weekly'
-    is_active = Column(Integer, nullable=False, default=1)  # SQLite boolean as integer
+    is_active = Column(Boolean, nullable=False, default=True)
     last_sync_at = Column(DateTime, nullable=True, index=True)
     created_at = Column(DateTime, default=utc_now, nullable=False)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
@@ -263,7 +257,7 @@ class AchievementDefinition(Base):
     description = Column(String(500), nullable=False)
     icon = Column(String(20), nullable=False)  # Emoji icon
     trigger_value = Column(Integer, nullable=False)  # Days for streak, count for volume, etc.
-    is_active = Column(Integer, nullable=False, default=1)  # SQLite boolean as integer
+    is_active = Column(Boolean, nullable=False, default=True)
 
 
 class UserAchievement(Base):
@@ -314,7 +308,7 @@ class ReminderPreference(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("user_profile.id"), unique=True, nullable=False, index=True)
-    is_enabled = Column(Integer, nullable=False, default=1)  # SQLite boolean
+    is_enabled = Column(Boolean, nullable=False, default=True)
     preferred_time = Column(DateTime)  # Preferred reminder time (e.g., 18:00:00)
     frequency = Column(String(20), nullable=False, default="daily")  # 'daily', 'weekly', 'never'
     quiet_hours_start = Column(DateTime)  # Don't remind before this time (e.g., 22:00:00)
