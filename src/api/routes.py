@@ -147,19 +147,7 @@ async def list_content(
     )
     contents = result.scalars().all()
 
-    return [
-        ContentResponse(
-            id=c.id,
-            platform=c.platform,
-            content_type=c.content_type,
-            url=c.url,
-            title=c.title,
-            author=c.author,
-            thumbnail_url=c.thumbnail_url,
-            created_at=c.created_at.isoformat(),
-        )
-        for c in contents
-    ]
+    return [ContentResponse.from_content(c) for c in contents]
 
 
 @router.post("/swipe", status_code=201, response_model=Union[SwipeResponse, SwipeBatchResponse])
@@ -204,19 +192,7 @@ async def list_pending_content(
     repo = ContentRepository(db)
     contents = await repo.get_pending(limit=limit, platform=platform, tags=tags)
 
-    return [
-        ContentResponse(
-            id=c.id,
-            platform=c.platform,
-            content_type=c.content_type,
-            url=c.url,
-            title=c.title,
-            author=c.author,
-            thumbnail_url=c.thumbnail_url,
-            created_at=c.created_at.isoformat(),
-        )
-        for c in contents
-    ]
+    return [ContentResponse.from_content(c) for c in contents]
 
 
 @router.get("/content/kept", response_model=list[ContentResponse])
@@ -235,19 +211,7 @@ async def list_kept_content(
     repo = ContentRepository(db)
     contents = await repo.get_kept(limit=limit, offset=offset, platform=platform, tags=tags)
 
-    return [
-        ContentResponse(
-            id=c.id,
-            platform=c.platform,
-            content_type=c.content_type,
-            url=c.url,
-            title=c.title,
-            author=c.author,
-            thumbnail_url=c.thumbnail_url,
-            created_at=c.created_at.isoformat(),
-        )
-        for c in contents
-    ]
+    return [ContentResponse.from_content(c) for c in contents]
 
 
 @router.get("/content/discarded", response_model=list[ContentResponse])
@@ -266,19 +230,7 @@ async def list_discarded_content(
     repo = ContentRepository(db)
     contents = await repo.get_discarded(limit=limit, offset=offset, platform=platform, tags=tags)
 
-    return [
-        ContentResponse(
-            id=c.id,
-            platform=c.platform,
-            content_type=c.content_type,
-            url=c.url,
-            title=c.title,
-            author=c.author,
-            thumbnail_url=c.thumbnail_url,
-            created_at=c.created_at.isoformat(),
-        )
-        for c in contents
-    ]
+    return [ContentResponse.from_content(c) for c in contents]
 
 
 # UX-003: Content Detail View

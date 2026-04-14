@@ -34,6 +34,27 @@ class ContentResponse(BaseModel):
     created_at: str
     updated_at: Optional[str] = None
 
+    @classmethod
+    def from_content(cls, content: Any) -> "ContentResponse":
+        """Create ContentResponse from Content model instance.
+
+        Args:
+            content: Content model instance from database
+
+        Returns:
+            ContentResponse instance
+        """
+        return cls(
+            id=content.id,
+            platform=content.platform,
+            content_type=content.content_type,
+            url=content.url,
+            title=content.title,
+            author=content.author,
+            thumbnail_url=content.thumbnail_url,
+            created_at=content.created_at.isoformat(),
+        )
+
 
 class SwipeCreate(BaseModel):
     """Schema for recording swipe action."""

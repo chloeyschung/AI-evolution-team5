@@ -6,9 +6,6 @@ class APIConnectionError(SummarizationError):
     """Raised when the connection to the AI API fails."""
     pass
 
-class ContentProcessingError(SummarizationError):
-    """Raised when the input content cannot be processed."""
-    pass
 
 class InvalidResponseError(SummarizationError):
     """Raised when the AI returns an invalid or improperly formatted response."""
