@@ -48,15 +48,15 @@
 - [x] User Profile & Preferences.
 
 ### Phase 2: Ecosystem Expansion
-- [x] Browser Extension (Chrome/Whale).
-- [x] Web Dashboard.
-- [x] YouTube Auto-Sync (INT-001).
-- [x] LinkedIn/Social Sync (INT-002) - MVP: manual import via public URLs.
+- [⚠️] Browser Extension (Chrome/Whale) - **Backend API ready; frontend not in repo**.
+- [⚠️] Web Dashboard - **Backend API ready; frontend not in repo**.
+- [⚠️] YouTube Auto-Sync (INT-001) - **Backend API ready**.
+- [⚠️] LinkedIn/Social Sync (INT-002) - **Backend API ready; MVP: manual import via public URLs**.
 
 ### Phase 3: Community & Personalization
-- [x] Interest-based "Trend Summary" community feeds (ADV-001).
-- [x] Gamified Achievement System (ADV-002).
-- [x] Smart Reminders (ADV-003).
+- [⚠️] Interest-based "Trend Summary" community feeds (ADV-001) - **Backend API ready**.
+- [⚠️] Gamified Achievement System (ADV-002) - **Backend API ready**.
+- [⚠️] Smart Reminders (ADV-003) - **Backend API ready**.
 - [ ] Advanced AI personalization based on swipe history.
 
 ## 5. Development Process (Spec-Driven Development)
