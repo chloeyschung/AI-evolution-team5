@@ -520,3 +520,52 @@ class CheckAchievementsResponse(BaseModel):
     """Schema for check achievements response."""
 
     new_achievements: List[NewAchievement]
+
+
+# ADV-003: Smart Reminders schemas
+
+
+class ReminderPreferencesResponse(BaseModel):
+    """Schema for reminder preferences response."""
+
+    is_enabled: bool
+    preferred_time: Optional[str] = None
+    frequency: str
+    quiet_hours_start: Optional[str] = None
+    quiet_hours_end: Optional[str] = None
+    backlog_threshold: int
+
+
+class ReminderPreferencesUpdate(BaseModel):
+    """Schema for updating reminder preferences."""
+
+    is_enabled: Optional[bool] = None
+    preferred_time: Optional[str] = Field(None, max_length=20)  # "HH:MM:SS" format
+    frequency: Optional[str] = Field(None, pattern="^(daily|weekly|never)$")
+    quiet_hours_start: Optional[str] = Field(None, max_length=20)  # "HH:MM:SS" format
+    quiet_hours_end: Optional[str] = Field(None, max_length=20)  # "HH:MM:SS" format
+    backlog_threshold: Optional[int] = Field(None, gt=0, le=1000)
+
+
+class ReminderSuggestionResponse(BaseModel):
+    """Schema for reminder suggestion response."""
+
+    has_reminder: bool
+    reminder_type: Optional[str] = None
+    message: Optional[str] = None
+    priority: Optional[str] = None
+    metadata: Optional[dict] = None
+
+
+class ReminderRespondRequest(BaseModel):
+    """Schema for responding to a reminder."""
+
+    reminder_id: int
+    action: str = Field(..., pattern="^(acted|dismissed)$")
+
+
+class ReminderRespondResponse(BaseModel):
+    """Schema for reminder response confirmation."""
+
+    success: bool
+    message: str

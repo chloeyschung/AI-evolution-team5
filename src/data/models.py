@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from enum import Enum
 
 import sqlalchemy
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, Enum as SQLEnum
+from sqlalchemy import Column, DateTime, ForeignKey, Float, Integer, String, Text, Enum as SQLEnum
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -286,3 +286,62 @@ class UserStreak(Base):
 
     # Relationship
     user = relationship("UserProfile", backref="streak")
+
+
+# ADV-003: Smart Reminders models
+
+
+class ReminderPreference(Base):
+    """User's reminder preferences (ADV-003)."""
+
+    __tablename__ = "reminder_preferences"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("user_profile.id"), unique=True, nullable=False, index=True)
+    is_enabled = Column(Integer, nullable=False, default=1)  # SQLite boolean
+    preferred_time = Column(DateTime)  # Preferred reminder time (e.g., 18:00:00)
+    frequency = Column(String(20), nullable=False, default="daily")  # 'daily', 'weekly', 'never'
+    quiet_hours_start = Column(DateTime)  # Don't remind before this time (e.g., 22:00:00)
+    quiet_hours_end = Column(DateTime)  # Don't remind after this time (e.g., 08:00:00)
+    backlog_threshold = Column(Integer, nullable=False, default=10)  # Items before backlog reminder
+    created_at = Column(DateTime, default=utc_now, index=True)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, index=True)
+
+    # Relationship
+    user = relationship("UserProfile", backref="reminder_preferences")
+
+
+class ReminderLog(Base):
+    """Log of sent reminders and user responses (ADV-003)."""
+
+    __tablename__ = "reminder_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("user_profile.id"), nullable=False, index=True)
+    reminder_type = Column(String(50), nullable=False, index=True)  # 'backlog', 'streak', 'time_based', 'reengagement'
+    message = Column(Text, nullable=False)
+    sent_at = Column(DateTime, default=utc_now, nullable=False, index=True)
+    action_taken = Column(Integer, nullable=False, default=0)  # SQLite boolean
+    action_taken_at = Column(DateTime, nullable=True)
+    dismissed_at = Column(DateTime, nullable=True)
+
+    # Relationship
+    user = relationship("UserProfile", backref="reminder_logs")
+
+
+class UserActivityPattern(Base):
+    """Learned user activity patterns for optimal reminder timing (ADV-003)."""
+
+    __tablename__ = "user_activity_patterns"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("user_profile.id"), unique=True, nullable=False, index=True)
+    most_active_hour = Column(Integer)  # 0-23, hour with most activity
+    most_active_day = Column(Integer)  # 0-6, day of week with most activity (0=Monday)
+    avg_daily_swipes = Column(Float, nullable=False, default=0.0)
+    avg_session_duration = Column(Float, nullable=False, default=0.0)  # Minutes
+    created_at = Column(DateTime, default=utc_now, index=True)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, index=True)
+
+    # Relationship
+    user = relationship("UserProfile", backref="activity_pattern")

@@ -24,6 +24,9 @@ from src.data.models import (
     AchievementDefinition,
     UserAchievement,
     UserStreak,
+    ReminderPreference,
+    ReminderLog,
+    UserActivityPattern,
 )
 from src.data import database as db_module
 
@@ -76,6 +79,9 @@ async def setup_test_database():
 
     # Cleanup: drop all data after test (keep tables for next test)
     async with AsyncTestingSessionLocal() as session:
+        await session.execute(delete(UserActivityPattern))
+        await session.execute(delete(ReminderLog))
+        await session.execute(delete(ReminderPreference))
         await session.execute(delete(UserAchievement))
         await session.execute(delete(UserStreak))
         await session.execute(delete(AchievementDefinition))
@@ -103,6 +109,9 @@ async def test_db_session():
 
     # Clear all data before test
     async with AsyncTestingSessionLocal() as session:
+        await session.execute(delete(UserActivityPattern))
+        await session.execute(delete(ReminderLog))
+        await session.execute(delete(ReminderPreference))
         await session.execute(delete(UserAchievement))
         await session.execute(delete(UserStreak))
         await session.execute(delete(AchievementDefinition))

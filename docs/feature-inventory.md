@@ -48,4 +48,4 @@ This document tracks all identified features for the **Briefly** project, catego
 ### Intelligence & Community
 - [x] **[ADV-001] Personalized Trend Feed**: A curated feed of trending summaries based on the user's swipe history. ✅ Implemented (relevance scoring with interest match, tag similarity, recency, engagement)
 - [x] **[ADV-002] Gamified Achievement System**: Visualizing "Knowledge Gained" to encourage daily consumption. ✅ Implemented (16 achievements across streak, volume, diversity, curation categories)
-- [ ] **[ADV-003] Smart Reminders**: Push notifications triggered by user-defined "knowledge consumption windows."
+- [x] **[ADV-003] Smart Reminders**: Push notifications triggered by user-defined "knowledge consumption windows." ✅ Implemented (4 reminder types: backlog, streak, time-based, reengagement; quiet hours, frequency limits, activity pattern learning)
