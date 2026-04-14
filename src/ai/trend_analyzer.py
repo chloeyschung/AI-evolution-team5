@@ -73,10 +73,10 @@ class TrendAnalyzer:
         Returns:
             Tuple of (trend feed items, total count)
         """
-        # Get kept content for user
+        # Get kept content for user (with hard limit to prevent OOM)
         kept_contents = await self._content_repo.get_kept(
             user_id,
-            limit=None,  # Get all for scoring
+            limit=1000,  # Hard limit to prevent memory issues with large datasets
             offset=0,
         )
 
