@@ -100,10 +100,19 @@ async def get_current_user(
     Raises:
         401: Invalid or missing token
     """
+    from src.auth.tokens import verify_access_token
+
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="unauthorized")
 
     token = authorization[7:]  # Remove "Bearer " prefix
+
+    # First verify JWT signature
+    user_id = verify_access_token(token)
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    # Then verify token exists in database (rotation check)
     auth_repo = AuthenticationRepository(db)
     token_record = await auth_repo.get_token_by_access_token(token)
 
