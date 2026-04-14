@@ -65,6 +65,8 @@ class ContentExtractor:
         Raises:
             ExtractionError: If the hostname resolves to a restricted IP.
         """
+        import socket
+
         # Block common internal hostnames
         internal_hostnames = {
             'localhost', 'localhost.localdomain', 'local',
@@ -74,13 +76,32 @@ class ContentExtractor:
         if hostname.lower() in internal_hostnames:
             raise ExtractionError(f"Access to internal hostname blocked: {hostname}")
 
-        # Block IP literals (prevent DNS rebinding attacks)
+        # Block IP literals (prevent direct IP access)
         try:
             ip = ipaddress.ip_address(hostname)
             if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
                 raise ExtractionError(f"Access to private/reserved IP address blocked: {hostname}")
         except ValueError:
-            # Not an IP address, will be resolved later (acceptable for hostnames)
+            # Not an IP address, will resolve and check below (DNS rebinding protection)
+            pass
+
+        # Resolve hostname and check resolved IPs (DNS rebinding protection)
+        # This prevents attacks where a hostname initially passes checks but resolves to private IPs
+        try:
+            resolved_ips = socket.getaddrinfo(hostname, None)
+            for info in resolved_ips:
+                resolved_ip = info[4][0]
+                try:
+                    ipaddr = ipaddress.ip_address(resolved_ip)
+                    if ipaddr.is_private or ipaddr.is_loopback or ipaddr.is_link_local or ipaddr.is_reserved:
+                        raise ExtractionError(
+                            f"Hostname resolves to private/reserved IP: {resolved_ip}"
+                        )
+                except ValueError:
+                    # Unexpected IP format, skip
+                    continue
+        except socket.gaierror:
+            # DNS resolution failed - this is acceptable, will fail during actual fetch if needed
             pass
 
     async def extract_text(self, url: str) -> str:
