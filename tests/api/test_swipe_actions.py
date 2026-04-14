@@ -73,13 +73,13 @@ class TestBatchSwipeEndpoints:
 class TestKeptContentEndpoints:
     """Tests for GET /content/kept endpoint."""
 
-    async def test_get_kept_content(self, async_client):
+    async def test_get_kept_content(self, authenticated_client):
         """Test retrieving kept content."""
         # Create and keep some content
         kept_ids = []
         discarded_ids = []
         for i in range(5):
-            response = await async_client.post(
+            response = await authenticated_client.post(
                 "/api/v1/content",
                 json={
                     "platform": "Test",
@@ -89,7 +89,7 @@ class TestKeptContentEndpoints:
             )
             kept_ids.append(response.json()["id"])
 
-            response = await async_client.post(
+            response = await authenticated_client.post(
                 "/api/v1/content",
                 json={
                     "platform": "Test",
@@ -101,20 +101,20 @@ class TestKeptContentEndpoints:
 
         # Keep the first batch
         for content_id in kept_ids:
-            await async_client.post(
+            await authenticated_client.post(
                 "/api/v1/swipe",
                 json={"content_id": content_id, "action": "keep"},
             )
 
         # Discard the second batch
         for content_id in discarded_ids:
-            await async_client.post(
+            await authenticated_client.post(
                 "/api/v1/swipe",
                 json={"content_id": content_id, "action": "discard"},
             )
 
         # Get kept content
-        response = await async_client.get("/api/v1/content/kept")
+        response = await authenticated_client.get("/api/v1/content/kept")
 
         assert response.status_code == 200
         data = response.json()
@@ -127,10 +127,10 @@ class TestKeptContentEndpoints:
         for content_id in discarded_ids:
             assert content_id not in returned_ids
 
-    async def test_get_kept_empty(self, async_client):
+    async def test_get_kept_empty(self, authenticated_client):
         """Test empty kept list when no content is kept."""
         # Create content but don't keep it
-        await async_client.post(
+        await authenticated_client.post(
             "/api/v1/content",
             json={
                 "platform": "Test",
@@ -140,17 +140,17 @@ class TestKeptContentEndpoints:
         )
 
         # Get kept content
-        response = await async_client.get("/api/v1/content/kept")
+        response = await authenticated_client.get("/api/v1/content/kept")
 
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 0
 
-    async def test_get_kept_pagination(self, async_client):
+    async def test_get_kept_pagination(self, authenticated_client):
         """Test pagination for kept content."""
         # Create and keep 10 content items
         for i in range(10):
-            response = await async_client.post(
+            response = await authenticated_client.post(
                 "/api/v1/content",
                 json={
                     "platform": "Test",
@@ -159,18 +159,18 @@ class TestKeptContentEndpoints:
                 },
             )
             content_id = response.json()["id"]
-            await async_client.post(
+            await authenticated_client.post(
                 "/api/v1/swipe",
                 json={"content_id": content_id, "action": "keep"},
             )
 
         # Get with limit=5
-        response = await async_client.get("/api/v1/content/kept?limit=5")
+        response = await authenticated_client.get("/api/v1/content/kept?limit=5")
         data = response.json()
         assert len(data) == 5
 
         # Get with offset=5
-        response = await async_client.get("/api/v1/content/kept?limit=5&offset=5")
+        response = await authenticated_client.get("/api/v1/content/kept?limit=5&offset=5")
         data = response.json()
         assert len(data) == 5
 
@@ -178,13 +178,13 @@ class TestKeptContentEndpoints:
 class TestDiscardedContentEndpoints:
     """Tests for GET /content/discarded endpoint."""
 
-    async def test_get_discarded_content(self, async_client):
+    async def test_get_discarded_content(self, authenticated_client):
         """Test retrieving discarded content."""
         # Create and discard some content
         discarded_ids = []
         kept_ids = []
         for i in range(5):
-            response = await async_client.post(
+            response = await authenticated_client.post(
                 "/api/v1/content",
                 json={
                     "platform": "Test",
@@ -194,7 +194,7 @@ class TestDiscardedContentEndpoints:
             )
             discarded_ids.append(response.json()["id"])
 
-            response = await async_client.post(
+            response = await authenticated_client.post(
                 "/api/v1/content",
                 json={
                     "platform": "Test",
@@ -206,20 +206,20 @@ class TestDiscardedContentEndpoints:
 
         # Discard the first batch
         for content_id in discarded_ids:
-            await async_client.post(
+            await authenticated_client.post(
                 "/api/v1/swipe",
                 json={"content_id": content_id, "action": "discard"},
             )
 
         # Keep the second batch
         for content_id in kept_ids:
-            await async_client.post(
+            await authenticated_client.post(
                 "/api/v1/swipe",
                 json={"content_id": content_id, "action": "keep"},
             )
 
         # Get discarded content
-        response = await async_client.get("/api/v1/content/discarded")
+        response = await authenticated_client.get("/api/v1/content/discarded")
 
         assert response.status_code == 200
         data = response.json()
@@ -232,10 +232,10 @@ class TestDiscardedContentEndpoints:
         for content_id in kept_ids:
             assert content_id not in returned_ids
 
-    async def test_get_discarded_empty(self, async_client):
+    async def test_get_discarded_empty(self, authenticated_client):
         """Test empty discarded list when no content is discarded."""
         # Create content but don't discard it
-        await async_client.post(
+        await authenticated_client.post(
             "/api/v1/content",
             json={
                 "platform": "Test",
@@ -245,7 +245,7 @@ class TestDiscardedContentEndpoints:
         )
 
         # Get discarded content
-        response = await async_client.get("/api/v1/content/discarded")
+        response = await authenticated_client.get("/api/v1/content/discarded")
 
         assert response.status_code == 200
         data = response.json()
@@ -255,12 +255,12 @@ class TestDiscardedContentEndpoints:
 class TestStatsEndpoint:
     """Tests for GET /stats endpoint."""
 
-    async def test_stats_endpoint(self, async_client):
+    async def test_stats_endpoint(self, authenticated_client):
         """Test accurate statistics counts."""
         # Create 10 content items
         content_ids = []
         for i in range(10):
-            response = await async_client.post(
+            response = await authenticated_client.post(
                 "/api/v1/content",
                 json={
                     "platform": "Test",
@@ -272,20 +272,20 @@ class TestStatsEndpoint:
 
         # Keep 4 items
         for i in range(4):
-            await async_client.post(
+            await authenticated_client.post(
                 "/api/v1/swipe",
                 json={"content_id": content_ids[i], "action": "keep"},
             )
 
         # Discard 3 items
         for i in range(4, 7):
-            await async_client.post(
+            await authenticated_client.post(
                 "/api/v1/swipe",
                 json={"content_id": content_ids[i], "action": "discard"},
             )
 
         # Get stats
-        response = await async_client.get("/api/v1/stats")
+        response = await authenticated_client.get("/api/v1/stats")
 
         assert response.status_code == 200
         data = response.json()
@@ -295,9 +295,9 @@ class TestStatsEndpoint:
         assert data["discarded"] == 3
         assert data["pending"] == 3  # 10 - 4 - 3 = 3
 
-    async def test_stats_empty(self, async_client):
+    async def test_stats_empty(self, authenticated_client):
         """Test stats with no content."""
-        response = await async_client.get("/api/v1/stats")
+        response = await authenticated_client.get("/api/v1/stats")
 
         assert response.status_code == 200
         data = response.json()
@@ -309,10 +309,10 @@ class TestStatsEndpoint:
 class TestSwipeMutualExclusivity:
     """Tests for edge cases and mutual exclusivity."""
 
-    async def test_kept_and_discarded_mutually_exclusive(self, async_client):
+    async def test_kept_and_discarded_mutually_exclusive(self, authenticated_client):
         """Test that same content cannot be both kept and discarded."""
         # Create content
-        response = await async_client.post(
+        response = await authenticated_client.post(
             "/api/v1/content",
             json={
                 "platform": "Test",
@@ -323,27 +323,27 @@ class TestSwipeMutualExclusivity:
         content_id = response.json()["id"]
 
         # Keep the content
-        await async_client.post(
+        await authenticated_client.post(
             "/api/v1/swipe",
             json={"content_id": content_id, "action": "keep"},
         )
 
         # Get kept and verify content is there
-        kept_response = await async_client.get("/api/v1/content/kept")
+        kept_response = await authenticated_client.get("/api/v1/content/kept")
         kept_ids = [c["id"] for c in kept_response.json()]
         assert content_id in kept_ids
 
         # Get discarded and verify content is NOT there
-        discarded_response = await async_client.get("/api/v1/content/discarded")
+        discarded_response = await authenticated_client.get("/api/v1/content/discarded")
         discarded_ids = [c["id"] for c in discarded_response.json()]
         assert content_id not in discarded_ids
 
-    async def test_pending_excludes_kept_and_discarded(self, async_client):
+    async def test_pending_excludes_kept_and_discarded(self, authenticated_client):
         """Test that pending content excludes all swiped items."""
         # Create 3 content items
         content_ids = []
         for i in range(3):
-            response = await async_client.post(
+            response = await authenticated_client.post(
                 "/api/v1/content",
                 json={
                     "platform": "Test",
@@ -354,17 +354,17 @@ class TestSwipeMutualExclusivity:
             content_ids.append(response.json()["id"])
 
         # Keep item 0, discard item 1, leave item 2 pending
-        await async_client.post(
+        await authenticated_client.post(
             "/api/v1/swipe",
             json={"content_id": content_ids[0], "action": "keep"},
         )
-        await async_client.post(
+        await authenticated_client.post(
             "/api/v1/swipe",
             json={"content_id": content_ids[1], "action": "discard"},
         )
 
         # Get pending - should only return item 2
-        response = await async_client.get("/api/v1/content/pending")
+        response = await authenticated_client.get("/api/v1/content/pending")
         data = response.json()
 
         assert len(data) == 1

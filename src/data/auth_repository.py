@@ -76,7 +76,7 @@ class AuthenticationRepository:
             .where(AuthenticationToken.user_id == user_id)
             .where(AuthenticationToken.revoked_at.is_(None))
         )
-        return result.scalar_one_or_default(None)
+        return result.scalar_one_or_none()
 
     async def get_token_by_access_token(self, access_token: str) -> Optional[AuthenticationToken]:
         """Get authentication token by access token.
@@ -95,11 +95,14 @@ class AuthenticationRepository:
             .where(AuthenticationToken.access_token == hashed_token)
             .where(AuthenticationToken.revoked_at.is_(None))
         )
-        token = result.scalar_one_or_default(None)
+        token = result.scalar_one_or_none()
 
         if token:
             # Check if token is expired
-            if token.expires_at < utc_now():
+            # Convert to UTC to handle timezone-aware/naive comparison
+            from src.utils.datetime_utils import convert_to_utc
+            expires_at_utc = convert_to_utc(token.expires_at)
+            if expires_at_utc and expires_at_utc < utc_now():
                 return None
 
         return token
@@ -118,7 +121,7 @@ class AuthenticationRepository:
             .where(AuthenticationToken.refresh_token == refresh_token)
             .where(AuthenticationToken.revoked_at.is_(None))
         )
-        return result.scalar_one_or_default(None)
+        return result.scalar_one_or_none()
 
     async def refresh_access_token(
         self,
@@ -170,7 +173,7 @@ class AuthenticationRepository:
             .where(AuthenticationToken.user_id == user_id)
             .where(AuthenticationToken.revoked_at.is_(None))
         )
-        token = result.scalar_one_or_default(None)
+        token = result.scalar_one_or_none()
 
         if token:
             token.revoked_at = utc_now()

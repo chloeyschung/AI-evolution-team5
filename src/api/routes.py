@@ -185,6 +185,7 @@ async def record_swipe(
 
 @router.get("/content/pending", response_model=list[ContentResponse])
 async def list_pending_content(
+    user_id: int = Depends(get_current_user),
     limit: int = Query(50, gt=0, le=100),
     platform: str | None = Query(None),  # UX-004: Filter by platform
     tags: list[str] | None = Query(None),  # F-014: Filter by AI-generated tags
@@ -196,13 +197,14 @@ async def list_pending_content(
     Optionally filter by platform and AI-generated tags.
     """
     repo = ContentRepository(db)
-    contents = await repo.get_pending(limit=limit, platform=platform, tags=tags)
+    contents = await repo.get_pending(user_id, limit=limit, platform=platform, tags=tags)
 
     return [ContentResponse.from_content(c) for c in contents]
 
 
 @router.get("/content/kept", response_model=list[ContentResponse])
 async def list_kept_content(
+    user_id: int = Depends(get_current_user),
     limit: int = Query(50, gt=0, le=100),
     offset: int = Query(0, ge=0),
     platform: str | None = Query(None),  # UX-004: Filter by platform
@@ -215,13 +217,14 @@ async def list_kept_content(
     Optionally filter by platform and AI-generated tags.
     """
     repo = ContentRepository(db)
-    contents = await repo.get_kept(limit=limit, offset=offset, platform=platform, tags=tags)
+    contents = await repo.get_kept(user_id, limit=limit, offset=offset, platform=platform, tags=tags)
 
     return [ContentResponse.from_content(c) for c in contents]
 
 
 @router.get("/content/discarded", response_model=list[ContentResponse])
 async def list_discarded_content(
+    user_id: int = Depends(get_current_user),
     limit: int = Query(50, gt=0, le=100),
     offset: int = Query(0, ge=0),
     platform: str | None = Query(None),  # UX-004: Filter by platform
@@ -234,7 +237,7 @@ async def list_discarded_content(
     Optionally filter by platform and AI-generated tags.
     """
     repo = ContentRepository(db)
-    contents = await repo.get_discarded(limit=limit, offset=offset, platform=platform, tags=tags)
+    contents = await repo.get_discarded(user_id, limit=limit, offset=offset, platform=platform, tags=tags)
 
     return [ContentResponse.from_content(c) for c in contents]
 
@@ -481,6 +484,7 @@ async def list_platforms(db: AsyncSession = Depends(get_db)) -> list[PlatformCou
 
 @router.get("/search", response_model=list[ContentResponse])
 async def search_content(
+    user_id: int = Depends(get_current_user),
     q: str = Query(..., min_length=1, description="Search query"),
     limit: int = Query(50, gt=0, le=100),
     offset: int = Query(0, ge=0),
@@ -501,7 +505,7 @@ async def search_content(
         List of matching content, sorted by recency.
     """
     repo = ContentRepository(db)
-    results = await repo.search_content(q, limit=limit, offset=offset)
+    results = await repo.search_content(user_id, q, limit=limit, offset=offset)
 
     return [ContentResponse.from_content(c) for c in results]
 

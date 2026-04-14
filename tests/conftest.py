@@ -11,6 +11,7 @@ from src.ai.metadata_extractor import ContentMetadata, ContentType
 from src.ingestion.extractor import ContentExtractor
 from src.ai.metadata_extractor import MetadataExtractor
 from src.api.app import app
+from src.auth.tokens import create_access_token, create_refresh_token
 from src.data.models import (
     Base,
     SwipeHistory,
@@ -27,6 +28,7 @@ from src.data.models import (
     ReminderPreference,
     ReminderLog,
     UserActivityPattern,
+    AuthenticationToken,
 )
 from src.data import database as db_module
 
@@ -88,6 +90,7 @@ async def setup_test_database():
         await session.execute(delete(IntegrationSyncLog))
         await session.execute(delete(IntegrationSyncConfig))
         await session.execute(delete(IntegrationTokens))
+        await session.execute(delete(AuthenticationToken))
         await session.execute(delete(InterestTag))
         await session.execute(delete(UserPreferences))
         await session.execute(delete(UserProfile))
@@ -118,6 +121,7 @@ async def test_db_session():
         await session.execute(delete(IntegrationSyncLog))
         await session.execute(delete(IntegrationSyncConfig))
         await session.execute(delete(IntegrationTokens))
+        await session.execute(delete(AuthenticationToken))
         await session.execute(delete(InterestTag))
         await session.execute(delete(UserPreferences))
         await session.execute(delete(UserProfile))
@@ -151,6 +155,72 @@ async def async_client(db):
     Requires the db fixture to ensure tables are created before tests run.
     """
     async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        yield client
+
+
+@pytest.fixture
+async def test_user(db, db_session: AsyncSession):
+    """Create a test user and return the user ID.
+
+    Use this fixture when you need a user in the database for testing.
+    Example: async def test_xxx(test_user: int): ...
+    """
+    from src.utils.datetime_utils import utc_now
+    from src.utils.token_hashing import hash_access_token
+    from datetime import timedelta
+
+    # Create a test user (using OAuth-style fields, no password)
+    user = UserProfile(
+        email="test@example.com",
+        google_sub="test_google_sub_123",
+        display_name="Test User",
+        created_at=utc_now(),
+        updated_at=utc_now(),
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+
+    # Create authentication token for the user
+    access_token = create_access_token(user.id)
+    refresh_token = create_refresh_token()
+    expires_at = utc_now() + timedelta(hours=1)
+
+    auth_token = AuthenticationToken(
+        user_id=user.id,
+        access_token=hash_access_token(access_token),
+        refresh_token=refresh_token,
+        expires_at=expires_at,
+    )
+    db_session.add(auth_token)
+    await db_session.commit()
+
+    return user.id
+
+
+@pytest.fixture
+async def auth_token(test_user: int) -> str:
+    """Generate a test JWT access token.
+
+    Use this fixture when you need an authentication token for API calls.
+    Example: async def test_xxx(auth_token: str): ...
+    """
+    return create_access_token(test_user)
+
+
+@pytest.fixture
+async def authenticated_client(db, auth_token: str):
+    """Async test client with authentication headers.
+
+    Requires the db fixture and provides an authenticated client.
+    Use this for testing endpoints that require authentication.
+    Example: async def test_xxx(authenticated_client): ...
+    """
+    async with httpx.AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+        headers={"Authorization": f"Bearer {auth_token}"}
+    ) as client:
         yield client
 
 

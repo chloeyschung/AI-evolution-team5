@@ -114,10 +114,10 @@ class TestSwipeEndpoints:
 class TestPendingContentEndpoints:
     """Tests for pending content API endpoints."""
 
-    async def test_get_pending_content(self, async_client):
+    async def test_get_pending_content(self, authenticated_client):
         """Test getting pending content (no swipe history)."""
         # Create contents
-        await async_client.post(
+        await authenticated_client.post(
             "/api/v1/content",
             json={
                 "platform": "Test",
@@ -125,7 +125,7 @@ class TestPendingContentEndpoints:
                 "url": "https://example.com/pending-1",
             },
         )
-        await async_client.post(
+        await authenticated_client.post(
             "/api/v1/content",
             json={
                 "platform": "Test",
@@ -135,16 +135,16 @@ class TestPendingContentEndpoints:
         )
 
         # Get pending content
-        response = await async_client.get("/api/v1/content/pending")
+        response = await authenticated_client.get("/api/v1/content/pending")
 
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 2
 
-    async def test_get_pending_empty(self, async_client):
+    async def test_get_pending_empty(self, authenticated_client):
         """Test getting pending content when all content is swiped."""
         # Create and swipe content
-        create_response = await async_client.post(
+        create_response = await authenticated_client.post(
             "/api/v1/content",
             json={
                 "platform": "Test",
@@ -155,23 +155,23 @@ class TestPendingContentEndpoints:
         content_id = create_response.json()["id"]
 
         # Swipe the content
-        await async_client.post(
+        await authenticated_client.post(
             "/api/v1/swipe",
             json={"content_id": content_id, "action": "keep"},
         )
 
         # Get pending content
-        response = await async_client.get("/api/v1/content/pending")
+        response = await authenticated_client.get("/api/v1/content/pending")
 
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 0
 
-    async def test_get_pending_limit(self, async_client):
+    async def test_get_pending_limit(self, authenticated_client):
         """Test pending content with limit parameter."""
         # Create multiple contents
         for i in range(10):
-            await async_client.post(
+            await authenticated_client.post(
                 "/api/v1/content",
                 json={
                     "platform": "Test",
@@ -181,7 +181,7 @@ class TestPendingContentEndpoints:
             )
 
         # Get pending content with limit
-        response = await async_client.get("/api/v1/content/pending?limit=5")
+        response = await authenticated_client.get("/api/v1/content/pending?limit=5")
 
         assert response.status_code == 200
         data = response.json()

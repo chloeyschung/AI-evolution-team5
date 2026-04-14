@@ -74,7 +74,7 @@ class AchievementChecker:
         platform_count = await self._get_platform_count(swipe_history)
 
         # Get kept count
-        kept_contents = await self._content_repo.get_kept(limit=None, offset=0)
+        kept_contents = await self._content_repo.get_kept(user_id, limit=None, offset=0)
         kept_count = len(kept_contents)
 
         return {

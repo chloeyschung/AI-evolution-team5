@@ -105,11 +105,17 @@ class ContentRepository(BaseRepository[Content]):
         """
         return await super().get_by_id(Content, content_id)
 
-    async def get_all(self, limit: int = 50, offset: int = 0,
-                     status: ContentStatus | None = None) -> List[Content]:
+    async def get_all(
+        self,
+        user_id: int,
+        limit: int = 50,
+        offset: int = 0,
+        status: ContentStatus | None = None,
+    ) -> List[Content]:
         """Get all content with pagination.
 
         Args:
+            user_id: User ID to filter content by.
             limit: Maximum number of results.
             offset: Number of results to skip.
             status: Optional filter by content status.
@@ -117,7 +123,13 @@ class ContentRepository(BaseRepository[Content]):
         Returns:
             List of Content objects, optionally filtered by status.
         """
-        query = select(Content).order_by(Content.created_at.desc()).limit(limit).offset(offset)
+        query = (
+            select(Content)
+            .where(Content.user_id == user_id)
+            .order_by(Content.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
         if status is not None:
             query = query.where(Content.status == status)
         result = await self.session.execute(query)
@@ -180,11 +192,16 @@ class ContentRepository(BaseRepository[Content]):
         return query
 
     async def get_pending(
-        self, limit: int = 50, platform: str | None = None, tags: List[str] | None = None
+        self,
+        user_id: int,
+        limit: int = 50,
+        platform: str | None = None,
+        tags: List[str] | None = None,
     ) -> List[Content]:
         """Get content that hasn't been swiped yet.
 
         Args:
+            user_id: User ID to filter content by.
             limit: Maximum number of results.
             platform: Optional platform filter (case-insensitive).
             tags: Optional list of AI-generated tags to filter by (F-014).
@@ -194,6 +211,7 @@ class ContentRepository(BaseRepository[Content]):
         """
         base_query = (
             select(Content)
+            .where(Content.user_id == user_id)
             .outerjoin(SwipeHistory, Content.id == SwipeHistory.content_id)
             .where(SwipeHistory.id.is_(None))
             .order_by(Content.created_at.desc())
@@ -206,11 +224,17 @@ class ContentRepository(BaseRepository[Content]):
         return list(result.scalars().unique().all())
 
     async def get_kept(
-        self, limit: int = 50, offset: int = 0, platform: str | None = None, tags: List[str] | None = None
+        self,
+        user_id: int,
+        limit: int = 50,
+        offset: int = 0,
+        platform: str | None = None,
+        tags: List[str] | None = None,
     ) -> List[Content]:
         """Get content that was swiped Keep.
 
         Args:
+            user_id: User ID to filter content by.
             limit: Maximum number of results.
             offset: Pagination offset.
             platform: Optional platform filter (case-insensitive).
@@ -221,6 +245,7 @@ class ContentRepository(BaseRepository[Content]):
         """
         base_query = (
             select(Content)
+            .where(Content.user_id == user_id)
             .join(SwipeHistory, Content.id == SwipeHistory.content_id)
             .where(SwipeHistory.action == SwipeAction.KEEP)
             .order_by(SwipeHistory.swiped_at.desc())
@@ -234,11 +259,17 @@ class ContentRepository(BaseRepository[Content]):
         return list(result.scalars().unique().all())
 
     async def get_discarded(
-        self, limit: int = 50, offset: int = 0, platform: str | None = None, tags: List[str] | None = None
+        self,
+        user_id: int,
+        limit: int = 50,
+        offset: int = 0,
+        platform: str | None = None,
+        tags: List[str] | None = None,
     ) -> List[Content]:
         """Get content that was swiped Discard.
 
         Args:
+            user_id: User ID to filter content by.
             limit: Maximum number of results.
             offset: Pagination offset.
             platform: Optional platform filter (case-insensitive).
@@ -249,6 +280,7 @@ class ContentRepository(BaseRepository[Content]):
         """
         base_query = (
             select(Content)
+            .where(Content.user_id == user_id)
             .join(SwipeHistory, Content.id == SwipeHistory.content_id)
             .where(SwipeHistory.action == SwipeAction.DISCARD)
             .order_by(SwipeHistory.swiped_at.desc())
@@ -275,11 +307,16 @@ class ContentRepository(BaseRepository[Content]):
         return [(row[0], row[1]) for row in result.fetchall()]
 
     async def search_content(
-        self, query: str, limit: int = 50, offset: int = 0
+        self,
+        user_id: int,
+        query: str,
+        limit: int = 50,
+        offset: int = 0,
     ) -> List[Content]:
         """Search content by title, author, or AI-generated tags (F-016).
 
         Args:
+            user_id: User ID to filter content by.
             query: Search query string (case-insensitive).
             limit: Maximum number of results.
             offset: Pagination offset.
@@ -294,6 +331,7 @@ class ContentRepository(BaseRepository[Content]):
         # F-016: Added ContentTag JOIN to enable tag-based search
         query_stmt = (
             select(Content)
+            .where(Content.user_id == user_id)
             .outerjoin(ContentTag, Content.id == ContentTag.content_id)
             .where(
                 (Content.title.isnot(None)) &  # Must have title

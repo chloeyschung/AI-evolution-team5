@@ -75,6 +75,7 @@ class TrendAnalyzer:
         """
         # Get kept content for user
         kept_contents = await self._content_repo.get_kept(
+            user_id,
             limit=None,  # Get all for scoring
             offset=0,
         )
@@ -323,6 +324,7 @@ class TrendAnalyzer:
         """
         # Get kept content
         kept_contents = await self._content_repo.get_kept(
+            user_id,
             limit=50,  # Sample size
             offset=0,
         )

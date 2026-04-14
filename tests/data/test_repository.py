@@ -4,13 +4,15 @@ import pytest
 from datetime import datetime, timezone
 
 from src.ai.metadata_extractor import ContentMetadata, ContentType
-from src.data.models import SwipeAction, Content
+from src.data.models import SwipeAction, Content, UserProfile
 from src.data.repository import ContentRepository, SwipeRepository
+from src.utils.datetime_utils import utc_now
 
 
 # Import shared test fixtures from conftest
 from tests.conftest import test_async_engine, AsyncTestingSessionLocal, Base
 from sqlalchemy import delete
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @pytest.fixture(scope="function")
@@ -21,6 +23,24 @@ async def db_session(db):
     """
     async with AsyncTestingSessionLocal() as session:
         yield session
+
+
+@pytest.fixture
+async def test_user_id(db_session: AsyncSession):
+    """Create a test user and return the user ID."""
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    user = UserProfile(
+        email="test@example.com",
+        google_sub="test_google_sub",
+        display_name="Test User",
+        created_at=utc_now(),
+        updated_at=utc_now(),
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user.id
 
 
 @pytest.fixture
@@ -95,7 +115,7 @@ class TestContentRepository:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_get_all(self, db_session):
+    async def test_get_all(self, db_session, test_user_id):
         """Test getting all content."""
         repo = ContentRepository(db_session)
 
@@ -109,12 +129,12 @@ class TestContentRepository:
             )
             await repo.save(metadata)
 
-        results = await repo.get_all(limit=10)
+        results = await repo.get_all(test_user_id, limit=10)
 
         assert len(results) == 5
 
     @pytest.mark.asyncio
-    async def test_get_all_pagination(self, db_session):
+    async def test_get_all_pagination(self, db_session, test_user_id):
         """Test pagination in get_all."""
         repo = ContentRepository(db_session)
 
@@ -128,12 +148,12 @@ class TestContentRepository:
             )
             await repo.save(metadata)
 
-        results = await repo.get_all(limit=5, offset=0)
+        results = await repo.get_all(test_user_id, limit=5, offset=0)
 
         assert len(results) == 5
 
     @pytest.mark.asyncio
-    async def test_get_kept(self, db_session):
+    async def test_get_kept(self, db_session, test_user_id):
         """Test getting kept content."""
         content_repo = ContentRepository(db_session)
         swipe_repo = SwipeRepository(db_session)
@@ -158,13 +178,13 @@ class TestContentRepository:
         await swipe_repo.record_swipe(content1.id, SwipeAction.KEEP)
         await swipe_repo.record_swipe(content2.id, SwipeAction.DISCARD)
 
-        kept = await content_repo.get_kept()
+        kept = await content_repo.get_kept(test_user_id)
 
         assert len(kept) == 1
         assert kept[0].url == "https://example.com/1"
 
     @pytest.mark.asyncio
-    async def test_get_pending_returns_unswiped_content(self, db_session):
+    async def test_get_pending_returns_unswiped_content(self, db_session, test_user_id):
         """Test getting pending content (no swipe history)."""
         content_repo = ContentRepository(db_session)
         swipe_repo = SwipeRepository(db_session)
@@ -195,7 +215,7 @@ class TestContentRepository:
         # Swipe only content1
         await swipe_repo.record_swipe(content1.id, SwipeAction.KEEP)
 
-        pending = await content_repo.get_pending()
+        pending = await content_repo.get_pending(test_user_id)
 
         assert len(pending) == 2
         pending_urls = [c.url for c in pending]
@@ -204,7 +224,7 @@ class TestContentRepository:
         assert "https://example.com/1" not in pending_urls
 
     @pytest.mark.asyncio
-    async def test_get_pending_excludes_all_swiped_content(self, db_session):
+    async def test_get_pending_excludes_all_swiped_content(self, db_session, test_user_id):
         """Test that pending excludes content with any swipe action."""
         content_repo = ContentRepository(db_session)
         swipe_repo = SwipeRepository(db_session)
@@ -237,12 +257,12 @@ class TestContentRepository:
         await swipe_repo.record_swipe(content2.id, SwipeAction.DISCARD)
         await swipe_repo.record_swipe(content3.id, SwipeAction.KEEP)
 
-        pending = await content_repo.get_pending()
+        pending = await content_repo.get_pending(test_user_id)
 
         assert len(pending) == 0
 
     @pytest.mark.asyncio
-    async def test_get_pending_respects_limit(self, db_session):
+    async def test_get_pending_respects_limit(self, db_session, test_user_id):
         """Test that limit parameter works correctly."""
         content_repo = ContentRepository(db_session)
 
@@ -256,12 +276,12 @@ class TestContentRepository:
                 )
             )
 
-        pending = await content_repo.get_pending(limit=5)
+        pending = await content_repo.get_pending(test_user_id, limit=5)
 
         assert len(pending) == 5
 
     @pytest.mark.asyncio
-    async def test_get_pending_orders_by_recency(self, db_session):
+    async def test_get_pending_orders_by_recency(self, db_session, test_user_id):
         """Test that pending content is ordered by recency (newest first)."""
         content_repo = ContentRepository(db_session)
 
@@ -285,7 +305,7 @@ class TestContentRepository:
             )
         )
 
-        pending = await content_repo.get_pending()
+        pending = await content_repo.get_pending(test_user_id)
 
         assert len(pending) == 2
         assert pending[0].url == "https://example.com/2"  # Newest first
