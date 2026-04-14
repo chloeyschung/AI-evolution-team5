@@ -51,10 +51,12 @@
 - [x] Browser Extension (Chrome/Whale).
 - [x] Web Dashboard.
 - [x] YouTube Auto-Sync (INT-001).
-- [ ] LinkedIn/Social Sync (INT-002).
+- [x] LinkedIn/Social Sync (INT-002) - MVP: manual import via public URLs.
 
 ### Phase 3: Community & Personalization
-- [ ] Interest-based "Trend Summary" community feeds.
+- [x] Interest-based "Trend Summary" community feeds (ADV-001).
+- [x] Gamified Achievement System (ADV-002).
+- [x] Smart Reminders (ADV-003).
 - [ ] Advanced AI personalization based on swipe history.
 
 ## 5. Development Process (Spec-Driven Development)
