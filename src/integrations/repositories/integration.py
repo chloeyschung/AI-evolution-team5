@@ -10,6 +10,7 @@ from src.data.models import (
     IntegrationSyncConfig,
     IntegrationSyncLog,
     IntegrationTokens,
+    Provider,
 )
 from src.integrations.youtube.models import SyncConfig, SyncLog
 

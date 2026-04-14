@@ -68,7 +68,7 @@ from .schemas import (
     ReminderRespondRequest,
     ReminderRespondResponse,
 )
-from src.data.models import ContentStatus, IntegrationTokens, IntegrationSyncConfig, IntegrationSyncLog
+from src.data.models import ContentStatus, Provider, IntegrationTokens, IntegrationSyncConfig, IntegrationSyncLog
 
 router = APIRouter()
 
@@ -1073,7 +1073,7 @@ async def delete_account(
 
 @router.get("/integrations/youtube/status", response_model=YouTubeConnectionStatus)
 async def get_youtube_connection_status(
-    user_id: int = 1,  # TODO: Get from auth token
+    user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> YouTubeConnectionStatus:
     """Check YouTube connection status.
@@ -1088,20 +1088,20 @@ async def get_youtube_connection_status(
     from src.integrations.repositories.integration import IntegrationRepository
 
     repo = IntegrationRepository(db)
-    tokens = await repo.get_tokens(user_id, "youtube")
+    tokens = await repo.get_tokens(user_id, Provider.YOUTUBE.value)
 
     if not tokens:
         return YouTubeConnectionStatus(is_connected=False)
 
     # Get last sync time
-    configs = await repo.get_sync_configs(user_id, "youtube")
+    configs = await repo.get_sync_configs(user_id, Provider.YOUTUBE.value)
     last_sync_at = None
     for config in configs:
         # Check database for last_sync_at
         result = await db.execute(
             select(IntegrationSyncConfig).where(
                 IntegrationSyncConfig.user_id == user_id,
-                IntegrationSyncConfig.provider == "youtube",
+                IntegrationSyncConfig.provider == Provider.YOUTUBE.value,
                 IntegrationSyncConfig.resource_id == config.playlist_id,
             )
         )
@@ -1151,7 +1151,7 @@ async def list_youtube_playlists(
 
     # Get YouTube tokens
     repo = IntegrationRepository(db)
-    youtube_tokens = await repo.get_tokens(user_id, "youtube")
+    youtube_tokens = await repo.get_tokens(user_id, Provider.YOUTUBE.value)
 
     if not youtube_tokens:
         raise HTTPException(status_code=401, detail="not_connected_to_youtube")
@@ -1167,7 +1167,7 @@ async def list_youtube_playlists(
         playlists = await client.get_playlists()
     except YouTubeAuthError as e:
         # Token expired, delete it
-        await repo.delete_tokens(user_id, "youtube")
+        await repo.delete_tokens(user_id, Provider.YOUTUBE.value)
         raise HTTPException(status_code=401, detail="youtube_auth_expired")
 
     return [
@@ -1220,7 +1220,7 @@ async def create_youtube_sync_config(
 
     # Check if YouTube is connected
     repo = IntegrationRepository(db)
-    youtube_tokens = await repo.get_tokens(user_id, "youtube")
+    youtube_tokens = await repo.get_tokens(user_id, Provider.YOUTUBE.value)
 
     if not youtube_tokens:
         raise HTTPException(status_code=401, detail="not_connected_to_youtube")
@@ -1228,7 +1228,7 @@ async def create_youtube_sync_config(
     # Create sync config
     config = await repo.save_sync_config(
         user_id=user_id,
-        provider="youtube",
+        provider=Provider.YOUTUBE.value,
         playlist_id=data.playlist_id,
         playlist_name=data.playlist_name,
         sync_frequency=data.sync_frequency,
@@ -1286,13 +1286,13 @@ async def list_youtube_sync_configs(
 
     # Get sync configs
     repo = IntegrationRepository(db)
-    configs = await repo.get_sync_configs(user_id, "youtube")
+    configs = await repo.get_sync_configs(user_id, Provider.YOUTUBE.value)
 
     # Get last_sync_at from database
     result = await db.execute(
         select(IntegrationSyncConfig).where(
             IntegrationSyncConfig.user_id == user_id,
-            IntegrationSyncConfig.provider == "youtube",
+            IntegrationSyncConfig.provider == Provider.YOUTUBE.value,
         )
     )
     db_configs = result.scalars().all()
@@ -1353,7 +1353,7 @@ async def update_youtube_sync_config(
 
     # Check if config exists
     repo = IntegrationRepository(db)
-    configs = await repo.get_sync_configs(user_id, "youtube")
+    configs = await repo.get_sync_configs(user_id, Provider.YOUTUBE.value)
 
     existing = None
     for c in configs:
@@ -1371,7 +1371,7 @@ async def update_youtube_sync_config(
 
     updated = await repo.save_sync_config(
         user_id=user_id,
-        provider="youtube",
+        provider=Provider.YOUTUBE.value,
         playlist_id=playlist_id,
         playlist_name=new_name,
         sync_frequency=new_frequency,
@@ -1382,7 +1382,7 @@ async def update_youtube_sync_config(
     result = await db.execute(
         select(IntegrationSyncConfig).where(
             IntegrationSyncConfig.user_id == user_id,
-            IntegrationSyncConfig.provider == "youtube",
+            IntegrationSyncConfig.provider == Provider.YOUTUBE.value,
             IntegrationSyncConfig.resource_id == playlist_id,
         )
     )
@@ -1434,7 +1434,7 @@ async def delete_youtube_sync_config(
 
     # Delete config
     repo = IntegrationRepository(db)
-    deleted = await repo.delete_sync_config(user_id, "youtube", playlist_id)
+    deleted = await repo.delete_sync_config(user_id, Provider.YOUTUBE.value, playlist_id)
 
     if not deleted:
         raise HTTPException(status_code=404, detail="sync_config_not_found")
@@ -1480,7 +1480,7 @@ async def list_youtube_sync_logs(
 
     # Get sync logs
     repo = IntegrationRepository(db)
-    logs = await repo.get_sync_logs(user_id, "youtube", limit=limit, offset=offset)
+    logs = await repo.get_sync_logs(user_id, Provider.YOUTUBE.value, limit=limit, offset=offset)
 
     return [
         YouTubeSyncLogResponse(
@@ -1536,7 +1536,7 @@ async def trigger_youtube_sync(
 
     # Get YouTube tokens
     integration_repo = IntegrationRepository(db)
-    youtube_tokens = await integration_repo.get_tokens(user_id, "youtube")
+    youtube_tokens = await integration_repo.get_tokens(user_id, Provider.YOUTUBE.value)
 
     if not youtube_tokens:
         raise HTTPException(status_code=401, detail="not_connected_to_youtube")
@@ -1565,7 +1565,7 @@ async def trigger_youtube_sync(
                 status = "success" if not result.errors else "partial"
                 await integration_repo.log_sync(
                     user_id=user_id,
-                    provider="youtube",
+                    provider=Provider.YOUTUBE.value,
                     resource_id=playlist_id,
                     status=status,
                     ingested_count=result.ingested,
@@ -1578,7 +1578,7 @@ async def trigger_youtube_sync(
                     status = "success" if not result.errors else "partial"
                     await integration_repo.log_sync(
                         user_id=user_id,
-                        provider="youtube",
+                        provider=Provider.YOUTUBE.value,
                         resource_id=pid,
                         status=status,
                         ingested_count=result.ingested,
@@ -1589,7 +1589,7 @@ async def trigger_youtube_sync(
             resource = playlist_id or "all"
             await integration_repo.log_sync(
                 user_id=user_id,
-                provider="youtube",
+                provider=Provider.YOUTUBE.value,
                 resource_id=resource,
                 status="failed",
                 ingested_count=0,
@@ -1739,7 +1739,7 @@ async def youtube_callback(
 
     await repo.save_tokens(
         user_id=user_id,
-        provider="youtube",
+        provider=Provider.YOUTUBE.value,
         access_token=token_data["access_token"],
         refresh_token=token_data["refresh_token"],
         expires_at=expires_at,
@@ -1790,7 +1790,7 @@ async def disconnect_youtube(
 
     # Get YouTube tokens
     repo = IntegrationRepository(db)
-    youtube_tokens = await repo.get_tokens(user_id, "youtube")
+    youtube_tokens = await repo.get_tokens(user_id, Provider.YOUTUBE.value)
 
     if youtube_tokens:
         # Revoke tokens with YouTube
@@ -1802,13 +1802,13 @@ async def disconnect_youtube(
         await client.disconnect()
 
         # Delete tokens from database
-        await repo.delete_tokens(user_id, "youtube")
+        await repo.delete_tokens(user_id, Provider.YOUTUBE.value)
 
     # Delete all sync configs
     await db.execute(
         delete(IntegrationSyncConfig).where(
             IntegrationSyncConfig.user_id == user_id,
-            IntegrationSyncConfig.provider == "youtube",
+            IntegrationSyncConfig.provider == Provider.YOUTUBE.value,
         )
     )
 
@@ -1847,13 +1847,13 @@ async def get_linkedin_status(
 
     # Check if LinkedIn tokens exist
     repo = IntegrationRepository(db)
-    tokens = await repo.get_tokens(user_id, "linkedin")
+    tokens = await repo.get_tokens(user_id, Provider.LINKEDIN.value)
 
     if not tokens:
         return LinkedInConnectionStatus(is_connected=False)
 
     # Get last sync time
-    last_sync = await repo.get_last_sync(user_id, "linkedin", "saved_posts")
+    last_sync = await repo.get_last_sync(user_id, Provider.LINKEDIN.value, "saved_posts")
 
     return LinkedInConnectionStatus(
         is_connected=True,
@@ -1899,13 +1899,13 @@ async def disconnect_linkedin(
 
     # Delete tokens from database
     repo = IntegrationRepository(db)
-    await repo.delete_tokens(user_id, "linkedin")
+    await repo.delete_tokens(user_id, Provider.LINKEDIN.value)
 
     # Delete all sync configs
     await db.execute(
         delete(IntegrationSyncConfig).where(
             IntegrationSyncConfig.user_id == user_id,
-            IntegrationSyncConfig.provider == "linkedin",
+            IntegrationSyncConfig.provider == Provider.LINKEDIN.value,
         )
     )
 
@@ -1952,7 +1952,7 @@ async def get_linkedin_sync_logs(
 
     # Get sync logs
     repo = IntegrationRepository(db)
-    logs = await repo.get_sync_logs(user_id, "linkedin", limit=limit, offset=offset)
+    logs = await repo.get_sync_logs(user_id, Provider.LINKEDIN.value, limit=limit, offset=offset)
 
     return [
         LinkedInSyncLogResponse(

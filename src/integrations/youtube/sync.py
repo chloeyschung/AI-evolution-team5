@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from src.ai.summarizer import Summarizer
-from src.data.models import ContentStatus
+from src.data.models import ContentStatus, Provider
 from src.data.repository import ContentRepository
 from src.integrations.repositories.integration import IntegrationRepository
 from src.integrations.youtube.client import YouTubeClient, YouTubeClientError
@@ -66,7 +66,7 @@ class YouTubeSyncService:
         try:
             # Get last sync time for this playlist
             last_sync = await self.integration_repo.get_last_sync(
-                user_id, "youtube", playlist_id
+                user_id, Provider.YOUTUBE.value, playlist_id
             )
             effective_since = since or last_sync
 
@@ -106,7 +106,7 @@ class YouTubeSyncService:
 
             # Update last sync timestamp
             await self.integration_repo.update_last_sync(
-                user_id, "youtube", playlist_id, datetime.now(timezone.utc)
+                user_id, Provider.YOUTUBE.value, playlist_id, datetime.now(timezone.utc)
             )
 
             return SyncResult(
@@ -145,7 +145,7 @@ class YouTubeSyncService:
 
         # Create content record
         content = await self.content_repo.save(
-            platform="youtube",
+            platform=Provider.YOUTUBE.value,
             content_type="video",
             url=url,
             title=video.title,
@@ -182,7 +182,7 @@ class YouTubeSyncService:
             Dict mapping playlist_id to SyncResult.
         """
         # Get all active sync configs for this user
-        configs = await self.integration_repo.get_sync_configs(user_id, "youtube")
+        configs = await self.integration_repo.get_sync_configs(user_id, Provider.YOUTUBE.value)
 
         # Sync each playlist concurrently
         results = {}

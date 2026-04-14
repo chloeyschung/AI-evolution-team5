@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...ai.categorizer import Categorizer
 from ...ai.metadata_extractor import ContentMetadata, ContentType
 from ...ai.summarizer import Summarizer
-from ...data.models import utc_now
+from ...data.models import Provider, utc_now
 from ...data.repository import ContentRepository, ContentTagRepository
 from ..repositories.integration import IntegrationRepository
 from .client import LinkedInClient, LinkedInClientError
@@ -20,7 +20,7 @@ class LinkedInSyncService:
     """Sync LinkedIn saved posts to Briefly."""
 
     # Constants
-    PROVIDER = "linkedin"
+    PROVIDER = Provider.LINKEDIN.value
     RESOURCE_ID = "saved_posts"
     PLATFORM = "LinkedIn"
 

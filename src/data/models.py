@@ -43,6 +43,12 @@ class ContentStatus(str, Enum):
     ARCHIVED = "archived"
 
 
+class Provider(str, Enum):
+    """Third-party integration providers."""
+    YOUTUBE = "youtube"
+    LINKEDIN = "linkedin"
+
+
 class Content(Base):
     """Main content table storing ContentMetadata."""
 
