@@ -12,7 +12,7 @@ from ..ingestion.extractor import ContentExtractor
 from ..ingestion.share_handler import ShareHandler
 from ..middleware.rate_limiter import limiter, rate_limit_exceeded_handler
 from ..utils.http_client import HttpClientPool
-from .routes import router, _set_share_handler, get_share_handler
+from .routes import router, _set_share_handler, get_share_handler, _background_tasks
 
 
 @asynccontextmanager
@@ -35,7 +35,15 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown: close HTTP client pool
+    # Shutdown: cancel background tasks and close HTTP client pool
+    for task in _background_tasks:
+        if not task.done():
+            task.cancel()
+    if _background_tasks:
+        await asyncio.gather(*_background_tasks, return_exceptions=True)
+    _background_tasks.clear()
+
+    # Close HTTP client pool
     await HttpClientPool.close()
 
 
