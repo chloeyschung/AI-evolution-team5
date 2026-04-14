@@ -1,9 +1,9 @@
 """Repository pattern for data access operations."""
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from typing import List
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import case, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.metadata_extractor import ContentMetadata
@@ -325,7 +325,7 @@ class SwipeRepository:
         history = SwipeHistory(
             content_id=content_id,
             action=action,
-            swiped_at=datetime.now(timezone.utc),
+            swiped_at=utc_now(),
         )
         self.session.add(history)
 
@@ -387,7 +387,7 @@ class SwipeRepository:
         Returns:
             List of created SwipeHistory objects.
         """
-        now = datetime.now(timezone.utc)
+        now = utc_now()
         histories = [
             SwipeHistory(
                 content_id=content_id,
@@ -521,67 +521,57 @@ class UserProfileRepository:
         return preferences
 
     async def get_statistics(self) -> dict:
-        """Calculate and return user statistics from swipe history.
+        """Calculate and return user statistics from swipe history (optimized: single query).
 
         Returns:
             Dictionary with total_swipes, total_kept, total_discarded,
             retention_rate, streak_days, first_swipe_at, last_swipe_at.
         """
-
-        # Count total swipes
-        total_result = await self.session.execute(select(func.count(SwipeHistory.id)))
-        total_swipes = total_result.scalar() or 0
-
-        # Count kept
-        kept_result = await self.session.execute(
-            select(func.count(SwipeHistory.id)).where(SwipeHistory.action == SwipeAction.KEEP)
+        # Single query for all counts using conditional aggregation
+        stats_result = await self.session.execute(
+            select(
+                func.count(SwipeHistory.id).label("total"),
+                func.sum(case((SwipeHistory.action == SwipeAction.KEEP, 1), else_=0)).label("kept"),
+                func.sum(case((SwipeHistory.action == SwipeAction.DISCARD, 1), else_=0)).label("discarded"),
+                func.min(SwipeHistory.swiped_at).label("first"),
+                func.max(SwipeHistory.swiped_at).label("last"),
+            )
         )
-        total_kept = kept_result.scalar() or 0
+        row = stats_result.fetchone()
 
-        # Count discarded
-        discarded_result = await self.session.execute(
-            select(func.count(SwipeHistory.id)).where(SwipeHistory.action == SwipeAction.DISCARD)
-        )
-        total_discarded = discarded_result.scalar() or 0
+        total_swipes = row.total or 0
+        total_kept = row.kept or 0
+        total_discarded = row.discarded or 0
+        first_swipe_at = row.first
+        last_swipe_at = row.last
 
         # Calculate retention rate
         retention_rate = total_kept / total_swipes if total_swipes > 0 else 0.0
 
-        # Get first and last swipe timestamps
-        first_result = await self.session.execute(
-            select(func.min(SwipeHistory.swiped_at)).where(SwipeHistory.id.isnot(None))
-        )
-        first_swipe_at = first_result.scalar()
-
-        last_result = await self.session.execute(
-            select(func.max(SwipeHistory.swiped_at)).where(SwipeHistory.id.isnot(None))
-        )
-        last_swipe_at = last_result.scalar()
-
-        # Calculate streak (consecutive days with activity, ending today or yesterday)
+        # Calculate streak using unique active dates (O(1) query instead of O(N) loop)
         streak_days = 0
         if first_swipe_at is not None:
             today = date.today()
             yesterday = today - timedelta(days=1)
-            current_date = yesterday if last_swipe_at is None or last_swipe_at.date() < today else today
+            end_date = yesterday if last_swipe_at is None or last_swipe_at.date() < today else today
 
-            while current_date >= first_swipe_at.date():
-                # Check if there's any swipe on this date
-                date_start = datetime.combine(current_date, datetime.min.time().replace(tzinfo=timezone.utc))
-                date_end = datetime.combine(current_date, datetime.max.time().replace(tzinfo=timezone.utc))
-
-                streak_result = await self.session.execute(
-                    select(func.count(SwipeHistory.id)).where(
-                        SwipeHistory.swiped_at >= date_start, SwipeHistory.swiped_at <= date_end
-                    )
+            # Get all unique active dates in descending order (single query)
+            dates_result = await self.session.execute(
+                select(func.date(SwipeHistory.swiped_at)).distinct()
+                .where(
+                    func.date(SwipeHistory.swiped_at) <= end_date,
+                    func.date(SwipeHistory.swiped_at) >= first_swipe_at.date()
                 )
-                streak_count = streak_result.scalar() or 0
+                .order_by(func.date(SwipeHistory.swiped_at).desc())
+            )
+            # Convert database dates to Python date objects for comparison
+            active_dates = {date.fromisoformat(str(row[0])) if isinstance(row[0], str) else row[0] for row in dates_result.fetchall()}
 
-                if streak_count > 0:
-                    streak_days += 1
-                    current_date -= timedelta(days=1)
-                else:
-                    break
+            # Count consecutive days from end_date backwards
+            current_date = end_date
+            while current_date in active_dates:
+                streak_days += 1
+                current_date -= timedelta(days=1)
 
         return {
             "total_swipes": total_swipes,
@@ -815,7 +805,7 @@ class ContentTagRepository:
         self.session = session
 
     async def add_tags(self, content_id: int, tags: List[str]) -> List[ContentTag]:
-        """Add tags to content.
+        """Add tags to content (optimized: single query instead of N+1).
 
         Args:
             content_id: Content ID to add tags to.
@@ -824,32 +814,32 @@ class ContentTagRepository:
         Returns:
             List of created ContentTag objects.
         """
+        # Fetch all existing tags for this content in one query
+        result = await self.session.execute(
+            select(ContentTag).where(ContentTag.content_id == content_id)
+        )
+        existing_tags = {t.tag.lower() for t in result.scalars().all()}
+
+        # Build new tags (avoid duplicates)
         created_tags = []
+        seen = set(existing_tags)
 
         for tag in tags:
-            # Check if tag already exists for this content
-            result = await self.session.execute(
-                select(ContentTag).where(
-                    ContentTag.content_id == content_id,
-                    ContentTag.tag.ilike(tag)
-                )
-            )
-            existing = result.scalar_one_or_none()
+            tag_lower = tag.lower()
+            if tag_lower in seen:
+                continue  # Skip duplicates
+            seen.add(tag_lower)
 
-            if existing:
-                created_tags.append(existing)
-            else:
-                # Create new tag
-                content_tag = ContentTag(
-                    content_id=content_id,
-                    tag=tag.lower()
-                )
-                self.session.add(content_tag)
-                created_tags.append(content_tag)
+            content_tag = ContentTag(
+                content_id=content_id,
+                tag=tag_lower
+            )
+            self.session.add(content_tag)
+            created_tags.append(content_tag)
 
         await self.session.commit()
 
-        # Refresh all tags
+        # Refresh all tags to populate IDs
         for tag in created_tags:
             await self.session.refresh(tag)
 
