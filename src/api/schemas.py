@@ -11,11 +11,11 @@ from src.data.models import SwipeAction, Theme, DefaultSort, ContentStatus
 class ContentCreate(BaseModel):
     """Schema for creating new content."""
 
-    platform: str
+    platform: str = Field(..., min_length=1, max_length=100)
     content_type: ContentType
-    url: str
-    title: Optional[str] = None
-    author: Optional[str] = None
+    url: str = Field(..., min_length=1, max_length=2048, pattern=r'^https?://')
+    title: Optional[str] = Field(None, min_length=1, max_length=500)
+    author: Optional[str] = Field(None, min_length=1, max_length=200)
 
 
 class ContentResponse(BaseModel):
