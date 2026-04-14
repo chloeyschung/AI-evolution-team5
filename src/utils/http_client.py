@@ -37,9 +37,14 @@ class HttpClientPool:
 
     This class ensures a single AsyncClient instance is used across the
     application with proper connection pooling enabled.
+
+    Note:
+        This implementation uses double-checked locking for thread safety
+        in multi-worker deployments.
     """
 
     _instance: httpx.AsyncClient | None = None
+    _lock: object = object()  # Lock for thread-safe initialization
     _mounts: dict[str, httpx.AsyncHTTPTransport | httpx.AsyncHTTPTransport] | None = None
 
     @classmethod
@@ -67,8 +72,11 @@ class HttpClientPool:
             if using this method directly. Prefer using async_client_context()
             for automatic lifecycle management.
         """
+        # Double-checked locking for thread safety
         if cls._instance is None or cls._instance.is_closed:
-            cls._create_client(timeout, follow_redirects, **kwargs)
+            with cls._lock:
+                if cls._instance is None or cls._instance.is_closed:
+                    cls._create_client(timeout, follow_redirects, **kwargs)
 
         return cls._instance
 
