@@ -26,6 +26,11 @@
 | F-019 | 데이터 동기화 | 콘텐츠 삭제 | 저장된 콘텐츠 개별 영구 삭제 | 삭제 확인 팝업 1 회. 삭제 시 양 플랫폼 즉시 반영. 삭제 후 복구 불가. | Phase 1 | iOS+Web | P1 | - | 정의완료 | - |
 | F-020 | 브라우저 확장 | 브라우저 확장 프로그램 (Chrome/Whale) | 데스크톱에서 한 번의 클릭으로 콘텐츠 저장 | Manifest V3, 컨텍스트 메뉴, 토큰 기반 인증, 메타데이터 자동 추출 | Phase 2 | Web | P0 | - | 정의완료 | ✅ 구현됨 (browser-extension/) |
 | F-021 | 웹 대시보드 | 웹 기반 지식 라이브러리 관리 | 큰 화면에서 저장된 콘텐츠 관리, 필터링, 분석 | Vue 3 기반 SPA, Google OAuth, 그리드/리스트 뷰, 분석 대시보드 | Phase 2 | Web | P0 | - | 정의완료 | ✅ 구현됨 (web-dashboard/) |
+| F-022 | 플랫폼 연동 | YouTube 자동 동기화 | YouTube Watch Later/Playlist 를 자동으로 가져와 저장 | OAuth 2.0, 플레이리스트 선택, 자동/수동 동기화, 동기화 로그 | Phase 3 | iOS+Web | P1 | - | 정의완료 | ✅ 구현됨 (src/integrations/youtube/) |
+| F-023 | 플랫폼 연동 | LinkedIn/Social 자동 동기화 | LinkedIn 저장된 포스팅을 자동으로 가져와 저장 | OAuth 2.0 (준비됨), 수동 import (MVP), 자동 동기화 (향후) | Phase 3 | iOS+Web | P1 | - | 정의완료 | ✅ 구현됨 (src/integrations/linkedin/) |
+| F-024 | 지능형 기능 | 개인화 트렌드 피드 | 사용자의 관심사와 스와이프 이력을 기반으로 추천하는 아카이브 콘텐츠 | 관심사 매칭 (35%), 태그 유사도 (30%), 최신성 (20%), 참여도 (15%) | Phase 3 | iOS+Web | P2 | - | 정의완료 | ✅ 구현됨 (src/ai/trend_analyzer.py) |
+| F-025 | 지능형 기능 | 게이미피케이션 성취 시스템 | 스와이프 활동을 기반으로 한 업적 시스템 (16 개 업적) | 연속 기록, 총 스와이프 수, 플랫폼 다양성, 큐레이션 4 가지 카테고리 | Phase 3 | iOS+Web | P2 | - | 정의완료 | ✅ 구현됨 (src/ai/achievement_checker.py) |
+| F-026 | 지능형 기능 | 스마트 리마인더 | 사용자 패턴을 학습하여 최적의 타이밍에 콘텐츠 소비 유도 | 백로그, 기록 유지, 시간 기반, 재참여 4 가지 리마인더 타입 | Phase 3 | iOS+Web | P2 | - | 정의완료 | ✅ 구현됨 (src/ai/reminder_engine.py) |
 
 ---
 
@@ -100,6 +105,15 @@
 ### Phase 2 - 생태계 확장
 - F-020: 브라우저 확장 프로그램 (Chrome/Whale)
 - F-021: 웹 대시보드
+
+### Phase 3 - 플랫폼 연동
+- F-022: YouTube 자동 동기화
+- F-023: LinkedIn/Social 자동 동기화
+
+### Phase 3 - 지능형 기능
+- F-024: 개인화 트렌드 피드
+- F-025: 게이미피케이션 성취 시스템
+- F-026: 스마트 리마인더
 
 ---
 
