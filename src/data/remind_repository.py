@@ -1,31 +1,30 @@
 """Repositories for reminder system (ADV-003)."""
 
-from datetime import datetime, time as time_type, timedelta
-from typing import Optional
+from datetime import datetime, timedelta
+from datetime import time as time_type
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.utils.datetime_utils import utc_now
 
+from .base_repository import BaseRepository
 from .models import (
-    ReminderPreference,
     ReminderLog,
+    ReminderPreference,
     UserActivityPattern,
 )
 
 
-class ReminderPreferenceRepository:
+class ReminderPreferenceRepository(BaseRepository[ReminderPreference]):
     """Repository for ReminderPreference."""
 
     def __init__(self, db_session: AsyncSession):
-        self.session = db_session
+        super().__init__(db_session)
 
-    async def get(self, user_id: int) -> Optional[ReminderPreference]:
+    async def get(self, user_id: int) -> ReminderPreference | None:
         """Get reminder preferences for user."""
-        result = await self.session.execute(
-            select(ReminderPreference).where(ReminderPreference.user_id == user_id)
-        )
+        result = await self.session.execute(select(ReminderPreference).where(ReminderPreference.user_id == user_id))
         return result.scalar_one_or_none()
 
     async def create(self, user_id: int, **kwargs) -> ReminderPreference:
@@ -35,9 +34,7 @@ class ReminderPreferenceRepository:
         await self.session.flush()
         return preference
 
-    async def update(
-        self, user_id: int, **kwargs
-    ) -> Optional[ReminderPreference]:
+    async def update(self, user_id: int, **kwargs) -> ReminderPreference | None:
         """Update reminder preferences for user."""
         preference = await self.get(user_id)
         if not preference:
@@ -57,7 +54,7 @@ class ReminderPreferenceRepository:
             # Create with defaults
             preference = await self.create(
                 user_id=user_id,
-                is_enabled=1,
+                is_enabled=True,
                 preferred_time=datetime.combine(datetime.min, time_type(18, 0)),  # 6 PM default
                 frequency="daily",
                 quiet_hours_start=datetime.combine(datetime.min, time_type(22, 0)),  # 10 PM
@@ -67,18 +64,18 @@ class ReminderPreferenceRepository:
         return preference
 
 
-class ReminderLogRepository:
+class ReminderLogRepository(BaseRepository[ReminderLog]):
     """Repository for ReminderLog."""
 
     def __init__(self, db_session: AsyncSession):
-        self.session = db_session
+        super().__init__(db_session)
 
     async def create(
         self,
         user_id: int,
         reminder_type: str,
         message: str,
-        sent_at: Optional[datetime] = None,
+        sent_at: datetime | None = None,
     ) -> ReminderLog:
         """Create a new reminder log entry."""
         log = ReminderLog(
@@ -91,27 +88,23 @@ class ReminderLogRepository:
         await self.session.flush()
         return log
 
-    async def mark_action_taken(self, log_id: int, action_at: Optional[datetime] = None) -> bool:
+    async def mark_action_taken(self, log_id: int, action_at: datetime | None = None) -> bool:
         """Mark that user took action on reminder."""
         result = await self.session.execute(
-            select(ReminderLog)
-            .where(ReminderLog.id == log_id)
-            .where(ReminderLog.action_taken == 0)
+            select(ReminderLog).where(ReminderLog.id == log_id).where(~ReminderLog.action_taken)
         )
         log = result.scalar_one_or_none()
         if not log:
             return False
 
-        log.action_taken = 1
+        log.action_taken = True
         log.action_taken_at = action_at or utc_now()
         await self.session.flush()
         return True
 
-    async def mark_dismissed(self, log_id: int, dismissed_at: Optional[datetime] = None) -> bool:
+    async def mark_dismissed(self, log_id: int, dismissed_at: datetime | None = None) -> bool:
         """Mark that user dismissed the reminder."""
-        result = await self.session.execute(
-            select(ReminderLog).where(ReminderLog.id == log_id)
-        )
+        result = await self.session.execute(select(ReminderLog).where(ReminderLog.id == log_id))
         log = result.scalar_one_or_none()
         if not log:
             return False
@@ -120,13 +113,9 @@ class ReminderLogRepository:
         await self.session.flush()
         return True
 
-    async def get_last_reminder(
-        self, user_id: int, reminder_type: Optional[str] = None
-    ) -> Optional[ReminderLog]:
+    async def get_last_reminder(self, user_id: int, reminder_type: str | None = None) -> ReminderLog | None:
         """Get the last reminder sent to user."""
-        query = select(ReminderLog).where(ReminderLog.user_id == user_id).order_by(
-            ReminderLog.sent_at.desc()
-        )
+        query = select(ReminderLog).where(ReminderLog.user_id == user_id).order_by(ReminderLog.sent_at.desc())
 
         if reminder_type:
             query = query.where(ReminderLog.reminder_type == reminder_type)
@@ -134,9 +123,7 @@ class ReminderLogRepository:
         result = await self.session.execute(query.limit(1))
         return result.scalar_one_or_none()
 
-    async def get_last_reminder_by_type(
-        self, user_id: int, reminder_type: str
-    ) -> Optional[ReminderLog]:
+    async def get_last_reminder_by_type(self, user_id: int, reminder_type: str) -> ReminderLog | None:
         """Get the last reminder of specific type sent to user."""
         result = await self.session.execute(
             select(ReminderLog)
@@ -147,16 +134,12 @@ class ReminderLogRepository:
         )
         return result.scalar_one_or_none()
 
-    async def get_response_rate(
-        self, user_id: int, days: int = 30
-    ) -> tuple[int, int]:
+    async def get_response_rate(self, user_id: int, days: int = 30) -> tuple[int, int]:
         """Get (actioned, total) reminder count for user in last N days."""
         cutoff = utc_now() - timedelta(days=days)
 
         total_result = await self.session.execute(
-            select(ReminderLog)
-            .where(ReminderLog.user_id == user_id)
-            .where(ReminderLog.sent_at >= cutoff)
+            select(ReminderLog).where(ReminderLog.user_id == user_id).where(ReminderLog.sent_at >= cutoff)
         )
         total = len(total_result.scalars().all())
 
@@ -164,24 +147,22 @@ class ReminderLogRepository:
             select(ReminderLog)
             .where(ReminderLog.user_id == user_id)
             .where(ReminderLog.sent_at >= cutoff)
-            .where(ReminderLog.action_taken == 1)
+            .where(ReminderLog.action_taken)
         )
         actioned = len(actioned_result.scalars().all())
 
         return actioned, total
 
 
-class UserActivityPatternRepository:
+class UserActivityPatternRepository(BaseRepository[UserActivityPattern]):
     """Repository for UserActivityPattern."""
 
     def __init__(self, db_session: AsyncSession):
-        self.session = db_session
+        super().__init__(db_session)
 
-    async def get(self, user_id: int) -> Optional[UserActivityPattern]:
+    async def get(self, user_id: int) -> UserActivityPattern | None:
         """Get activity pattern for user."""
-        result = await self.session.execute(
-            select(UserActivityPattern).where(UserActivityPattern.user_id == user_id)
-        )
+        result = await self.session.execute(select(UserActivityPattern).where(UserActivityPattern.user_id == user_id))
         return result.scalar_one_or_none()
 
     async def create(self, user_id: int, **kwargs) -> UserActivityPattern:
@@ -191,9 +172,7 @@ class UserActivityPatternRepository:
         await self.session.flush()
         return pattern
 
-    async def update(
-        self, user_id: int, **kwargs
-    ) -> Optional[UserActivityPattern]:
+    async def update(self, user_id: int, **kwargs) -> UserActivityPattern | None:
         """Update activity pattern for user."""
         pattern = await self.get(user_id)
         if not pattern:

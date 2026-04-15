@@ -1,8 +1,8 @@
 """LinkedIn integration for Briefly."""
 
 from .client import LinkedInClient
-from .sync import LinkedInSyncService
 from .models import LinkedInPost, LinkedInSavedItem, LinkedInSyncResult
+from .sync import LinkedInSyncService
 
 __all__ = [
     "LinkedInClient",

@@ -1,16 +1,18 @@
 """Token utilities for authentication.
 
 Provides JWT access token and opaque refresh token generation/validation.
+
+TODO #5 (2026-04-14): Added algorithm header validation to prevent algorithm confusion attacks
+TODO #10 (2026-04-14): Replace Optional with | None syntax
 """
 
-import jwt
 import secrets
 from datetime import timedelta
-from typing import Optional
+
+import jwt
 
 from src.config import settings
 from src.utils.datetime_utils import utc_now
-
 
 # Token configuration
 ACCESS_TOKEN_EXPIRY_MINUTES = 60  # 1 hour
@@ -48,8 +50,22 @@ def verify_access_token(token: str) -> int | None:
 
     Returns:
         User ID if token is valid, None if invalid or expired
+
+    Security:
+        TODO #5 (2026-04-14): Validates algorithm header to prevent algorithm confusion attacks.
+        Only HS256 is accepted - rejects none/RS256/etc.
     """
     try:
+        # First, get the header without verification to check algorithm
+        # This allows us to validate the algorithm before full verification
+        header = jwt.get_unverified_header(token)
+
+        # TODO #5 (2026-04-14): Explicit algorithm header validation
+        # Prevent algorithm confusion attacks by rejecting anything other than HS256
+        if header.get("alg") != "HS256":
+            return None
+
+        # Now verify with strict algorithm enforcement
         payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=["HS256"])
         user_id = payload.get("sub")
         token_type = payload.get("type")
@@ -61,6 +77,9 @@ def verify_access_token(token: str) -> int | None:
     except jwt.ExpiredSignatureError:
         return None
     except jwt.InvalidTokenError:
+        return None
+    except Exception:
+        # Catch any other unexpected errors (malformed tokens, etc.)
         return None
 
 

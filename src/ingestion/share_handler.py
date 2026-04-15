@@ -1,20 +1,17 @@
 """Share handler for mobile share sheet integration."""
 
-from typing import Dict
-
 from src.ai.metadata_extractor import ContentMetadata, MetadataExtractor
-
 from src.ingestion.extractor import ContentExtractor
 
-from .share_types import ShareDataType, ShareData
+from .exceptions import InvalidShareDataError, UnsupportedShareTypeError
 from .share_processor import (
     BaseShareProcessor,
-    URLShareProcessor,
-    PlainTextProcessor,
     DeepLinkProcessor,
     ImageProcessor,
+    PlainTextProcessor,
+    URLShareProcessor,
 )
-from .exceptions import InvalidShareDataError, UnsupportedShareTypeError
+from .share_types import ShareData, ShareDataType
 from .utils import (
     DEEP_LINK_PATTERN,
     URL_DETECTION_PATTERN,
@@ -31,17 +28,15 @@ class ShareHandler:
         self,
         content_extractor: ContentExtractor,
         metadata_extractor: MetadataExtractor | None = None,
-        summarizer = None,
+        summarizer=None,
     ):
         """Initialize ShareHandler with required services."""
         self._content_extractor = content_extractor
         # Create metadata extractor if not provided
         self._metadata_extractor = metadata_extractor or MetadataExtractor()
         self._summarizer = summarizer
-        self._processors: Dict[ShareDataType, BaseShareProcessor] = {
-            ShareDataType.URL: URLShareProcessor(
-                content_extractor, self._metadata_extractor, summarizer
-            ),
+        self._processors: dict[ShareDataType, BaseShareProcessor] = {
+            ShareDataType.URL: URLShareProcessor(content_extractor, self._metadata_extractor, summarizer),
             ShareDataType.PLAIN_TEXT: PlainTextProcessor(),
             ShareDataType.DEEP_LINK: DeepLinkProcessor(),
             ShareDataType.IMAGE: ImageProcessor(),
@@ -88,10 +83,10 @@ class ShareHandler:
         """Route share data to appropriate processor."""
         try:
             return self._processors[share_data.data_type]
-        except KeyError:
+        except KeyError as e:
             raise UnsupportedShareTypeError(
                 f"No processor available for share type: {share_data.data_type.value}"
-            )
+            ) from e
 
     async def process_share(self, raw_data: dict) -> ContentMetadata:
         """Process incoming share data and return metadata."""

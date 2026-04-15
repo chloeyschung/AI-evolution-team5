@@ -9,6 +9,22 @@ onMounted(async () => {
   await contentStore.loadContent(1);
   await contentStore.loadPlatforms();
 });
+
+const handleDelete = async (id: number) => {
+  try {
+    await contentStore.deleteItem(id);
+  } catch (error) {
+    console.error('Delete failed:', error);
+  }
+};
+
+const handleSwipe = async (action: { content_id: number; action: 'keep' | 'discard' }) => {
+  try {
+    await contentStore.performSwipe(action);
+  } catch (error) {
+    console.error('Swipe failed:', error);
+  }
+};
 </script>
 
 <template>
@@ -23,6 +39,8 @@ onMounted(async () => {
         v-for="item in contentStore.items"
         :key="item.id"
         :content="item"
+        @delete="handleDelete"
+        @swipe="handleSwipe"
       />
     </div>
 

@@ -3,8 +3,9 @@
 import pytest
 from datetime import datetime
 
-from src.ai.metadata_extractor import MetadataExtractor, ContentMetadata, ContentType
+from src.ai.metadata_extractor import MetadataExtractor, ContentMetadata
 from src.ai.exceptions import InvalidURLError
+from src.constants import ContentType
 
 
 @pytest.fixture

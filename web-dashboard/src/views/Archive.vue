@@ -9,6 +9,14 @@ onMounted(async () => {
   contentStore.updateFilters({ status: 'archived' });
   await contentStore.loadContent(1);
 });
+
+const handleDelete = async (id: number) => {
+  try {
+    await contentStore.deleteItem(id);
+  } catch (error) {
+    console.error('Delete failed:', error);
+  }
+};
 </script>
 
 <template>
@@ -23,6 +31,7 @@ onMounted(async () => {
         v-for="item in contentStore.items"
         :key="item.id"
         :content="item"
+        @delete="handleDelete"
       />
     </div>
 

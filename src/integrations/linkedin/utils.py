@@ -1,11 +1,10 @@
 """Utility functions for LinkedIn integration."""
 
 import re
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 
-def parse_linkedin_date(date_str: str) -> Optional[datetime]:
+def parse_linkedin_date(date_str: str) -> datetime | None:
     """Parse LinkedIn date string to datetime.
 
     LinkedIn uses various date formats in their API.
@@ -23,21 +22,21 @@ def parse_linkedin_date(date_str: str) -> Optional[datetime]:
     if date_str.isdigit():
         try:
             timestamp = int(date_str) / 1000  # Convert ms to seconds
-            return datetime.fromtimestamp(timestamp, tz=timezone.utc)
+            return datetime.fromtimestamp(timestamp, tz=UTC)
         except (ValueError, OSError):
             return None
 
     # Try ISO format
     try:
         dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
     except ValueError:
         pass
 
     return None
 
 
-def extract_post_id_from_url(url: str) -> Optional[str]:
+def extract_post_id_from_url(url: str) -> str | None:
     """Extract post ID from LinkedIn URL.
 
     Args:

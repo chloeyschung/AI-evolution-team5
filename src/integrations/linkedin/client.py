@@ -1,33 +1,38 @@
 """LinkedIn API client with OAuth 2.0 support."""
 
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 import httpx
 
+from src.ingestion.extractor import ContentExtractor
+from src.utils.datetime_utils import utc_now
+from src.utils.http_client import async_client_context
+
 from ...ai.metadata_extractor import MetadataExtractor
 from .models import LinkedInPost, LinkedInSavedItem
-from src.utils.http_client import async_client_context
-from src.utils.datetime_utils import utc_now
 
 
 class LinkedInClientError(Exception):
     """Base exception for LinkedIn client errors."""
+
     pass
 
 
 class LinkedInAuthError(LinkedInClientError):
     """Authentication/authorization error."""
+
     pass
 
 
 class LinkedInRateLimitError(LinkedInClientError):
     """Rate limit exceeded error."""
+
     pass
 
 
 class LinkedInAPIError(LinkedInClientError):
     """General API error."""
+
     pass
 
 
@@ -37,7 +42,7 @@ class LinkedInClient:
     BASE_URL = "https://api.linkedin.com/v2"
     DEFAULT_LINKEDIN_URL = "https://www.linkedin.com"
 
-    def __init__(self, access_token: str, refresh_token: Optional[str] = None):
+    def __init__(self, access_token: str, refresh_token: str | None = None):
         """Initialize LinkedIn client.
 
         Args:
@@ -93,7 +98,7 @@ class LinkedInClient:
                 return self._parse_saved_items(data)
 
             except httpx.RequestError as e:
-                raise LinkedInAPIError(f"Request failed: {e}")
+                raise LinkedInAPIError(f"Request failed: {e}") from e
 
     def _parse_saved_items(self, data: dict) -> list[LinkedInSavedItem]:
         """Parse saved items from API response.
@@ -111,19 +116,17 @@ class LinkedInClient:
             try:
                 item = LinkedInSavedItem(
                     urn=element.get("urn", ""),
-                    saved_at=datetime.fromisoformat(
-                        element.get("savedAt", utc_now().isoformat())
-                    ).replace(tzinfo=timezone.utc),
+                    saved_at=datetime.fromisoformat(element.get("savedAt", utc_now().isoformat())).replace(tzinfo=UTC),
                     target_urn=element.get("target", {}).get("urn", ""),
                 )
                 items.append(item)
-            except (KeyError, ValueError) as e:
+            except (KeyError, ValueError):
                 # Skip malformed items
                 continue
 
         return items
 
-    async def get_post_from_url(self, url: str) -> Optional[LinkedInPost]:
+    async def get_post_from_url(self, url: str) -> LinkedInPost | None:
         """Extract post data from a LinkedIn URL.
 
         This method fetches the page and extracts metadata.
@@ -136,6 +139,10 @@ class LinkedInClient:
             LinkedInPost if found, None otherwise.
         """
         try:
+            # SSRF protection: validate URL before making request
+            extractor = ContentExtractor()
+            extractor._validate_url(url)
+
             # Use metadata extractor to get post data from HTML
             async with async_client_context() as client:
                 response = await client.get(url, timeout=30.0)
@@ -164,7 +171,7 @@ class LinkedInClient:
         except Exception:
             return None
 
-    def _extract_urn_from_url(self, url: str) -> Optional[str]:
+    def _extract_urn_from_url(self, url: str) -> str | None:
         """Extract LinkedIn URN from URL.
 
         Args:

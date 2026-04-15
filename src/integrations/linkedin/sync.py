@@ -1,15 +1,15 @@
 """LinkedIn sync service for Briefly."""
 
 import asyncio
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...ai.categorizer import Categorizer
-from ...ai.metadata_extractor import ContentMetadata, ContentType
+from ...ai.metadata_extractor import ContentMetadata
 from ...ai.summarizer import Summarizer
-from ...data.models import Provider, utc_now
+from ...constants import ContentType, Provider
+from ...data.models import utc_now
 from ...data.repository import ContentRepository, ContentTagRepository
 from ..repositories.integration import IntegrationRepository
 from .client import LinkedInClient, LinkedInClientError
@@ -27,7 +27,7 @@ class LinkedInSyncService:
     def __init__(
         self,
         db_session: AsyncSession,
-        summarizer: Optional[Summarizer] = None,
+        summarizer: Summarizer | None = None,
     ):
         """Initialize LinkedIn sync service.
 
@@ -42,7 +42,7 @@ class LinkedInSyncService:
         self._summarizer = summarizer
         self._categorizer = Categorizer(summarizer) if summarizer else None
 
-    async def create_client(self, user_id: int) -> Optional[LinkedInClient]:
+    async def create_client(self, user_id: int) -> LinkedInClient | None:
         """Create LinkedIn client with user's tokens.
 
         Args:
@@ -53,7 +53,7 @@ class LinkedInSyncService:
         """
         from .client import LinkedInClient
 
-        tokens = await self._integration_repo.get_oauth_tokens(user_id, self.PROVIDER)
+        tokens = await self._integration_repo.get_tokens(user_id, self.PROVIDER)
         if not tokens:
             return None
 
@@ -66,7 +66,7 @@ class LinkedInSyncService:
         self,
         user_id: int,
         client: LinkedInClient,
-        since: Optional[datetime] = None,
+        since: datetime | None = None,
     ) -> LinkedInSyncResult:
         """Sync saved posts from LinkedIn.
 
@@ -81,7 +81,6 @@ class LinkedInSyncService:
         Raises:
             LinkedInClientError: If sync fails due API error.
         """
-        from .client import LinkedInClient
 
         result = LinkedInSyncResult()
 
@@ -108,10 +107,12 @@ class LinkedInSyncService:
                     # Fetch post data from URL
                     post = await client.get_post_from_url(url)
                     if not post:
-                        result.errors.append({
-                            "urn": item.target_urn,
-                            "error": "Failed to fetch post data",
-                        })
+                        result.errors.append(
+                            {
+                                "urn": item.target_urn,
+                                "error": "Failed to fetch post data",
+                            }
+                        )
                         continue
 
                     # Process the post
@@ -119,16 +120,20 @@ class LinkedInSyncService:
                     if content_id is not None:
                         result.ingested += 1
                     else:
-                        result.errors.append({
-                            "urn": item.target_urn,
-                            "error": "Failed to process post",
-                        })
+                        result.errors.append(
+                            {
+                                "urn": item.target_urn,
+                                "error": "Failed to process post",
+                            }
+                        )
 
                 except Exception as e:
-                    result.errors.append({
-                        "urn": item.target_urn,
-                        "error": str(e),
-                    })
+                    result.errors.append(
+                        {
+                            "urn": item.target_urn,
+                            "error": str(e),
+                        }
+                    )
 
             # Update sync timestamp
             await self._integration_repo.update_last_sync(
@@ -142,16 +147,18 @@ class LinkedInSyncService:
             # Re-raise client errors (auth, rate limit, etc.)
             raise
         except Exception as e:
-            result.errors.append({
-                "error": f"Sync failed: {e}",
-            })
+            result.errors.append(
+                {
+                    "error": f"Sync failed: {e}",
+                }
+            )
 
         return result
 
     async def _process_post(
         self,
         post: LinkedInPost,
-    ) -> Optional[int]:
+    ) -> int | None:
         """Process a LinkedIn post and save to database.
 
         Extracted from sync_saved_posts and sync_single_post to avoid duplication.
@@ -221,7 +228,6 @@ class LinkedInSyncService:
         Returns:
             Dictionary with content_id and status.
         """
-        from .client import LinkedInClient
 
         # Check if already exists
         existing = await self._content_repo.get_by_url(url)

@@ -2,10 +2,12 @@
 import { ref } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';
+import { useContentStore } from '../../stores/content';
 
 const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
+const contentStore = useContentStore();
 
 const searchQuery = ref('');
 
@@ -22,6 +24,17 @@ const isActive = (path: string) => route.path === path;
 const handleLogout = async () => {
   await authStore.performLogout();
   router.push('/login');
+};
+
+// Debounced search
+let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+const handleSearch = () => {
+  if (searchTimeout) {
+    clearTimeout(searchTimeout);
+  }
+  searchTimeout = setTimeout(() => {
+    contentStore.performSearch(searchQuery.value);
+  }, 300);
 };
 </script>
 
@@ -50,6 +63,7 @@ const handleLogout = async () => {
       <div class="search-box">
         <input
           v-model="searchQuery"
+          @input="handleSearch"
           type="text"
           placeholder="Search..."
           class="search-input"

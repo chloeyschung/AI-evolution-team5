@@ -1,17 +1,17 @@
 """Share data processors for different content types."""
 
+import logging
 import re
 from abc import ABC, abstractmethod
-from typing import List
 
-from src.ai.metadata_extractor import ContentMetadata, ContentType
-from src.ai.metadata_extractor import MetadataExtractor
-from .share_types import ShareDataType, ShareData
+from src.ai.metadata_extractor import ContentMetadata, MetadataExtractor
+from src.constants import ContentType
+
 from .exceptions import (
-    InvalidShareDataError,
     DeepLinkValidationError,
     ImageProcessingError,
 )
+from .share_types import ShareData, ShareDataType
 from .utils import (
     URL_EXTRACTION_PATTERN,
     extract_scheme,
@@ -25,7 +25,7 @@ class BaseShareProcessor(ABC):
 
     @property
     @abstractmethod
-    def supported_types(self) -> List[ShareDataType]:
+    def supported_types(self) -> list[ShareDataType]:
         """Return list of share data types this processor handles."""
         pass
 
@@ -42,38 +42,32 @@ class URLShareProcessor(BaseShareProcessor):
         self,
         content_extractor,
         metadata_extractor: MetadataExtractor,
-        summarizer = None,
+        summarizer=None,
     ):
         self._content_extractor = content_extractor
         self._metadata_extractor = metadata_extractor
         self._summarizer = summarizer  # type: ignore[assignment]
 
     @property
-    def supported_types(self) -> List[ShareDataType]:
+    def supported_types(self) -> list[ShareDataType]:
         return [ShareDataType.URL]
 
     async def process(self, share_data: ShareData) -> ContentMetadata:
         url = validate_non_empty(share_data.content, "URL content is empty.")
 
-        # Extract text content
+        text_content = None
         try:
             text_content = await self._content_extractor.extract_text(url)
-        except Exception:
-            text_content = None
+        except Exception as e:
+            logging.warning(f"Failed to extract text content from {url}: {e}")
 
-        # Extract metadata with HTML content for richer metadata
         metadata = await self._metadata_extractor.extract_metadata(url, html_content=text_content)
 
-        # Generate summary if summarizer is available and text was extracted
-        summary = None
         if self._summarizer and text_content:
             try:
-                summary = await self._summarizer.summarize(text_content)
-            except Exception:
-                pass  # Summary generation failed, continue without summary
-
-        # Update metadata with summary
-        metadata.summary = summary
+                metadata.summary = await self._summarizer.summarize(text_content)
+            except Exception as e:
+                logging.warning(f"Failed to generate summary for {url}: {e}")
 
         return metadata
 
@@ -82,7 +76,7 @@ class PlainTextProcessor(BaseShareProcessor):
     """Process plain text share data."""
 
     @property
-    def supported_types(self) -> List[ShareDataType]:
+    def supported_types(self) -> list[ShareDataType]:
         return [ShareDataType.PLAIN_TEXT]
 
     async def process(self, share_data: ShareData) -> ContentMetadata:
@@ -127,7 +121,7 @@ class DeepLinkProcessor(BaseShareProcessor):
     SOCIAL_APPS = {"whatsapp", "telegram", "twitter", "facebook", "instagram"}
 
     @property
-    def supported_types(self) -> List[ShareDataType]:
+    def supported_types(self) -> list[ShareDataType]:
         return [ShareDataType.DEEP_LINK]
 
     async def process(self, share_data: ShareData) -> ContentMetadata:
@@ -177,7 +171,7 @@ class ImageProcessor(BaseShareProcessor):
     IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
 
     @property
-    def supported_types(self) -> List[ShareDataType]:
+    def supported_types(self) -> list[ShareDataType]:
         return [ShareDataType.IMAGE]
 
     async def process(self, share_data: ShareData) -> ContentMetadata:

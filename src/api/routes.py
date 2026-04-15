@@ -1,85 +1,104 @@
-"""API route handlers for content and swipe operations."""
+"""API route handlers for content and swipe operations.
+
+TODO #2 (2026-04-14): Race condition in _background_tasks - added asyncio.Lock for thread safety
+TODO #9 (2026-04-14): Replaced Union with | syntax throughout
+TODO #18 (2026-04-14): Standardized error message format using ErrorCode enum
+TODO #25 (2026-04-14): Move direct DB delete() calls to ContentRepository.delete_content()
+"""
 
 import asyncio
-from datetime import datetime, timezone
-from typing import Union
+import os
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
-
-from ..middleware.rate_limiter import limiter
+from fastapi import Request as FastAPIRequest
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Track background tasks for proper lifecycle management
-_background_tasks: set[asyncio.Task] = set()
-
 from src.ai.metadata_extractor import ContentMetadata
+from src.constants import ACCOUNT_DELETION_BLOCK_DAYS, ErrorCode, Provider
+from src.data.models import utc_now
 from src.ingestion.share_handler import ShareHandler
 
+from ..data.auth_repository import AuthenticationRepository
 from ..data.database import get_db
-from ..data.models import Content
+from ..data.models import (
+    Content,
+    ContentStatus,
+    ContentTag,
+    IntegrationSyncConfig,
+    SwipeHistory,
+)
 from ..data.repository import (
     ContentRepository,
+    ContentTagRepository,
     SwipeRepository,
     UserProfileRepository,
-    ContentTagRepository,
 )
-from ..data.auth_repository import AuthenticationRepository
+from ..services import ContentService, SwipeService
+from ..middleware.rate_limiter import limiter
 from .schemas import (
-    ContentCreate,
-    ContentResponse,
-    ContentDetailResponse,
-    SwipeHistoryResponse,
-    SwipeCreate,
-    SwipeResponse,
-    SwipeBatchRequest,
-    SwipeBatchResponse,
-    StatsResponse,
-    ShareRequest,
-    ShareResponse,
-    UserProfileResponse,
-    UserProfileUpdate,
-    UserPreferencesResponse,
-    UserPreferencesUpdate,
-    UserStatisticsResponse,
-    InterestTagRequest,
-    InterestTagResponse,
-    DeleteContentResponse,
-    PlatformCount,
-    ContentTagsResponse,
-    AuthStatusResponse,
-    TokenRefreshRequest,
-    TokenRefreshResponse,
-    GoogleLoginRequest,
-    GoogleLoginResponse,
-    LogoutResponse,
     AccountDeleteRequest,
     AccountDeleteResponse,
-    YouTubePlaylistResponse,
+    AchievementProgress,
+    AchievementsListResponse,
+    AchievementsStatsResponse,
+    AuthStatusResponse,
+    CheckAchievementsResponse,
+    ContentCreate,
+    ContentDetailResponse,
+    ContentResponse,
+    ContentStatusUpdate,
+    ContentTagsResponse,
+    DeleteContentResponse,
+    GoogleLoginRequest,
+    GoogleLoginResponse,
+    GoogleOAuthCodeRequest,
+    InterestTagRequest,
+    InterestTagResponse,
+    LinkedInConnectionStatus,
+    LinkedInDisconnectResponse,
+    LinkedInImportRequest,
+    LinkedInSyncLogResponse,
+    LogoutResponse,
+    NewAchievement,
+    PlatformCount,
+    ReminderPreferencesResponse,
+    ReminderPreferencesUpdate,
+    ReminderRespondRequest,
+    ReminderRespondResponse,
+    ReminderSuggestionResponse,
+    ShareRequest,
+    ShareResponse,
+    StatsResponse,
+    StreakStats,
+    SwipeBatchRequest,
+    SwipeBatchResponse,
+    SwipeCreate,
+    SwipeHistoryResponse,
+    SwipeResponse,
+    TokenRefreshRequest,
+    TokenRefreshResponse,
+    TrendFeedItem,
+    TrendFeedResponse,
+    UserPreferencesResponse,
+    UserPreferencesUpdate,
+    UserProfileResponse,
+    UserProfileUpdate,
+    UserStatisticsResponse,
     YouTubeConnectionStatus,
+    YouTubeDisconnectResponse,
+    YouTubePlaylistResponse,
     YouTubeSyncConfigCreate,
     YouTubeSyncConfigResponse,
     YouTubeSyncConfigUpdate,
     YouTubeSyncLogResponse,
-    YouTubeDisconnectResponse,
-    LinkedInConnectionStatus,
-    LinkedInSyncConfigCreate,
-    LinkedInSyncConfigResponse,
-    LinkedInSyncLogResponse,
-    LinkedInDisconnectResponse,
-    LinkedInImportRequest,
-    TrendFeedResponse,
-    TrendFeedItem,
-    AchievementsListResponse,
-    AchievementsStatsResponse,
-    CheckAchievementsResponse,
-    ReminderPreferencesResponse,
-    ReminderPreferencesUpdate,
-    ReminderSuggestionResponse,
-    ReminderRespondRequest,
-    ReminderRespondResponse,
 )
-from src.data.models import ContentStatus, Provider, IntegrationTokens, IntegrationSyncConfig, IntegrationSyncLog
+
+# Track background tasks for proper lifecycle management
+# TODO #2 (2026-04-14): Protected by _background_tasks_lock for thread safety
+_background_tasks: set[asyncio.Task] = set()
+_background_tasks_lock: asyncio.Lock = asyncio.Lock()
 
 router = APIRouter()
 
@@ -103,21 +122,21 @@ async def get_current_user(
     from src.auth.tokens import verify_access_token
 
     if not Authorization or not Authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="unauthorized")
+        raise HTTPException(status_code=401, detail=ErrorCode.UNAUTHORIZED)
 
     token = Authorization[7:]  # Remove "Bearer " prefix
 
     # First verify JWT signature
     user_id = verify_access_token(token)
     if user_id is None:
-        raise HTTPException(status_code=401, detail="unauthorized")
+        raise HTTPException(status_code=401, detail=ErrorCode.UNAUTHORIZED)
 
     # Then verify token exists in database (rotation check)
     auth_repo = AuthenticationRepository(db)
     token_record = await auth_repo.get_token_by_access_token(token)
 
     if not token_record:
-        raise HTTPException(status_code=401, detail="unauthorized")
+        raise HTTPException(status_code=401, detail=ErrorCode.UNAUTHORIZED)
 
     return token_record.user_id
 
@@ -125,19 +144,22 @@ async def get_current_user(
 @router.post("/content", status_code=201, response_model=ContentResponse)
 async def create_content(
     data: ContentCreate,
+    user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ContentResponse:
-    """Save new content metadata."""
-    metadata = ContentMetadata(
+    """Save new content metadata.
+
+    TODO #3 (2026-04-14): Added user_id parameter to associate content with authenticated user.
+    """
+    service = ContentService(db)
+    content = await service.create_content(
         platform=data.platform,
         content_type=data.content_type,
         url=data.url,
         title=data.title,
         author=data.author,
+        user_id=user_id,
     )
-
-    repo = ContentRepository(db)
-    content = await repo.save(metadata)
 
     return ContentResponse.from_content(content)
 
@@ -145,41 +167,38 @@ async def create_content(
 @router.get("/content", response_model=list[ContentResponse])
 async def list_content(
     limit: int = Query(50, gt=0, le=100),
+    user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[ContentResponse]:
-    """List all content."""
-    result = await db.execute(
-        select(Content).order_by(Content.created_at.desc()).limit(limit)
-    )
-    contents = result.scalars().all()
+    """List all content for the authenticated user."""
+    repo = ContentRepository(db)
+    contents = await repo.get_all_ordered(user_id=user_id, limit=limit)
 
     return [ContentResponse.from_content(c) for c in contents]
 
 
-@router.post("/swipe", status_code=201, response_model=Union[SwipeResponse, SwipeBatchResponse])
+@router.post("/swipe", status_code=201, response_model=SwipeResponse | SwipeBatchResponse)
 async def record_swipe(
-    data: Union[SwipeCreate, SwipeBatchRequest],
+    data: SwipeCreate | SwipeBatchRequest,
+    user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> Union[SwipeResponse, SwipeBatchResponse]:
+) -> SwipeResponse | SwipeBatchResponse:
     """Record a swipe action (single or batch)."""
-    repo = SwipeRepository(db)
+    service = SwipeService(db)
 
     if isinstance(data, SwipeBatchRequest):
         actions = [(a.content_id, a.action) for a in data.actions]
-        histories = await repo.record_swipes_batch(actions)
+        result = await service.record_swipes_batch(actions, user_id=user_id)
         return SwipeBatchResponse(
-            recorded=len(histories),
-            results=[
-                SwipeResponse(id=h.id, content_id=h.content_id, action=h.action.value)
-                for h in histories
-            ],
+            recorded=result.recorded,
+            results=[SwipeResponse(id=r.id, content_id=r.content_id, action=r.action.value) for r in result.results],
         )
     else:
-        history = await repo.record_swipe(data.content_id, data.action)
+        result = await service.record_swipe(data.content_id, data.action, user_id=user_id)
         return SwipeResponse(
-            id=history.id,
-            content_id=history.content_id,
-            action=history.action.value,
+            id=result.id,
+            content_id=result.content_id,
+            action=result.action.value,
         )
 
 
@@ -196,8 +215,8 @@ async def list_pending_content(
     Returns content ordered by recency (newest first).
     Optionally filter by platform and AI-generated tags.
     """
-    repo = ContentRepository(db)
-    contents = await repo.get_pending(user_id, limit=limit, platform=platform, tags=tags)
+    service = ContentService(db)
+    contents = await service.get_pending_content(user_id, limit=limit)
 
     return [ContentResponse.from_content(c) for c in contents]
 
@@ -248,14 +267,15 @@ async def list_discarded_content(
 @router.get("/content/{content_id}", response_model=ContentDetailResponse)
 async def get_content_detail(
     content_id: int,
+    user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ContentDetailResponse:
     """Get content detail with swipe history."""
     content_repo = ContentRepository(db)
     content = await content_repo.get_by_id(content_id)
 
-    if content is None:
-        raise HTTPException(status_code=404, detail=f"Content with ID {content_id} not found")
+    if content is None or content.user_id != user_id:
+        raise HTTPException(status_code=404, detail=f"{ErrorCode.CONTENT_NOT_FOUND}: {content_id}")
 
     swipe_repo = SwipeRepository(db)
     history = await swipe_repo.get_history(content_id)
@@ -285,14 +305,16 @@ async def get_content_detail(
 @router.patch("/content/{content_id}/status", response_model=ContentResponse)
 async def update_content_status(
     content_id: int,
-    data: dict,
+    data: ContentStatusUpdate,
+    user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ContentResponse:
     """Update content status (INBOX → ARCHIVED transition).
 
     Args:
         content_id: The content ID to update.
-        data: Dictionary with "status" field (must be "archived").
+        data: ContentStatusUpdate with "status" field.
+        user_id: Authenticated user ID.
         db: Database session.
 
     Returns:
@@ -303,15 +325,14 @@ async def update_content_status(
         400: Invalid status transition.
     """
     repo = ContentRepository(db)
-    new_status = ContentStatus(data.get("status", "archived"))
 
     try:
-        content = await repo.update_status(content_id, new_status)
+        content = await repo.update_status(content_id, data.status, user_id=user_id)
         return ContentResponse.from_content(content)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except RuntimeError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 # AI-003: Content Categorization endpoints
@@ -320,12 +341,14 @@ async def update_content_status(
 @router.get("/content/{content_id}/tags", response_model=ContentTagsResponse)
 async def get_content_tags(
     content_id: int,
+    user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ContentTagsResponse:
     """Get AI-generated tags for content.
 
     Args:
         content_id: The content ID.
+        user_id: Authenticated user ID.
         db: Database session.
 
     Returns:
@@ -334,12 +357,12 @@ async def get_content_tags(
     Raises:
         404: Content not found.
     """
-    # Check if content exists
+    # Check if content exists and belongs to user
     content_repo = ContentRepository(db)
     content = await content_repo.get_by_id(content_id)
 
-    if not content:
-        raise HTTPException(status_code=404, detail="content_not_found")
+    if not content or content.user_id != user_id:
+        raise HTTPException(status_code=404, detail=ErrorCode.CONTENT_NOT_FOUND)
 
     # Get tags
     tag_repo = ContentTagRepository(db)
@@ -351,6 +374,7 @@ async def get_content_tags(
 @router.post("/content/{content_id}/categorize", response_model=ContentTagsResponse)
 async def categorize_content(
     content_id: int,
+    user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ContentTagsResponse:
     """Trigger AI categorization for content.
@@ -359,6 +383,7 @@ async def categorize_content(
 
     Args:
         content_id: The content ID to categorize.
+        user_id: Authenticated user ID.
         db: Database session.
 
     Returns:
@@ -369,32 +394,27 @@ async def categorize_content(
     """
     from src.ai.categorizer import Categorizer
 
-    # Check if content exists and get title/summary
+    # Check if content exists and belongs to user
     content_repo = ContentRepository(db)
     content = await content_repo.get_by_id(content_id)
 
-    if not content:
-        raise HTTPException(status_code=404, detail="content_not_found")
+    if not content or content.user_id != user_id:
+        raise HTTPException(status_code=404, detail=ErrorCode.CONTENT_NOT_FOUND)
 
     # Initialize categorizer
     import os
+
     from src.ai.summarizer import Summarizer
 
     summarizer_api_key = os.getenv("ANTHROPIC_API_KEY")
     if not summarizer_api_key:
-        raise HTTPException(
-            status_code=500,
-            detail="anthropic_api_key_not_configured"
-        )
+        raise HTTPException(status_code=500, detail="anthropic_api_key_not_configured")
 
     summarizer = Summarizer(api_key=summarizer_api_key)
     categorizer = Categorizer(summarizer)
 
     # Generate tags
-    tags = await categorizer.generate_tags(
-        title=content.title or "",
-        summary=content.summary
-    )
+    tags = await categorizer.generate_tags(title=content.title or "", summary=content.summary)
 
     # Save tags to database
     tag_repo = ContentTagRepository(db)
@@ -410,6 +430,7 @@ async def categorize_content(
 async def delete_content(
     content_id: int,
     db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
 ) -> DeleteContentResponse:
     """Permanently delete content and associated swipe history.
 
@@ -425,37 +446,30 @@ async def delete_content(
     Raises:
         404: Content not found.
     """
-    from sqlalchemy import delete
 
     # Check if content exists
     content_repo = ContentRepository(db)
-    content = await content_repo.get_by_id(content_id)
 
-    if not content:
-        raise HTTPException(status_code=404, detail="content_not_found")
+    # Delete content and related records (handles foreign key constraints)
+    deleted = await content_repo.delete_content(content_id, user_id)
 
-    from ..data.models import ContentTag
-
-    # Delete associated records first (foreign key constraints)
-    await db.execute(delete(ContentTag).where(ContentTag.content_id == content_id))
-    await db.execute(delete(SwipeHistory).where(SwipeHistory.content_id == content_id))
-
-    # Delete content
-    await db.execute(delete(Content).where(Content.id == content_id))
-
-    await db.commit()
+    if not deleted:
+        raise HTTPException(status_code=404, detail=ErrorCode.CONTENT_NOT_FOUND)
 
     return DeleteContentResponse(message="Content deleted successfully")
 
 
 @router.get("/stats", response_model=StatsResponse)
-async def get_content_stats(db: AsyncSession = Depends(get_db)) -> StatsResponse:
-    """Get content statistics.
+async def get_content_stats(
+    user_id: int = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> StatsResponse:
+    """Get content statistics for the authenticated user.
 
     Returns counts of pending, kept, and discarded content.
     """
     repo = ContentRepository(db)
-    stats = await repo.get_stats()
+    stats = await repo.get_stats(user_id=user_id)
 
     return StatsResponse(
         pending=stats["pending"],
@@ -468,13 +482,16 @@ async def get_content_stats(db: AsyncSession = Depends(get_db)) -> StatsResponse
 
 
 @router.get("/platforms", response_model=list[PlatformCount])
-async def list_platforms(db: AsyncSession = Depends(get_db)) -> list[PlatformCount]:
+async def list_platforms(
+    user_id: int = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[PlatformCount]:
     """Get list of platforms user has saved content from.
 
     Returns platforms with content counts, sorted by count descending.
     """
     repo = ContentRepository(db)
-    platform_counts = await repo.get_platform_counts()
+    platform_counts = await repo.get_platform_counts(user_id=user_id)
 
     return [PlatformCount(platform=p, count=c) for p, c in platform_counts]
 
@@ -510,21 +527,14 @@ async def search_content(
     return [ContentResponse.from_content(c) for c in results]
 
 
-# Share handler dependency - initialized in app.py
-_share_handler: ShareHandler | None = None
+# Share handler dependency - initialized in app.py (Task #11: DI pattern)
+def get_share_handler(request: FastAPIRequest) -> ShareHandler:
+    """Get the share handler instance from app.state."""
 
-
-def _set_share_handler(handler: ShareHandler) -> None:
-    """Set the share handler instance for dependency injection."""
-    global _share_handler
-    _share_handler = handler
-
-
-def get_share_handler() -> ShareHandler:
-    """Get the share handler instance."""
-    if _share_handler is None:
+    share_handler = request.app.state.share_handler
+    if share_handler is None:
         raise RuntimeError("ShareHandler not initialized. Configure it in app.py.")
-    return _share_handler
+    return share_handler
 
 
 @limiter.limit("10/minute")  # Rate limit: 10 requests per minute per IP
@@ -532,12 +542,15 @@ def get_share_handler() -> ShareHandler:
 async def share_content(
     request: Request,
     data: ShareRequest,
+    user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     share_handler: ShareHandler = Depends(get_share_handler),
 ) -> ShareResponse:
     """Process shared content from mobile share sheet.
 
     Automatically extracts content, generates summary, and stores it.
+
+    TODO #3 (2026-04-14): Added user_id parameter to associate content with authenticated user.
     """
     # Process share data
     raw_payload = {
@@ -548,9 +561,9 @@ async def share_content(
 
     metadata = await share_handler.process_share(raw_payload)
 
-    # Save content using repository
+    # Save content using repository with user_id
     repo = ContentRepository(db)
-    content = await repo.save(metadata)
+    content = await repo.save(metadata, user_id=user_id)
 
     return ShareResponse(
         id=content.id,
@@ -568,13 +581,16 @@ async def share_content(
 
 
 @router.get("/profile", response_model=UserProfileResponse)
-async def get_profile(db: AsyncSession = Depends(get_db)) -> UserProfileResponse:
+async def get_profile(
+    user_id: int = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UserProfileResponse:
     """Get user profile.
 
     Auto-creates profile if it doesn't exist.
     """
     repo = UserProfileRepository(db)
-    profile = await repo.get_or_create_profile()
+    profile = await repo.get_or_create_profile(user_id=user_id)
 
     return UserProfileResponse(
         id=profile.id,
@@ -589,11 +605,13 @@ async def get_profile(db: AsyncSession = Depends(get_db)) -> UserProfileResponse
 @router.patch("/profile", response_model=UserProfileResponse)
 async def update_profile(
     data: UserProfileUpdate,
+    user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> UserProfileResponse:
     """Update user profile."""
     repo = UserProfileRepository(db)
     profile = await repo.update_profile(
+        user_id=user_id,
         display_name=data.display_name,
         avatar_url=data.avatar_url,
         bio=data.bio,
@@ -654,7 +672,10 @@ async def update_preferences(
 
 
 @router.get("/user/statistics", response_model=UserStatisticsResponse)
-async def get_user_statistics(db: AsyncSession = Depends(get_db)) -> UserStatisticsResponse:
+async def get_user_statistics(
+    user_id: int = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UserStatisticsResponse:
     """Get user statistics from swipe history.
 
     Returns aggregated metrics including swipe counts, retention rate, and streak.
@@ -718,7 +739,7 @@ async def remove_interest(
 @router.get("/auth/status", response_model=AuthStatusResponse)
 async def get_auth_status(
     db: AsyncSession = Depends(get_db),
-    authorization: str | None = None,
+    authorization: str | None = Header(None, alias="Authorization"),
 ) -> AuthStatusResponse:
     """Check current authentication status.
 
@@ -776,7 +797,7 @@ async def refresh_auth_token(
     refresh_result = await auth_repo.refresh_access_token(data.refresh_token)
 
     if not refresh_result:
-        raise HTTPException(status_code=401, detail="invalid_refresh_token")
+        raise HTTPException(status_code=401, detail=ErrorCode.INVALID_REFRESH_TOKEN)
 
     token_record, access_token = refresh_result
 
@@ -812,25 +833,23 @@ async def google_login(
         401: Invalid Google ID token.
         403: Account within 30-day re-registration block.
     """
-    from src.auth.google_oauth import verify_google_id_token, extract_user_info_from_token, GoogleTokenVerificationError
-    from src.data.repository import UserProfileRepository, AccountDeletionRepository
+    from src.auth.google_oauth import GoogleTokenVerificationError, verify_google_id_token
+    from src.config import settings
+    from src.data.repository import AccountDeletionRepository, UserProfileRepository
 
-    # Verify Google ID token
+    # Verify Google ID token with audience validation
     try:
-        token_info = await verify_google_id_token(data.google_id_token)
+        await verify_google_id_token(data.google_id_token, client_id=settings.GOOGLE_CLIENT_ID)
     except GoogleTokenVerificationError as e:
-        raise HTTPException(status_code=401, detail=f"invalid_google_token: {str(e)}")
+        raise HTTPException(status_code=401, detail=f"{ErrorCode.INVALID_GOOGLE_TOKEN}: {str(e)}") from e
 
-    # Extract user info
-    user_info = extract_user_info_from_token(token_info)
+    # Extract user info from request
     email = data.google_user_info.email
     google_sub = data.google_user_info.id
 
     # Check for 30-day re-registration block
     deletion_repo = AccountDeletionRepository(db)
-    is_blocked, block_expires_at = await deletion_repo.is_account_blocked(
-        email=email, google_sub=google_sub
-    )
+    is_blocked, block_expires_at = await deletion_repo.is_account_blocked(email=email, google_sub=google_sub)
 
     if is_blocked:
         raise HTTPException(
@@ -885,13 +904,128 @@ async def google_login(
     )
 
 
+@router.post("/auth/google/code", status_code=200, response_model=GoogleLoginResponse)
+async def google_login_with_code(
+    data: GoogleOAuthCodeRequest,
+    db: AsyncSession = Depends(get_db),
+) -> GoogleLoginResponse:
+    """Authenticate with Google OAuth code exchange (web flow).
+
+    This endpoint handles the full OAuth code exchange on the backend,
+    so the client secret never needs to be exposed to the frontend.
+
+    Handles:
+    - OAuth code → token exchange (backend with client_secret)
+    - New user registration (auto-create account)
+    - Existing user login (issue new tokens)
+    - 30-day re-registration block enforcement
+
+    Args:
+        data: OAuth code from Google redirect.
+        db: Database session.
+
+    Returns:
+        Access tokens and user info.
+
+    Raises:
+        400: Missing or invalid OAuth code.
+        401: Invalid Google token.
+        403: Account within 30-day re-registration block.
+    """
+    from src.auth.google_oauth import (
+        GoogleTokenVerificationError,
+        exchange_auth_code_for_tokens,
+    )
+    from src.config import settings
+    from src.data.repository import AccountDeletionRepository, UserProfileRepository
+
+    if not data.code:
+        raise HTTPException(status_code=400, detail="OAuth code is required")
+
+    # Exchange code for tokens (backend has client_secret)
+    try:
+        id_token, google_user_info = await exchange_auth_code_for_tokens(
+            code=data.code,
+            client_id=settings.GOOGLE_CLIENT_ID,
+            client_secret=settings.GOOGLE_CLIENT_SECRET,
+            redirect_uri=settings.GOOGLE_REDIRECT_URI,
+        )
+    except GoogleTokenVerificationError as e:
+        raise HTTPException(status_code=401, detail=f"{ErrorCode.INVALID_GOOGLE_TOKEN}: {str(e)}") from e
+
+    # Extract user info
+    email = google_user_info.get("email")
+    google_sub = google_user_info.get("sub") or google_user_info.get("id")
+
+    if not email or not google_sub:
+        raise HTTPException(status_code=401, detail="Missing email or user ID from Google")
+
+    # Check for 30-day re-registration block
+    deletion_repo = AccountDeletionRepository(db)
+    is_blocked, block_expires_at = await deletion_repo.is_account_blocked(
+        email=email, google_sub=google_sub
+    )
+
+    if is_blocked:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "account_restriction",
+                "message": "Account recently deleted. Please wait 30 days before re-registering.",
+                "available_at": block_expires_at.isoformat(),
+            },
+        )
+
+    # Check if user already exists
+    user_repo = UserProfileRepository(db)
+    existing_user = await user_repo.get_user_by_email(email)
+
+    if not existing_user:
+        # Check by google_sub as fallback
+        existing_user = await user_repo.get_user_by_google_sub(google_sub)
+
+    auth_repo = AuthenticationRepository(db)
+    is_new_user = False
+
+    if existing_user:
+        # Existing user: update last login
+        await user_repo.update_last_login(existing_user.id)
+    else:
+        # New user: create account
+        existing_user = await user_repo.create_user(
+            email=email,
+            google_sub=google_sub,
+            display_name=google_user_info.get("name"),
+            avatar_url=google_user_info.get("picture"),
+        )
+        is_new_user = True
+
+    # Create authentication tokens (returns tuple of record and plaintext JWT)
+    token_record, access_token = await auth_repo.create_tokens(existing_user.id)
+
+    return GoogleLoginResponse(
+        access_token=access_token,  # Plaintext JWT for client
+        refresh_token=token_record.refresh_token,
+        expires_at=token_record.expires_at.isoformat(),
+        user=UserProfileResponse(
+            id=existing_user.id,
+            display_name=existing_user.display_name,
+            avatar_url=existing_user.avatar_url,
+            bio=existing_user.bio,
+            created_at=existing_user.created_at.isoformat(),
+            updated_at=existing_user.updated_at.isoformat(),
+        ),
+        is_new_user=is_new_user,
+    )
+
+
 # AUTH-003: Logout endpoint
 
 
 @router.post("/auth/logout", response_model=LogoutResponse)
 async def logout(
     db: AsyncSession = Depends(get_db),
-    authorization: str | None = None,
+    user_id: int = Depends(get_current_user),
 ) -> LogoutResponse:
     """End current session and revoke tokens.
 
@@ -899,7 +1033,7 @@ async def logout(
 
     Args:
         db: Database session.
-        authorization: Authorization header with Bearer token.
+        user_id: Authenticated user ID.
 
     Returns:
         Logout confirmation.
@@ -907,20 +1041,8 @@ async def logout(
     Raises:
         401: Invalid or missing token.
     """
-    # Validate token and get user_id
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="unauthorized")
-
-    token = authorization[7:]  # Remove "Bearer " prefix
     auth_repo = AuthenticationRepository(db)
-
-    token_record = await auth_repo.get_token_by_access_token(token)
-    if not token_record:
-        raise HTTPException(status_code=401, detail="unauthorized")
-
-    # Revoke tokens
-    await auth_repo.revoke_token_by_user_id(token_record.user_id)
-
+    await auth_repo.revoke_token_by_user_id(user_id)
     return LogoutResponse(message="Logged out successfully")
 
 
@@ -931,7 +1053,7 @@ async def logout(
 async def delete_account(
     data: AccountDeleteRequest,
     db: AsyncSession = Depends(get_db),
-    authorization: str | None = None,
+    user_id: int = Depends(get_current_user),
 ) -> AccountDeleteResponse:
     """Permanently delete user account and all data.
 
@@ -952,7 +1074,7 @@ async def delete_account(
     Args:
         data: Account deletion request with confirmation.
         db: Database session.
-        authorization: Authorization header with Bearer token.
+        user_id: Authenticated user ID.
 
     Returns:
         Deletion confirmation with block expiry date.
@@ -964,10 +1086,9 @@ async def delete_account(
     from datetime import timedelta
     from secrets import token_urlsafe
 
-    from sqlalchemy import delete
+    from src.data.repository import AccountDeletionRepository
 
     from ..data.models import (
-        AccountDeletion,
         AuthenticationToken,
         Content,
         InterestTag,
@@ -976,28 +1097,13 @@ async def delete_account(
         UserProfile,
         utc_now,
     )
-    from src.data.repository import UserProfileRepository
-    from src.data.repository import AccountDeletionRepository
-
-    # Validate token and get user_id
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="unauthorized")
-
-    token = authorization[7:]  # Remove "Bearer " prefix
-    auth_repo = AuthenticationRepository(db)
-
-    token_record = await auth_repo.get_token_by_access_token(token)
-    if not token_record:
-        raise HTTPException(status_code=401, detail="unauthorized")
-
-    user_id = token_record.user_id
 
     # Get user profile
     result = await db.execute(select(UserProfile).where(UserProfile.id == user_id))
     user = result.scalar_one_or_none()
 
     if not user:
-        raise HTTPException(status_code=404, detail="user_not_found")
+        raise HTTPException(status_code=404, detail=ErrorCode.USER_NOT_FOUND)
 
     # Two-step confirmation logic
     if not data.confirm:
@@ -1009,37 +1115,58 @@ async def delete_account(
             },
         )
 
+    deletion_repo = AccountDeletionRepository(db)
+
     # Step 1: Generate confirmation token (if no token provided)
     if not data.confirmation_token:
-        # Return a confirmation token for step 2
+        # Generate and store confirmation token server-side
         confirmation_token = token_urlsafe(32)
-        # Store token in session (simplified: return it for client to send back)
-        return AccountDeleteResponse(
-            message="Confirmation token generated. Please confirm to proceed with deletion.",
-            block_expires_at=confirmation_token,  # Reuse field for token
+        now = utc_now()
+        block_expires_at = now + timedelta(days=ACCOUNT_DELETION_BLOCK_DAYS)
+
+        await deletion_repo.record_account_deletion(
+            email=user.email,  # type: ignore
+            google_sub=user.google_sub,  # type: ignore
+            block_days=ACCOUNT_DELETION_BLOCK_DAYS,
+            confirmation_token=confirmation_token,
         )
 
-    # Step 2: Confirm and delete
+        return AccountDeleteResponse(
+            message="Confirmation token generated. Please confirm to proceed with deletion.",
+            block_expires_at=block_expires_at.isoformat(),
+        )
+
+    # Step 2: Validate confirmation token
+    stored_token = await deletion_repo.get_confirmation_token(user.email)  # type: ignore
+    if stored_token is None or stored_token != data.confirmation_token:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_confirmation_token",
+                "message": "Invalid or expired confirmation token. Please request a new one.",
+            },
+        )
+
+    # Step 3: Proceed with deletion
     now = utc_now()
-    block_expires_at = now + timedelta(days=30)
+    block_expires_at = now + timedelta(days=ACCOUNT_DELETION_BLOCK_DAYS)
 
     # 1. Revoke tokens (already done by getting token, but ensure)
     await auth_repo.revoke_token_by_user_id(user_id)
 
-    # 2. Record account deletion (30-day block)
-    deletion_repo = AccountDeletionRepository(db)
+    # 2. Update account deletion record (remove confirmation token, set final block expiry)
     await deletion_repo.record_account_deletion(
         email=user.email,  # type: ignore
         google_sub=user.google_sub,  # type: ignore
-        block_days=30,
+        block_days=ACCOUNT_DELETION_BLOCK_DAYS,
+        confirmation_token=None,  # Clear the token
     )
 
-    # 3. Delete all user data (order matters for foreign keys)
-    # Note: Content and SwipeHistory don't have user_id (single-user MVP design)
+    # 3. Delete all user data (order matters for foreign key constraints)
     await db.execute(delete(UserPreferences).where(UserPreferences.user_id == user_id))
     await db.execute(delete(InterestTag).where(InterestTag.user_id == user_id))
-    await db.execute(delete(SwipeHistory).where(SwipeHistory.id.isnot(None)))  # All swipes (single-user system)
-    await db.execute(delete(Content).where(Content.id.isnot(None)))  # All content (single-user system)
+    await db.execute(delete(SwipeHistory).where(SwipeHistory.user_id == user_id))
+    await db.execute(delete(Content).where(Content.user_id == user_id))
     await db.execute(delete(AuthenticationToken).where(AuthenticationToken.user_id == user_id))
     await db.execute(delete(UserProfile).where(UserProfile.id == user_id))
 
@@ -1117,14 +1244,14 @@ async def list_youtube_playlists(
         401: Not connected to YouTube.
     """
     from src.integrations.repositories.integration import IntegrationRepository
-    from src.integrations.youtube.client import YouTubeClient, YouTubeAuthError
+    from src.integrations.youtube.client import YouTubeAuthError, YouTubeClient
 
     # Get YouTube tokens
     repo = IntegrationRepository(db)
     youtube_tokens = await repo.get_tokens(user_id, Provider.YOUTUBE.value)
 
     if not youtube_tokens:
-        raise HTTPException(status_code=401, detail="not_connected_to_youtube")
+        raise HTTPException(status_code=401, detail=ErrorCode.NOT_CONNECTED_TO_YOUTUBE)
 
     # Create YouTube client and fetch playlists
     client = YouTubeClient(
@@ -1135,10 +1262,10 @@ async def list_youtube_playlists(
 
     try:
         playlists = await client.get_playlists()
-    except YouTubeAuthError as e:
+    except YouTubeAuthError:
         # Token expired, delete it
         await repo.delete_tokens(user_id, Provider.YOUTUBE.value)
-        raise HTTPException(status_code=401, detail="youtube_auth_expired")
+        raise HTTPException(status_code=401, detail=ErrorCode.YOUTUBE_AUTH_EXPIRED) from None
 
     return [
         YouTubePlaylistResponse(
@@ -1180,7 +1307,7 @@ async def create_youtube_sync_config(
     youtube_tokens = await repo.get_tokens(user_id, Provider.YOUTUBE.value)
 
     if not youtube_tokens:
-        raise HTTPException(status_code=401, detail="not_connected_to_youtube")
+        raise HTTPException(status_code=401, detail=ErrorCode.NOT_CONNECTED_TO_YOUTUBE)
 
     # Create sync config
     config = await repo.save_sync_config(
@@ -1250,9 +1377,11 @@ async def list_youtube_sync_configs(
             playlist_name=c.playlist_name,
             sync_frequency=c.sync_frequency,
             is_active=c.is_active,
-            last_sync_at=db_config_map.get(c.playlist_id, {}).last_sync_at.isoformat()
-            if db_config_map.get(c.playlist_id) and db_config_map[c.playlist_id].last_sync_at
-            else None,
+            last_sync_at=(
+                db_config_map[c.playlist_id].last_sync_at.isoformat()
+                if c.playlist_id in db_config_map and db_config_map[c.playlist_id].last_sync_at
+                else None
+            ),
         )
         for c in configs
     ]
@@ -1293,7 +1422,7 @@ async def update_youtube_sync_config(
             break
 
     if not existing:
-        raise HTTPException(status_code=404, detail="sync_config_not_found")
+        raise HTTPException(status_code=404, detail=ErrorCode.SYNC_CONFIG_NOT_FOUND)
 
     # Update config
     new_name = data.playlist_name if data.playlist_name is not None else existing.playlist_name
@@ -1355,7 +1484,7 @@ async def delete_youtube_sync_config(
     deleted = await repo.delete_sync_config(user_id, Provider.YOUTUBE.value, playlist_id)
 
     if not deleted:
-        raise HTTPException(status_code=404, detail="sync_config_not_found")
+        raise HTTPException(status_code=404, detail=ErrorCode.SYNC_CONFIG_NOT_FOUND)
 
     return {"message": "Sync configuration deleted successfully"}
 
@@ -1420,18 +1549,18 @@ async def trigger_youtube_sync(
     Raises:
         401: Not authenticated or not connected to YouTube.
     """
+    from src.ai.summarizer import Summarizer
+    from src.data.repository import ContentRepository
     from src.integrations.repositories.integration import IntegrationRepository
     from src.integrations.youtube.client import YouTubeClient
     from src.integrations.youtube.sync import YouTubeSyncService
-    from src.ai.summarizer import Summarizer
-    from src.data.repository import ContentRepository
 
     # Get YouTube tokens
     integration_repo = IntegrationRepository(db)
     youtube_tokens = await integration_repo.get_tokens(user_id, Provider.YOUTUBE.value)
 
     if not youtube_tokens:
-        raise HTTPException(status_code=401, detail="not_connected_to_youtube")
+        raise HTTPException(status_code=401, detail=ErrorCode.NOT_CONNECTED_TO_YOUTUBE)
 
     # Create clients
     youtube_client = YouTubeClient(
@@ -1445,10 +1574,7 @@ async def trigger_youtube_sync(
     # Initialize summarizer with API key
     summarizer_api_key = os.getenv("ANTHROPIC_API_KEY")
     if not summarizer_api_key:
-        raise HTTPException(
-            status_code=500,
-            detail="anthropic_api_key_not_configured"
-        )
+        raise HTTPException(status_code=500, detail="anthropic_api_key_not_configured")
 
     summarizer = Summarizer(api_key=summarizer_api_key)
     sync_service = YouTubeSyncService(
@@ -1505,7 +1631,10 @@ async def trigger_youtube_sync(
     import logging
 
     async def background_task_wrapper():
-        """Wrapper to ensure exceptions don't crash the process."""
+        """Wrapper to ensure exceptions don't crash the process.
+
+        TODO #2 (2026-04-14): Uses _background_tasks_lock for thread-safe task management.
+        """
         current_task = asyncio.current_task()
         try:
             logging.info("YouTube sync background task started")
@@ -1515,11 +1644,15 @@ async def trigger_youtube_sync(
             # Log unhandled exceptions (should not happen due to do_sync try/except)
             logging.error(f"Uncaught exception in YouTube sync background task: {e}")
         finally:
+            # TODO #2 (2026-04-14): Thread-safe task removal using lock
             if current_task:
-                _background_tasks.discard(current_task)
+                async with _background_tasks_lock:
+                    _background_tasks.discard(current_task)
 
     task = asyncio.create_task(background_task_wrapper())
-    _background_tasks.add(task)
+    # TODO #2 (2026-04-14): Thread-safe task addition using lock
+    async with _background_tasks_lock:
+        _background_tasks.add(task)
     logging.info(f"YouTube sync background task scheduled (task id: {id(task)})")
 
     return {
@@ -1553,25 +1686,22 @@ async def connect_youtube(
     # Get OAuth credentials
     client_id = os.getenv("YOUTUBE_CLIENT_ID")
     if not client_id:
-        raise HTTPException(status_code=500, detail="youtube_oauth_not_configured")
+        raise HTTPException(status_code=500, detail=ErrorCode.YOUTUBE_OAUTH_NOT_CONFIGURED)
 
     # Build OAuth URL
     scope = "https://www.googleapis.com/auth/youtube.readonly"
     redirect_uri = os.getenv("YOUTUBE_REDIRECT_URI", "http://localhost:8000/api/v1/integrations/youtube/callback")
 
-    auth_url = (
-        "https://accounts.google.com/o/oauth2/v2/auth?"
-        + urlencode(
-            {
-                "client_id": client_id,
-                "redirect_uri": redirect_uri,
-                "response_type": "code",
-                "scope": scope,
-                "access_type": "offline",
-                "prompt": "consent",
-                "state": str(user_id),  # Use user_id as state
-            }
-        )
+    auth_url = "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(
+        {
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": scope,
+            "access_type": "offline",
+            "prompt": "consent",
+            "state": str(user_id),  # Use user_id as state
+        }
     )
 
     return {"auth_url": auth_url}
@@ -1609,21 +1739,19 @@ async def youtube_callback(
     try:
         user_id = int(state)
     except ValueError:
-        raise HTTPException(status_code=400, detail="invalid_state")
+        raise HTTPException(status_code=400, detail=ErrorCode.INVALID_STATE) from None
 
     # Get OAuth credentials
     client_id = os.getenv("YOUTUBE_CLIENT_ID")
     client_secret = os.getenv("YOUTUBE_CLIENT_SECRET")
 
     if not client_id or not client_secret:
-        raise HTTPException(status_code=500, detail="youtube_oauth_not_configured")
+        raise HTTPException(status_code=500, detail=ErrorCode.YOUTUBE_OAUTH_NOT_CONFIGURED)
 
-    redirect_uri = os.getenv(
-        "YOUTUBE_REDIRECT_URI", "http://localhost:8000/api/v1/integrations/youtube/callback"
-    )
+    redirect_uri = os.getenv("YOUTUBE_REDIRECT_URI", "http://localhost:8000/api/v1/integrations/youtube/callback")
 
     # Exchange code for tokens
-    async with async_client_context() as client:
+    async with httpx.AsyncClient() as client:
         response = await client.post(
             "https://oauth2.googleapis.com/token",
             data={
@@ -1637,7 +1765,7 @@ async def youtube_callback(
         )
 
     if response.status_code != 200:
-        raise HTTPException(status_code=400, detail="youtube_auth_failed")
+        raise HTTPException(status_code=400, detail=ErrorCode.YOUTUBE_AUTH_FAILED)
 
     token_data = response.json()
 
@@ -1678,7 +1806,6 @@ async def disconnect_youtube(
     Raises:
         401: Not authenticated.
     """
-    from sqlalchemy import delete
 
     from src.integrations.repositories.integration import IntegrationRepository
     from src.integrations.youtube.client import YouTubeClient
@@ -1766,7 +1893,6 @@ async def disconnect_linkedin(
     Raises:
         401: Not authenticated.
     """
-    from sqlalchemy import delete
 
     from src.integrations.repositories.integration import IntegrationRepository
 
@@ -1864,17 +1990,17 @@ async def import_linkedin_post(
     )
 
     if result.get("status") == "error":
-        raise HTTPException(status_code=400, detail=result.get("error", "failed_to_import"))
+        raise HTTPException(status_code=400, detail=result.get("error", ErrorCode.FAILED_TO_IMPORT))
 
     # Fetch the content for response
     content_id = result.get("content_id")
     if not content_id:
-        raise HTTPException(status_code=500, detail="failed_to_get_content_id")
+        raise HTTPException(status_code=500, detail=ErrorCode.FAILED_TO_GET_CONTENT_ID)
 
     content_repo = ContentRepository(db)
     content = await content_repo.get_by_id(content_id)
     if not content:
-        raise HTTPException(status_code=404, detail="content_not_found")
+        raise HTTPException(status_code=404, detail=ErrorCode.CONTENT_NOT_FOUND)
 
     return ShareResponse(
         id=content.id,
@@ -1900,9 +2026,7 @@ async def get_trend_feed(
         pattern="^(week|month|all)$",
         description="Time range filter: week, month, or all",
     ),
-    min_score: float = Query(
-        0.1, ge=0, le=1, description="Minimum relevance score threshold"
-    ),
+    min_score: float = Query(0.1, ge=0, le=1, description="Minimum relevance score threshold"),
     user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> TrendFeedResponse:
@@ -1985,9 +2109,7 @@ async def get_achievements(
 
     checker = AchievementChecker(db)
     stats = await checker._calculate_user_stats(user_id)
-    achievements = await checker._achievement_repo.get_achievements_with_progress(
-        user_id, stats
-    )
+    achievements = await checker._achievement_repo.get_achievements_with_progress(user_id, stats)
 
     # Filter by type if specified
     if achievement_type:
@@ -2013,7 +2135,6 @@ async def get_achievements_stats(
     from src.ai.achievement_checker import AchievementChecker
 
     checker = AchievementChecker(db)
-    stats = await checker._calculate_user_stats(user_id)
 
     # Get streak info
     streak = await checker._streak_repo.get_or_create_streak(user_id)
@@ -2024,11 +2145,7 @@ async def get_achievements_stats(
 
     total_unlocked = len(user_achievements)
     total_available = len(all_definitions)
-    completion_percent = (
-        int((total_unlocked / total_available) * 100)
-        if total_available > 0
-        else 0
-    )
+    completion_percent = int((total_unlocked / total_available) * 100) if total_available > 0 else 0
 
     # Build recent achievements list (last 5)
     recent = []
@@ -2147,7 +2264,6 @@ async def update_reminder_preferences(
     Returns:
         Updated reminder preferences
     """
-    from datetime import datetime
 
     from src.data.remind_repository import ReminderPreferenceRepository
 
@@ -2163,7 +2279,7 @@ async def update_reminder_preferences(
             time_parts = datetime.strptime(update.preferred_time, "%H:%M:%S").time()
             kwargs["preferred_time"] = datetime.combine(datetime.min, time_parts)
         except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid preferred_time format. Use HH:MM:SS")
+            raise HTTPException(status_code=400, detail=f"{ErrorCode.INVALID_TIME_FORMAT}: preferred_time") from None
     if update.frequency is not None:
         kwargs["frequency"] = update.frequency
     if update.quiet_hours_start is not None:
@@ -2171,13 +2287,13 @@ async def update_reminder_preferences(
             time_parts = datetime.strptime(update.quiet_hours_start, "%H:%M:%S").time()
             kwargs["quiet_hours_start"] = datetime.combine(datetime.min, time_parts)
         except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid quiet_hours_start format. Use HH:MM:SS")
+            raise HTTPException(status_code=400, detail=f"{ErrorCode.INVALID_TIME_FORMAT}: quiet_hours_start") from None
     if update.quiet_hours_end is not None:
         try:
             time_parts = datetime.strptime(update.quiet_hours_end, "%H:%M:%S").time()
             kwargs["quiet_hours_end"] = datetime.combine(datetime.min, time_parts)
         except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid quiet_hours_end format. Use HH:MM:SS")
+            raise HTTPException(status_code=400, detail=f"{ErrorCode.INVALID_TIME_FORMAT}: quiet_hours_end") from None
     if update.backlog_threshold is not None:
         kwargs["backlog_threshold"] = update.backlog_threshold
 

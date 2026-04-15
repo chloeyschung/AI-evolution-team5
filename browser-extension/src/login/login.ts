@@ -1,6 +1,24 @@
 import { storageManager } from '../shared/storage';
 
-interface LoginResponse {
+interface GoogleTokenResponse {
+  access_token: string;
+  id_token: string;
+  token_type: string;
+  expires_in: number;
+  scope: string;
+}
+
+interface GoogleUserInfoResponse {
+  id: string;
+  email: string;
+  name: string;
+  given_name?: string;
+  family_name?: string;
+  picture?: string;
+  email_verified: boolean;
+}
+
+interface BackendLoginResponse {
   access_token: string;
   refresh_token: string;
   expires_at: string;
@@ -23,7 +41,6 @@ async function handleLogin(): Promise<void> {
     // Get code from URL
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
-    const state = urlParams.get('state');
 
     if (!code) {
       throw new Error('Authorization code not found');
@@ -31,38 +48,87 @@ async function handleLogin(): Promise<void> {
 
     showLoading();
 
-    // Get API base URL from storage
-    const settings = await storageManager.getSettings();
-    const apiBaseUrl = settings.apiBaseUrl;
+    // Get Google Client ID from environment
+    const googleClientId = (window as any).__BRIEFLY_CONFIG?.GOOGLE_CLIENT_ID || '';
+    if (!googleClientId) {
+      throw new Error('Google Client ID not configured');
+    }
 
-    // Exchange code for tokens using the backend
-    const tokenResponse = await fetch(`${apiBaseUrl}/api/v1/auth/google/callback`, {
+    // Step 1: Exchange code for Google tokens (ID token)
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, state }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: googleClientId,
+        client_secret: '', // Not needed for public client
+        redirect_uri: chrome.runtime.getURL('login/login.html'),
+        grant_type: 'authorization_code',
+      }),
     });
 
     if (!tokenResponse.ok) {
-      const errorData = await tokenResponse.json();
-      throw new Error(errorData.detail || 'Token exchange failed');
+      throw new Error('Failed to exchange authorization code');
     }
 
-    const data: LoginResponse = await tokenResponse.json();
+    const googleTokens: GoogleTokenResponse = await tokenResponse.json();
 
-    // Store tokens
-    await storageManager.storeTokens({
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      expires_at: new Date(data.expires_at).getTime(),
+    // Step 2: Get user info from Google
+    const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${googleTokens.id_token}` },
     });
+
+    if (!userInfoResponse.ok) {
+      throw new Error('Failed to get user info');
+    }
+
+    const userInfo: GoogleUserInfoResponse = await userInfoResponse.json();
+
+    // Step 3: Get API base URL from storage
+    const settings = await storageManager.getSettings();
+    const apiBaseUrl = settings.apiBaseUrl;
+
+    // Step 4: Exchange Google ID token for backend tokens
+    const backendResponse = await fetch(`${apiBaseUrl}/api/v1/auth/google`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        google_id_token: googleTokens.id_token,
+        google_user_info: {
+          id: userInfo.id,
+          email: userInfo.email,
+          name: userInfo.name,
+          picture: userInfo.picture,
+        },
+      }),
+    });
+
+    if (!backendResponse.ok) {
+      const errorData = await backendResponse.json().catch(() => ({}));
+      throw new Error(errorData.detail || 'Login failed');
+    }
+
+    const backendData: BackendLoginResponse = await backendResponse.json();
+
+    // Step 5: Store tokens
+    await storageManager.storeTokens({
+      access_token: backendData.access_token,
+      refresh_token: backendData.refresh_token,
+      expires_at: new Date(backendData.expires_at).getTime(),
+    });
+
+    // Notify popup that login completed successfully
+    try {
+      chrome.runtime.sendMessage({ action: 'loginComplete' });
+    } catch (err) {
+      console.warn('Failed to send loginComplete message:', err);
+    }
 
     // Close this window and return to extension
     window.close();
 
     // If window can't be closed, show success message
-    setTimeout(() => {
-      showSuccess();
-    }, 1000);
+    setTimeout(showSuccess, 1000);
   } catch (error) {
     console.error('Login error:', error);
     showError(error instanceof Error ? error.message : 'Login failed');

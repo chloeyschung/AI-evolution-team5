@@ -1,6 +1,11 @@
-"""Base repository class with common patterns."""
+"""Base repository class with common patterns.
 
-from typing import Generic, Optional, TypeVar, Callable
+TODO #10 (2026-04-14): Removed Optional import - using | None syntax instead.
+"""
+
+from collections.abc import Callable
+from typing import TypeVar
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase
@@ -8,7 +13,7 @@ from sqlalchemy.orm import DeclarativeBase
 ModelType = TypeVar("ModelType", bound=DeclarativeBase)
 
 
-class BaseRepository(Generic[ModelType]):
+class BaseRepository[ModelType]:
     """Base repository providing common database operations.
 
     This class consolidates repeated patterns found across repositories:
@@ -35,9 +40,7 @@ class BaseRepository(Generic[ModelType]):
         Returns:
             Model instance if found, None otherwise.
         """
-        result = await self.session.execute(
-            select(model).where(model.id == id_value)
-        )
+        result = await self.session.execute(select(model).where(model.id == id_value))
         return result.scalar_one_or_none()
 
     async def _get_or_create_base(

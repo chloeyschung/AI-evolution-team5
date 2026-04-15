@@ -1,14 +1,14 @@
 """Achievement checker for gamified system (ADV-002)."""
 
 from datetime import date
-from typing import List
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..data.models import Content, SwipeAction, SwipeHistory, ContentStatus
 from ..data.achievement_repository import AchievementRepository, StreakRepository
+from ..data.models import Content, SwipeHistory
 from ..data.repository import ContentRepository, SwipeRepository
+from ..utils.datetime_utils import utc_now
 
 
 class AchievementChecker:
@@ -25,7 +25,7 @@ class AchievementChecker:
         self._content_repo = ContentRepository(db_session)
         self._swipe_repo = SwipeRepository(db_session)
 
-    async def check_and_award(self, user_id: int) -> List[dict]:
+    async def check_and_award(self, user_id: int) -> list[dict]:
         """Check all achievements and award newly unlocked ones.
 
         Args:
@@ -39,18 +39,10 @@ class AchievementChecker:
 
         # Check each achievement type
         new_achievements = []
-        new_achievements.extend(
-            await self._check_streak_achievements(user_id, stats)
-        )
-        new_achievements.extend(
-            await self._check_volume_achievements(user_id, stats)
-        )
-        new_achievements.extend(
-            await self._check_diversity_achievements(user_id, stats)
-        )
-        new_achievements.extend(
-            await self._check_curation_achievements(user_id, stats)
-        )
+        new_achievements.extend(await self._check_streak_achievements(user_id, stats))
+        new_achievements.extend(await self._check_volume_achievements(user_id, stats))
+        new_achievements.extend(await self._check_diversity_achievements(user_id, stats))
+        new_achievements.extend(await self._check_curation_achievements(user_id, stats))
 
         return new_achievements
 
@@ -84,7 +76,7 @@ class AchievementChecker:
             "kept_count": kept_count,
         }
 
-    async def _get_platform_count(self, swipe_history: List[SwipeHistory]) -> int:
+    async def _get_platform_count(self, swipe_history: list[SwipeHistory]) -> int:
         """Get count of unique platforms from swipe history.
 
         Args:
@@ -100,17 +92,13 @@ class AchievementChecker:
         content_ids = [swipe.content_id for swipe in swipe_history]
 
         # Query all content in one go
-        result = await self._swipe_repo.session.execute(
-            select(Content).where(Content.id.in_(content_ids))
-        )
+        result = await self._swipe_repo.session.execute(select(Content).where(Content.id.in_(content_ids)))
         contents = result.scalars().all()
 
-        platforms = set(content.platform for content in contents)
+        platforms = {content.platform for content in contents}
         return len(platforms)
 
-    async def _check_streak_achievements(
-        self, user_id: int, stats: dict
-    ) -> List[dict]:
+    async def _check_streak_achievements(self, user_id: int, stats: dict) -> list[dict]:
         """Check streak-based achievements.
 
         Args:
@@ -145,9 +133,7 @@ class AchievementChecker:
 
         return new_achievements
 
-    async def _check_volume_achievements(
-        self, user_id: int, stats: dict
-    ) -> List[dict]:
+    async def _check_volume_achievements(self, user_id: int, stats: dict) -> list[dict]:
         """Check volume-based achievements (total swipes).
 
         Args:
@@ -182,9 +168,7 @@ class AchievementChecker:
 
         return new_achievements
 
-    async def _check_diversity_achievements(
-        self, user_id: int, stats: dict
-    ) -> List[dict]:
+    async def _check_diversity_achievements(self, user_id: int, stats: dict) -> list[dict]:
         """Check diversity achievements (platform count).
 
         Args:
@@ -219,9 +203,7 @@ class AchievementChecker:
 
         return new_achievements
 
-    async def _check_curation_achievements(
-        self, user_id: int, stats: dict
-    ) -> List[dict]:
+    async def _check_curation_achievements(self, user_id: int, stats: dict) -> list[dict]:
         """Check curation achievements (kept count).
 
         Args:
@@ -256,19 +238,17 @@ class AchievementChecker:
 
         return new_achievements
 
-    async def update_streak_on_swipe(
-        self, user_id: int, activity_date: date | None = None
-    ) -> dict[str, int]:
+    async def update_streak_on_swipe(self, user_id: int, activity_date: date | None = None) -> dict[str, int]:
         """Update user's streak after a swipe action.
 
         Args:
             user_id: User ID
-            activity_date: Date of activity (defaults to today)
+            activity_date: Date of activity (defaults to UTC today)
 
         Returns:
             Dict with current_streak, longest_streak, total_active_days
         """
         if activity_date is None:
-            activity_date = date.today()
+            activity_date = utc_now().date()
 
         return await self._streak_repo.update_streak(user_id, activity_date)

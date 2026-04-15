@@ -1,17 +1,20 @@
-"""Repository for achievement-related operations (ADV-002)."""
+"""Repository for achievement-related operations (ADV-002).
+
+TODO #10 (2026-04-14): Removed Optional import - using | None syntax instead.
+"""
 
 from datetime import date, datetime
-from typing import List, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.utils.datetime_utils import utc_now
 
+from .base_repository import BaseRepository
 from .models import AchievementDefinition, UserAchievement, UserStreak
 
 
-class AchievementRepository:
+class AchievementRepository(BaseRepository[AchievementDefinition]):
     """Repository for achievement definitions and user achievements."""
 
     def __init__(self, db_session: AsyncSession):
@@ -20,11 +23,10 @@ class AchievementRepository:
         Args:
             db_session: Async database session.
         """
-        self._db = db_session
+        super().__init__(db_session)
+        self._db = db_session  # Keep for backward compatibility
 
-    async def get_all_definitions(
-        self, achievement_type: Optional[str] = None
-    ) -> List[AchievementDefinition]:
+    async def get_all_definitions(self, achievement_type: str | None = None) -> list[AchievementDefinition]:
         """Get all achievement definitions.
 
         Args:
@@ -33,7 +35,7 @@ class AchievementRepository:
         Returns:
             List of achievement definitions
         """
-        query = select(AchievementDefinition).where(AchievementDefinition.is_active == 1)
+        query = select(AchievementDefinition).where(AchievementDefinition.is_active)
 
         if achievement_type:
             query = query.where(AchievementDefinition.type == achievement_type)
@@ -43,7 +45,7 @@ class AchievementRepository:
         result = await self._db.execute(query)
         return result.scalars().all()
 
-    async def get_definition_by_key(self, key: str) -> Optional[AchievementDefinition]:
+    async def get_definition_by_key(self, key: str) -> AchievementDefinition | None:
         """Get achievement definition by key.
 
         Args:
@@ -52,12 +54,10 @@ class AchievementRepository:
         Returns:
             Achievement definition or None
         """
-        result = await self._db.execute(
-            select(AchievementDefinition).where(AchievementDefinition.key == key)
-        )
+        result = await self._db.execute(select(AchievementDefinition).where(AchievementDefinition.key == key))
         return result.scalar_one_or_none()
 
-    async def get_user_achievements(self, user_id: int) -> List[UserAchievement]:
+    async def get_user_achievements(self, user_id: int) -> list[UserAchievement]:
         """Get all unlocked achievements for a user.
 
         Args:
@@ -74,9 +74,7 @@ class AchievementRepository:
         )
         return result.scalars().all()
 
-    async def get_user_achievement(
-        self, user_id: int, achievement_id: int
-    ) -> Optional[UserAchievement]:
+    async def get_user_achievement(self, user_id: int, achievement_id: int) -> UserAchievement | None:
         """Get specific achievement for a user.
 
         Args:
@@ -95,8 +93,8 @@ class AchievementRepository:
         return result.scalar_one_or_none()
 
     async def award_achievement(
-        self, user_id: int, achievement_id: int, metadata: Optional[dict] = None
-    ) -> Optional[UserAchievement]:
+        self, user_id: int, achievement_id: int, metadata: dict | None = None
+    ) -> UserAchievement | None:
         """Award an achievement to a user (idempotent).
 
         Args:
@@ -129,7 +127,7 @@ class AchievementRepository:
         self,
         user_id: int,
         stats: dict,
-    ) -> List[dict]:
+    ) -> list[dict]:
         """Get all achievements with unlock status and progress.
 
         Args:
@@ -173,9 +171,7 @@ class AchievementRepository:
 
         return result
 
-    def _calculate_progress(
-        self, definition: AchievementDefinition, stats: dict
-    ) -> tuple[int, int]:
+    def _calculate_progress(self, definition: AchievementDefinition, stats: dict) -> tuple[int, int]:
         """Calculate progress for an achievement.
 
         Args:
@@ -202,7 +198,7 @@ class AchievementRepository:
         return current, percent
 
 
-class StreakRepository:
+class StreakRepository(BaseRepository[UserStreak]):
     """Repository for user streak tracking."""
 
     def __init__(self, db_session: AsyncSession):
@@ -211,7 +207,8 @@ class StreakRepository:
         Args:
             db_session: Async database session.
         """
-        self._db = db_session
+        super().__init__(db_session)
+        self._db = db_session  # Keep for backward compatibility
 
     async def get_or_create_streak(self, user_id: int) -> UserStreak:
         """Get or create user streak record.
@@ -222,9 +219,7 @@ class StreakRepository:
         Returns:
             User streak record
         """
-        result = await self._db.execute(
-            select(UserStreak).where(UserStreak.user_id == user_id)
-        )
+        result = await self._db.execute(select(UserStreak).where(UserStreak.user_id == user_id))
         streak = result.scalar_one_or_none()
 
         if not streak:
@@ -239,9 +234,7 @@ class StreakRepository:
 
         return streak
 
-    async def update_streak(
-        self, user_id: int, activity_date: date
-    ) -> dict[str, int]:
+    async def update_streak(self, user_id: int, activity_date: date) -> dict[str, int]:
         """Update streak for user's activity on a given date.
 
         Args:
@@ -255,7 +248,11 @@ class StreakRepository:
 
         # Check if already recorded for today
         if streak.last_activity_date:
-            last_date = streak.last_activity_date.date() if hasattr(streak.last_activity_date, 'date') else streak.last_activity_date
+            last_date = (
+                streak.last_activity_date.date()
+                if hasattr(streak.last_activity_date, "date")
+                else streak.last_activity_date
+            )
             if last_date == activity_date:
                 # Already recorded today
                 return {
@@ -282,9 +279,7 @@ class StreakRepository:
             "total_active_days": streak.total_active_days,
         }
 
-    def _calculate_new_streak(
-        self, streak: UserStreak, activity_date: date
-    ) -> int:
+    def _calculate_new_streak(self, streak: UserStreak, activity_date: date) -> int:
         """Calculate new streak value based on previous activity.
 
         Args:
@@ -298,7 +293,11 @@ class StreakRepository:
             # First activity
             return 1
 
-        last_date = streak.last_activity_date.date() if hasattr(streak.last_activity_date, 'date') else streak.last_activity_date
+        last_date = (
+            streak.last_activity_date.date()
+            if hasattr(streak.last_activity_date, "date")
+            else streak.last_activity_date
+        )
         days_diff = (activity_date - last_date).days
 
         if days_diff == 1:

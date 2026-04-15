@@ -5,7 +5,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import AchievementDefinition
 
-
 ACHIEVEMENT_DEFINITIONS = [
     # Streak achievements
     {

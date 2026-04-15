@@ -30,6 +30,22 @@
   --border-color: #374151;
 }
 
+/* System preference: dark mode */
+@media (prefers-color-scheme: dark) {
+  [data-theme='system'],
+  [data-theme]:not([data-theme]) {
+    --bg-primary: #111827;
+    --bg-secondary: #1f2937;
+    --bg-tertiary: #374151;
+
+    --text-primary: #f9fafb;
+    --text-secondary: #d1d5db;
+    --text-tertiary: #9ca3af;
+
+    --border-color: #374151;
+  }
+}
+
 /* Reset & Base */
 *,
 *::before,

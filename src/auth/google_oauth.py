@@ -1,13 +1,15 @@
 """Google OAuth utilities for authentication.
 
 Provides Google ID token verification and user info extraction.
+
+TODO #10 (2026-04-14): Removed Optional import - using | None syntax instead.
 """
 
+from typing import Any
+
 import httpx
-from typing import Optional, Dict, Any
 
 from src.utils.http_client import async_client_context
-
 
 # Google OAuth configuration
 GOOGLE_TOKEN_INFO_URL = "https://oauth2.googleapis.com/tokeninfo"
@@ -16,20 +18,23 @@ GOOGLE_USER_INFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
 
 class GoogleOAuthError(Exception):
     """Base exception for Google OAuth errors."""
+
     pass
 
 
 class GoogleTokenVerificationError(GoogleOAuthError):
     """Raised when Google ID token verification fails."""
+
     pass
 
 
 class GoogleUserInfoError(GoogleOAuthError):
     """Raised when fetching Google user info fails."""
+
     pass
 
 
-async def verify_google_id_token(id_token: str, client_id: str | None = None) -> Dict[str, Any]:
+async def verify_google_id_token(id_token: str, client_id: str | None = None) -> dict[str, Any]:
     """Verify Google ID token and return decoded claims.
 
     Args:
@@ -51,27 +56,23 @@ async def verify_google_id_token(id_token: str, client_id: str | None = None) ->
             response = await client.get(GOOGLE_TOKEN_INFO_URL, params=params, timeout=10.0)
 
             if response.status_code != 200:
-                raise GoogleTokenVerificationError(
-                    f"Google token verification failed: {response.status_code}"
-                )
+                raise GoogleTokenVerificationError(f"Google token verification failed: {response.status_code}")
 
             token_info = response.json()
 
             # Check for error in response
             if "error" in token_info:
-                raise GoogleTokenVerificationError(
-                    f"Google token verification error: {token_info['error']}"
-                )
+                raise GoogleTokenVerificationError(f"Google token verification error: {token_info['error']}")
 
             return token_info
 
     except httpx.HTTPError as e:
-        raise GoogleTokenVerificationError(f"Failed to verify Google token: {e}")
+        raise GoogleTokenVerificationError(f"Failed to verify Google token: {e}") from e
     except ValueError as e:
-        raise GoogleTokenVerificationError(f"Invalid Google token response: {e}")
+        raise GoogleTokenVerificationError(f"Invalid Google token response: {e}") from e
 
 
-async def get_google_user_info(access_token: str) -> Dict[str, Any]:
+async def get_google_user_info(access_token: str) -> dict[str, Any]:
     """Fetch user info from Google using access token.
 
     Args:
@@ -90,19 +91,17 @@ async def get_google_user_info(access_token: str) -> Dict[str, Any]:
             response = await client.get(GOOGLE_USER_INFO_URL, headers=headers, timeout=10.0)
 
             if response.status_code != 200:
-                raise GoogleUserInfoError(
-                    f"Google user info fetch failed: {response.status_code}"
-                )
+                raise GoogleUserInfoError(f"Google user info fetch failed: {response.status_code}")
 
             return response.json()
 
     except httpx.HTTPError as e:
-        raise GoogleUserInfoError(f"Failed to fetch Google user info: {e}")
+        raise GoogleUserInfoError(f"Failed to fetch Google user info: {e}") from e
     except ValueError as e:
-        raise GoogleUserInfoError(f"Invalid Google user info response: {e}")
+        raise GoogleUserInfoError(f"Invalid Google user info response: {e}") from e
 
 
-def extract_user_info_from_token(token_info: Dict[str, Any]) -> Dict[str, Any]:
+def extract_user_info_from_token(token_info: dict[str, Any]) -> dict[str, Any]:
     """Extract user info from verified Google token info.
 
     Args:
@@ -125,3 +124,72 @@ def extract_user_info_from_token(token_info: Dict[str, Any]) -> Dict[str, Any]:
         "given_name": token_info.get("given_name"),
         "family_name": token_info.get("family_name"),
     }
+
+
+async def exchange_auth_code_for_tokens(
+    code: str,
+    client_id: str,
+    client_secret: str,
+    redirect_uri: str,
+) -> tuple[str, dict[str, Any]]:
+    """Exchange OAuth authorization code for Google tokens.
+
+    This is the web OAuth flow where the backend handles the token exchange
+    using client_secret (which should never be exposed to the frontend).
+
+    Args:
+        code: Authorization code from Google OAuth
+        client_id: Google OAuth client ID
+        client_secret: Google OAuth client secret (backend only)
+        redirect_uri: OAuth redirect URI
+
+    Returns:
+        Tuple of (id_token, user_info_dict)
+
+    Raises:
+        GoogleTokenVerificationError: If code exchange fails
+    """
+    GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+
+    try:
+        async with async_client_context() as client:
+            response = await client.post(
+                GOOGLE_TOKEN_URL,
+                data={
+                    "code": code,
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "redirect_uri": redirect_uri,
+                    "grant_type": "authorization_code",
+                },
+                timeout=10.0,
+            )
+
+            if response.status_code != 200:
+                raise GoogleTokenVerificationError(
+                    f"Google code exchange failed: {response.status_code}"
+                )
+
+            token_data = response.json()
+
+            # Check for error in response
+            if "error" in token_data:
+                raise GoogleTokenVerificationError(
+                    f"Google code exchange error: {token_data['error']}"
+                )
+
+            id_token = token_data.get("id_token")
+            access_token = token_data.get("access_token")
+
+            if not id_token:
+                raise GoogleTokenVerificationError("No ID token in Google response")
+
+            # Get user info using the access token
+            user_info = await get_google_user_info(access_token)
+
+            return id_token, user_info
+
+    except httpx.HTTPError as e:
+        raise GoogleTokenVerificationError(f"Failed to exchange OAuth code: {e}") from e
+    except ValueError as e:
+        raise GoogleTokenVerificationError(f"Invalid Google token response: {e}") from e

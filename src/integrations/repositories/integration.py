@@ -1,16 +1,20 @@
-"""Repository for integration state management."""
+"""Repository for integration state management.
 
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+TODO #10 (2026-04-14): Removed Optional import - using | None syntax instead.
+TODO #12 (2026-04-14): Extracted common patterns using upsert pattern
+TODO #13 (2026-04-14): Moved magic numbers to constants.py
+"""
 
-from sqlalchemy import delete, select, update
+from datetime import UTC, datetime, timedelta
+
+from sqlalchemy import delete, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.constants import DAILY_SYNC_THRESHOLD, HOURLY_SYNC_THRESHOLD, WEEKLY_SYNC_THRESHOLD
 from src.data.models import (
     IntegrationSyncConfig,
     IntegrationSyncLog,
     IntegrationTokens,
-    Provider,
 )
 from src.integrations.youtube.models import SyncConfig, SyncLog
 
@@ -48,30 +52,33 @@ class IntegrationRepository:
         Returns:
             Saved IntegrationTokens record.
         """
-        # Delete any existing tokens for this user/provider
-        await self.session.execute(
-            delete(IntegrationTokens).where(
-                IntegrationTokens.user_id == user_id,
-                IntegrationTokens.provider == provider,
+        # Check if record exists
+        existing = await self.get_tokens(user_id, provider)
+
+        if existing:
+            # Update existing record with encrypted tokens
+            from src.utils.token_encryption import encrypt_token
+
+            existing.access_token = encrypt_token(access_token)
+            existing.refresh_token = encrypt_token(refresh_token)
+            existing.expires_at = expires_at
+            existing.updated_at = datetime.now(UTC)
+            await self.session.flush()
+            return existing
+        else:
+            # Create new record with encryption
+            token_record = IntegrationTokens.with_encrypted_tokens(
+                user_id=user_id,
+                provider=provider,
+                access_token=access_token,
+                refresh_token=refresh_token,
+                expires_at=expires_at,
             )
-        )
+            self.session.add(token_record)
+            await self.session.flush()
+            return token_record
 
-        # Insert new tokens with encryption
-        token_record = IntegrationTokens.with_encrypted_tokens(
-            user_id=user_id,
-            provider=provider,
-            access_token=access_token,
-            refresh_token=refresh_token,
-            expires_at=expires_at,
-        )
-        self.session.add(token_record)
-        await self.session.flush()
-
-        return token_record
-
-    async def get_tokens(
-        self, user_id: int, provider: str
-    ) -> Optional[IntegrationTokens]:
+    async def get_tokens(self, user_id: int, provider: str) -> IntegrationTokens | None:
         """Get OAuth tokens for a user.
 
         Args:
@@ -131,40 +138,51 @@ class IntegrationRepository:
         Returns:
             Saved IntegrationSyncConfig record.
         """
-        # Check if config exists
-        result = await self.session.execute(
-            select(IntegrationSyncConfig).where(
-                IntegrationSyncConfig.user_id == user_id,
-                IntegrationSyncConfig.provider == provider,
-                IntegrationSyncConfig.resource_id == playlist_id,
-            )
-        )
-        existing = result.scalar_one_or_none()
+        # Check if record exists
+        existing = await self.get_sync_config(user_id, provider, playlist_id)
 
         if existing:
-            # Update existing
+            # Update existing record
             existing.resource_name = playlist_name
             existing.sync_frequency = sync_frequency
-            existing.is_active = 1 if is_active else 0
+            existing.is_active = is_active
             await self.session.flush()
             return existing
         else:
-            # Create new
+            # Create new record
             config = IntegrationSyncConfig(
                 user_id=user_id,
                 provider=provider,
                 resource_id=playlist_id,
                 resource_name=playlist_name,
                 sync_frequency=sync_frequency,
-                is_active=1 if is_active else 0,
+                is_active=is_active,
             )
             self.session.add(config)
             await self.session.flush()
             return config
 
-    async def get_sync_configs(
-        self, user_id: int, provider: str
-    ) -> list[SyncConfig]:
+    async def get_sync_config(self, user_id: int, provider: str, resource_id: str) -> IntegrationSyncConfig | None:
+        """Get sync configuration by user, provider, and resource.
+
+        Args:
+            user_id: User ID
+            provider: Provider name
+            resource_id: Resource ID
+
+        Returns:
+            IntegrationSyncConfig record or None.
+        """
+        result = await self.session.execute(
+            select(IntegrationSyncConfig).where(
+                IntegrationSyncConfig.user_id == user_id,
+                IntegrationSyncConfig.provider == provider,
+                IntegrationSyncConfig.resource_id == resource_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def get_sync_configs(self, user_id: int, provider: str) -> list[SyncConfig]:
         """Get all sync configs for a user and provider.
 
         Args:
@@ -194,9 +212,7 @@ class IntegrationRepository:
             for r in records
         ]
 
-    async def delete_sync_config(
-        self, user_id: int, provider: str, resource_id: str
-    ) -> bool:
+    async def delete_sync_config(self, user_id: int, provider: str, resource_id: str) -> bool:
         """Delete a sync configuration.
 
         Args:
@@ -234,24 +250,26 @@ class IntegrationRepository:
             sync_time: When sync completed
         """
         await self.session.execute(
-            select(IntegrationSyncConfig).where(
+            select(IntegrationSyncConfig)
+            .where(
                 IntegrationSyncConfig.user_id == user_id,
                 IntegrationSyncConfig.provider == provider,
                 IntegrationSyncConfig.resource_id == resource_id,
-            ).with_for_update()
+            )
+            .with_for_update()
         )
 
         await self.session.execute(
-            update(IntegrationSyncConfig).where(
+            update(IntegrationSyncConfig)
+            .where(
                 IntegrationSyncConfig.user_id == user_id,
                 IntegrationSyncConfig.provider == provider,
                 IntegrationSyncConfig.resource_id == resource_id,
-            ).values(last_sync_at=sync_time)
+            )
+            .values(last_sync_at=sync_time)
         )
 
-    async def get_last_sync(
-        self, user_id: int, provider: str, resource_id: str
-    ) -> Optional[datetime]:
+    async def get_last_sync(self, user_id: int, provider: str, resource_id: str) -> datetime | None:
         """Get the last sync timestamp for a resource.
 
         Args:
@@ -281,7 +299,7 @@ class IntegrationRepository:
         status: str,
         ingested_count: int,
         skipped_count: int,
-        error_message: Optional[str] = None,
+        error_message: str | None = None,
     ) -> IntegrationSyncLog:
         """Log a sync operation.
 
@@ -361,46 +379,27 @@ class IntegrationRepository:
         Returns:
             List of IntegrationSyncConfig records due for sync.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
-        # Build conditions based on sync frequency
-        conditions = []
-
-        # Hourly: last_sync > 1 hour ago or None
-        hourly = (
-            (IntegrationSyncConfig.sync_frequency == "hourly")
-            & (
-                (IntegrationSyncConfig.last_sync_at < now - timedelta(hours=1))
-                | (IntegrationSyncConfig.last_sync_at == None)
-            )
+        # Build due conditions using CASE-like logic
+        # Each frequency has its own time threshold
+        hourly_due = (IntegrationSyncConfig.sync_frequency == "hourly") & (
+            (IntegrationSyncConfig.last_sync_at < now - timedelta(hours=HOURLY_SYNC_THRESHOLD))
+            | (IntegrationSyncConfig.last_sync_at.is_(None))
         )
-        conditions.append(hourly)
 
-        # Daily: last_sync > 24 hours ago or None
-        daily = (
-            (IntegrationSyncConfig.sync_frequency == "daily")
-            & (
-                (IntegrationSyncConfig.last_sync_at < now - timedelta(days=1))
-                | (IntegrationSyncConfig.last_sync_at == None)
-            )
+        daily_due = (IntegrationSyncConfig.sync_frequency == "daily") & (
+            (IntegrationSyncConfig.last_sync_at < now - timedelta(hours=DAILY_SYNC_THRESHOLD))
+            | (IntegrationSyncConfig.last_sync_at.is_(None))
         )
-        conditions.append(daily)
 
-        # Weekly: last_sync > 7 days ago or None
-        weekly = (
-            (IntegrationSyncConfig.sync_frequency == "weekly")
-            & (
-                (IntegrationSyncConfig.last_sync_at < now - timedelta(weeks=1))
-                | (IntegrationSyncConfig.last_sync_at == None)
-            )
+        weekly_due = (IntegrationSyncConfig.sync_frequency == "weekly") & (
+            (IntegrationSyncConfig.last_sync_at < now - timedelta(hours=WEEKLY_SYNC_THRESHOLD))
+            | (IntegrationSyncConfig.last_sync_at.is_(None))
         )
-        conditions.append(weekly)
 
         # Get active configs that are due
         result = await self.session.execute(
-            select(IntegrationSyncConfig).where(
-                (IntegrationSyncConfig.is_active == 1)
-                & (hourly | daily | weekly)
-            )
+            select(IntegrationSyncConfig).where(IntegrationSyncConfig.is_active & (hourly_due | daily_due | weekly_due))
         )
         return result.scalars().all()

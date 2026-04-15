@@ -1,14 +1,15 @@
 import { AuthTokens, AuthStatus, GoogleLoginRequest, GoogleLoginResponse } from './types';
 import { storageManager } from './storage';
-import { apiClient } from './api';
 
 const ACCESS_TOKEN_EXPIRY_BUFFER = 5 * 60 * 1000; // 5 minutes buffer
 
 export class AuthManager {
   private tokens: AuthTokens | null = null;
+  private refreshPromise: Promise<AuthTokens> | null = null;
 
   async initialize(): Promise<void> {
     this.tokens = await storageManager.getTokens();
+    this.refreshPromise = null;
   }
 
   async isAuthenticated(): Promise<boolean> {
@@ -22,7 +23,8 @@ export class AuthManager {
       if (!tokens) return { is_authenticated: false };
 
       const token = await this.getAccessToken();
-      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/status`, {
+      const apiBaseUrl = await this.getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/api/v1/auth/status`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -52,43 +54,58 @@ export class AuthManager {
   }
 
   async refreshToken(): Promise<AuthTokens> {
+    // Deduplicate concurrent refresh calls
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
     const tokens = await storageManager.getTokens();
     if (!tokens || !tokens.refresh_token) {
       throw new Error('No refresh token available');
     }
 
-    try {
-      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: tokens.refresh_token })
-      });
+    const apiBaseUrl = await this.getApiBaseUrl();
 
-      if (!response.ok) {
-        throw new Error('Token refresh failed');
+    this.refreshPromise = (async () => {
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/v1/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: tokens.refresh_token })
+        });
+
+        if (!response.ok) {
+          throw new Error('Token refresh failed');
+        }
+
+        const data = await response.json();
+        const newTokens: AuthTokens = {
+          access_token: data.access_token,
+          refresh_token: data.refresh_token || tokens.refresh_token,
+          expires_at: new Date(data.expires_at).getTime(),
+        };
+
+        await storageManager.storeTokens(newTokens);
+        this.tokens = newTokens;
+        return newTokens;
+      } catch (error) {
+        console.error('Error refreshing token:', error);
+        await storageManager.clearTokens();
+        this.tokens = null;
+        throw error;
+      } finally {
+        this.refreshPromise = null;
       }
+    })();
 
-      const data = await response.json();
-      const newTokens: AuthTokens = {
-        access_token: data.access_token,
-        refresh_token: data.refresh_token || tokens.refresh_token,
-        expires_at: new Date(data.expires_at).getTime(),
-      };
-
-      await storageManager.storeTokens(newTokens);
-      this.tokens = newTokens;
-      return newTokens;
-    } catch (error) {
-      console.error('Error refreshing token:', error);
-      await storageManager.clearTokens();
-      this.tokens = null;
-      throw error;
-    }
+    return this.refreshPromise;
   }
 
   async loginWithGoogle(idToken: string, userInfo: GoogleLoginRequest['google_user_info']): Promise<void> {
+    const apiBaseUrl = await this.getApiBaseUrl();
+
     try {
-      const response = await fetch(`${this.getApiBaseUrl()}/api/v1/auth/google`, {
+      const response = await fetch(`${apiBaseUrl}/api/v1/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -117,10 +134,12 @@ export class AuthManager {
   }
 
   async logout(): Promise<void> {
+    const apiBaseUrl = await this.getApiBaseUrl();
+
     try {
       const token = await storageManager.getTokens();
       if (token?.access_token) {
-        await fetch(`${this.getApiBaseUrl()}/api/v1/auth/logout`, {
+        await fetch(`${apiBaseUrl}/api/v1/auth/logout`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token.access_token}` }
         });
@@ -133,9 +152,9 @@ export class AuthManager {
     }
   }
 
-  private getApiBaseUrl(): string {
-    const settings = storageManager.getSettings();
-    return settings.then(s => s.apiBaseUrl);
+  private async getApiBaseUrl(): Promise<string> {
+    const settings = await storageManager.getSettings();
+    return settings.apiBaseUrl;
   }
 }
 

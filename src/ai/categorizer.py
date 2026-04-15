@@ -1,16 +1,21 @@
 """AI-powered content categorization using LLM.
 
 Auto-generates 1-3 category tags for content based on title and summary.
+
+TODO #10 (2026-04-14): Removed Optional import - using | None syntax instead.
+TODO #15 (2026-04-14): Added complete docstrings to methods.
+TODO #13 (2026-04-14): Moved magic numbers to constants.py
 """
 
 import re
-from typing import List, Optional
 
 from src.ai.summarizer import Summarizer
+from src.constants import MAX_TAG_LENGTH, MAX_TAGS_PER_CONTENT
 
 
 class CategorizationError(Exception):
     """Base exception for categorization errors."""
+
     pass
 
 
@@ -20,12 +25,6 @@ class Categorizer:
     Generates 1-3 relevant category tags for content using LLM.
     """
 
-    # Max tags per content
-    MAX_TAGS = 3
-
-    # Max characters per tag
-    MAX_TAG_LENGTH = 50
-
     def __init__(self, summarizer: Summarizer):
         """Initialize categorizer.
 
@@ -34,17 +33,21 @@ class Categorizer:
         """
         self.summarizer = summarizer
 
-    async def generate_tags(
-        self, title: str, summary: str | None = None
-    ) -> List[str]:
-        """Generate category tags for content.
+    async def generate_tags(self, title: str, summary: str | None = None) -> list[str]:
+        """Generate category tags for content using LLM.
 
         Args:
-            title: Content title.
-            summary: Content summary (optional).
+            title: Content title. Required for tag generation.
+            summary: Content summary (optional). Improves tag accuracy when provided.
 
         Returns:
-            List of 1-3 category tags (lowercase, cleaned).
+            List of 1-3 category tags (lowercase, cleaned). Returns empty list if
+            tag generation fails (won't block content save).
+
+        Example:
+            >>> categorizer = Categorizer(summarizer)
+            >>> tags = await categorizer.generate_tags("Python Tips", "Learn Python...")
+            >>> print(tags)  # ['python', 'programming', 'tutorial']
         """
         # Build prompt for tag generation
         prompt = self._build_tag_prompt(title, summary)
@@ -61,18 +64,26 @@ class Categorizer:
         except Exception as e:
             # Log error and return empty list (don't block content save)
             import logging
+
             logging.warning(f"Tag generation failed: {e}")
             return []
 
     def _build_tag_prompt(self, title: str, summary: str | None) -> str:
         """Build prompt for tag generation.
 
+        Constructs a structured prompt with title and summary to guide
+        the LLM in generating relevant category tags.
+
         Args:
-            title: Content title.
-            summary: Content summary.
+            title: Content title. Required for prompt construction.
+            summary: Content summary. If None, uses "No summary available."
 
         Returns:
-            Prompt string for LLM.
+            Formatted prompt string ready for LLM consumption.
+
+        Example:
+            >>> prompt = categorizer._build_tag_prompt("Python Tips", "Learn Python...")
+            >>> print(prompt[:50])  # "Analyze this content and generate 1-3 cat..."
         """
         summary_text = summary or "No summary available."
 
@@ -94,30 +105,40 @@ Tags:"""
 
         return prompt
 
-    def _parse_tags(self, response: str) -> List[str]:
+    def _parse_tags(self, response: str) -> list[str]:
         """Parse tags from LLM response.
 
+        Splits response by newlines/commas, cleans each tag, removes
+        duplicates while preserving order, and returns up to MAX_TAGS.
+
         Args:
-            response: LLM response text.
+            response: Raw LLM response text. Can contain newlines, commas,
+                numbering (1., 2-), or bullets.
 
         Returns:
-            List of cleaned, validated tags.
+            List of 1-3 cleaned, validated, unique tags in order of appearance.
+            Empty list if no valid tags found.
+
+        Example:
+            >>> response = "1. python\\n2. programming\\n3. tutorial"
+            >>> tags = categorizer._parse_tags(response)
+            >>> print(tags)  # ['python', 'programming', 'tutorial']
         """
         tags = []
 
         # Split by newlines or commas
-        parts = re.split(r'[\n,]+', response.strip())
+        parts = re.split(r"[\n,]+", response.strip())
 
         for part in parts:
             # Clean the tag
             tag = self._clean_tag(part.strip())
 
             # Validate and add
-            if tag and len(tags) < self.MAX_TAGS:
+            if tag and len(tags) < MAX_TAGS_PER_CONTENT:
                 tags.append(tag)
 
                 # Stop if we have max tags
-                if len(tags) >= self.MAX_TAGS:
+                if len(tags) >= MAX_TAGS_PER_CONTENT:
                     break
 
         # Remove duplicates while preserving order
@@ -133,27 +154,36 @@ Tags:"""
     def _clean_tag(self, tag: str) -> str:
         """Clean and validate a tag.
 
+        Removes special characters, normalizes to lowercase, strips numbering
+        (1., 2-), collapses spaces, and enforces MAX_TAG_LENGTH limit.
+
         Args:
-            tag: Raw tag string.
+            tag: Raw tag string. May contain special characters, numbering,
+                or extra whitespace.
 
         Returns:
-            Cleaned tag or empty string if invalid.
+            Cleaned tag with only letters, numbers, spaces, and hyphens.
+            Empty string if tag is invalid (empty after cleaning or no words).
+
+        Example:
+            >>> categorizer._clean_tag("1. Python-Tips!")  # 'python-tips'
+            >>> categorizer._clean_tag("  2-  PROBLEM  ")  # 'problem'
         """
         # Remove special characters, keep letters, numbers, spaces, hyphens
-        cleaned = re.sub(r'[^\w\s\-]', '', tag)
+        cleaned = re.sub(r"[^\w\s\-]", "", tag)
 
         # Lowercase and strip
         cleaned = cleaned.lower().strip()
 
         # Remove numbering (1., 2-, etc.)
-        cleaned = re.sub(r'^\d+[\.\-\)]\s*', '', cleaned)
+        cleaned = re.sub(r"^\d+[\.\-\)]\s*", "", cleaned)
 
         # Collapse multiple spaces
-        cleaned = re.sub(r'\s+', ' ', cleaned)
+        cleaned = re.sub(r"\s+", " ", cleaned)
 
         # Validate length
-        if len(cleaned) > self.MAX_TAG_LENGTH:
-            cleaned = cleaned[: self.MAX_TAG_LENGTH]
+        if len(cleaned) > MAX_TAG_LENGTH:
+            cleaned = cleaned[:MAX_TAG_LENGTH]
 
         # Must have at least one word
         if not cleaned or len(cleaned.split()) == 0:

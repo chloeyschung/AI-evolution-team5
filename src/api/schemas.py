@@ -1,11 +1,17 @@
 """Pydantic schemas for API request/response validation."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
-from src.ai.metadata_extractor import ContentType
-from src.data.models import SwipeAction, Theme, DefaultSort, ContentStatus
+from src.constants import (
+    ContentStatus,
+    ContentType,
+    DefaultSort,
+    SwipeAction,
+    Theme,
+)
+from src.data.models import utc_now
 
 
 class ContentCreate(BaseModel):
@@ -13,9 +19,15 @@ class ContentCreate(BaseModel):
 
     platform: str = Field(..., min_length=1, max_length=100)
     content_type: ContentType
-    url: str = Field(..., min_length=1, max_length=2048, pattern=r'^https?://')
-    title: Optional[str] = Field(None, min_length=1, max_length=500)
-    author: Optional[str] = Field(None, min_length=1, max_length=200)
+    url: str = Field(..., min_length=1, max_length=2048, pattern=r"^https?://")
+    title: str | None = Field(None, min_length=1, max_length=500)
+    author: str | None = Field(None, min_length=1, max_length=200)
+
+
+class ContentStatusUpdate(BaseModel):
+    """Schema for updating content status."""
+
+    status: ContentStatus = Field(..., description="New status for the content")
 
 
 class ContentResponse(BaseModel):
@@ -27,12 +39,12 @@ class ContentResponse(BaseModel):
     platform: str
     content_type: str
     url: str
-    title: Optional[str] = None
-    author: Optional[str] = None
-    thumbnail_url: Optional[str] = None
+    title: str | None = None
+    author: str | None = None
+    thumbnail_url: str | None = None
     status: ContentStatus = ContentStatus.INBOX
     created_at: str
-    updated_at: Optional[str] = None
+    updated_at: str | None = None
 
     @classmethod
     def from_content(cls, content: Any) -> "ContentResponse":
@@ -55,6 +67,29 @@ class ContentResponse(BaseModel):
             status=content.status,
             created_at=content.created_at.isoformat(),
             updated_at=content.updated_at.isoformat() if content.updated_at else None,
+        )
+
+    @classmethod
+    def from_metadata(cls, metadata: Any) -> "ContentResponse":
+        """Create ContentResponse from ContentMetadata instance.
+
+        Args:
+            metadata: ContentMetadata instance from service layer
+
+        Returns:
+            ContentResponse instance
+        """
+        return cls(
+            id=metadata.id if hasattr(metadata, "id") else 0,
+            platform=metadata.platform,
+            content_type=metadata.content_type.value if hasattr(metadata.content_type, "value") else metadata.content_type,
+            url=metadata.url,
+            title=metadata.title,
+            author=metadata.author,
+            thumbnail_url=metadata.thumbnail_url,
+            status=ContentStatus.INBOX,
+            created_at=utc_now().isoformat(),
+            updated_at=None,
         )
 
 
@@ -83,14 +118,14 @@ class SwipeActionBatch(BaseModel):
 class SwipeBatchRequest(BaseModel):
     """Batch swipe request."""
 
-    actions: List[SwipeActionBatch]
+    actions: list[SwipeActionBatch]
 
 
 class SwipeBatchResponse(BaseModel):
     """Batch swipe response."""
 
     recorded: int
-    results: List[SwipeResponse]
+    results: list[SwipeResponse]
 
 
 class StatsResponse(BaseModel):
@@ -105,8 +140,8 @@ class ShareRequest(BaseModel):
     """Schema for sharing content via mobile share sheet."""
 
     content: str = Field(..., min_length=1, description="Content to share (URL, text, etc.)")
-    platform: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    platform: str | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class ShareResponse(BaseModel):
@@ -118,9 +153,9 @@ class ShareResponse(BaseModel):
     platform: str
     content_type: str
     url: str
-    title: Optional[str] = None
-    author: Optional[str] = None
-    summary: Optional[str] = None
+    title: str | None = None
+    author: str | None = None
+    summary: str | None = None
     created_at: str
 
 
@@ -145,13 +180,13 @@ class ContentDetailResponse(BaseModel):
     platform: str
     content_type: str
     url: str
-    title: Optional[str] = None
-    author: Optional[str] = None
-    summary: Optional[str] = None
+    title: str | None = None
+    author: str | None = None
+    summary: str | None = None
     status: ContentStatus
-    swipe_history: Optional[SwipeHistoryResponse] = None
+    swipe_history: SwipeHistoryResponse | None = None
     created_at: str
-    updated_at: Optional[str] = None
+    updated_at: str | None = None
 
 
 # DAT-002: User Profile & Preferences schemas
@@ -163,9 +198,9 @@ class UserProfileResponse(BaseModel):
     model_config = {"from_attributes": True}
 
     id: int
-    display_name: Optional[str] = None
-    avatar_url: Optional[str] = None
-    bio: Optional[str] = None
+    display_name: str | None = None
+    avatar_url: str | None = None
+    bio: str | None = None
     created_at: str
     updated_at: str
 
@@ -173,9 +208,9 @@ class UserProfileResponse(BaseModel):
 class UserProfileUpdate(BaseModel):
     """Schema for updating user profile."""
 
-    display_name: Optional[str] = Field(None, max_length=100)
-    avatar_url: Optional[str] = Field(None, max_length=500)
-    bio: Optional[str] = Field(None, max_length=500)
+    display_name: str | None = Field(None, max_length=100)
+    avatar_url: str | None = Field(None, max_length=500)
+    bio: str | None = Field(None, max_length=500)
 
 
 class UserPreferencesResponse(BaseModel):
@@ -192,10 +227,10 @@ class UserPreferencesResponse(BaseModel):
 class UserPreferencesUpdate(BaseModel):
     """Schema for updating user preferences."""
 
-    theme: Optional[Theme] = None
-    notifications_enabled: Optional[bool] = None
-    daily_goal: Optional[int] = Field(None, gt=0, le=1000)
-    default_sort: Optional[DefaultSort] = None
+    theme: Theme | None = None
+    notifications_enabled: bool | None = None
+    daily_goal: int | None = Field(None, gt=0, le=1000)
+    default_sort: DefaultSort | None = None
 
 
 class UserStatisticsResponse(BaseModel):
@@ -206,8 +241,8 @@ class UserStatisticsResponse(BaseModel):
     total_discarded: int
     retention_rate: float
     streak_days: int
-    first_swipe_at: Optional[str] = None
-    last_swipe_at: Optional[str] = None
+    first_swipe_at: str | None = None
+    last_swipe_at: str | None = None
 
 
 class InterestTagRequest(BaseModel):
@@ -244,7 +279,7 @@ class ContentTagsResponse(BaseModel):
     """Schema for content tags response (AI-003)."""
 
     content_id: int
-    tags: List[str]
+    tags: list[str]
 
 
 # AUTH-001: Authentication schemas
@@ -254,9 +289,9 @@ class AuthStatusResponse(BaseModel):
     """Schema for authentication status check."""
 
     is_authenticated: bool
-    user_id: Optional[int] = None
-    email: Optional[str] = None
-    token_expires_at: Optional[str] = None
+    user_id: int | None = None
+    email: str | None = None
+    token_expires_at: str | None = None
 
 
 class TokenRefreshRequest(BaseModel):
@@ -286,15 +321,25 @@ class GoogleUserInfo(BaseModel):
 
     id: str
     email: str
-    name: Optional[str] = None
-    picture: Optional[str] = None
+    name: str | None = None
+    picture: str | None = None
 
 
 class GoogleLoginRequest(BaseModel):
-    """Schema for Google login request."""
+    """Schema for Google login request (ID token flow)."""
 
     google_id_token: str
     google_user_info: GoogleUserInfo
+
+
+class GoogleOAuthCodeRequest(BaseModel):
+    """Schema for Google OAuth code exchange (web flow).
+
+    The frontend sends only the authorization code.
+    The backend handles the token exchange with client_secret.
+    """
+
+    code: str
 
 
 class GoogleLoginResponse(BaseModel):
@@ -317,7 +362,7 @@ class AccountDeleteRequest(BaseModel):
     """Schema for account deletion request."""
 
     confirm: bool = False
-    confirmation_token: Optional[str] = None
+    confirmation_token: str | None = None
 
 
 class AccountDeleteResponse(BaseModel):
@@ -337,8 +382,8 @@ class YouTubePlaylistResponse(BaseModel):
 
     playlist_id: str
     title: str
-    description: Optional[str] = None
-    thumbnail_url: Optional[str] = None
+    description: str | None = None
+    thumbnail_url: str | None = None
     video_count: int = 0
     is_watch_later: bool = False
 
@@ -347,7 +392,7 @@ class YouTubeConnectionStatus(BaseModel):
     """Schema for YouTube connection status."""
 
     is_connected: bool
-    last_sync_at: Optional[str] = None
+    last_sync_at: str | None = None
 
 
 class YouTubeSyncConfigCreate(BaseModel):
@@ -367,15 +412,15 @@ class YouTubeSyncConfigResponse(BaseModel):
     playlist_name: str
     sync_frequency: str
     is_active: bool
-    last_sync_at: Optional[str] = None
+    last_sync_at: str | None = None
 
 
 class YouTubeSyncConfigUpdate(BaseModel):
     """Schema for updating sync configuration."""
 
-    playlist_name: Optional[str] = Field(None, min_length=1, max_length=500)
-    sync_frequency: Optional[str] = Field(None, pattern="^(hourly|daily|weekly)$")
-    is_active: Optional[bool] = None
+    playlist_name: str | None = Field(None, min_length=1, max_length=500)
+    sync_frequency: str | None = Field(None, pattern="^(hourly|daily|weekly)$")
+    is_active: bool | None = None
 
 
 class YouTubeSyncLogResponse(BaseModel):
@@ -388,7 +433,7 @@ class YouTubeSyncLogResponse(BaseModel):
     status: str
     ingested_count: int
     skipped_count: int
-    error_message: Optional[str] = None
+    error_message: str | None = None
     executed_at: str
 
 
@@ -405,7 +450,7 @@ class LinkedInConnectionStatus(BaseModel):
     """Schema for LinkedIn connection status."""
 
     is_connected: bool
-    last_sync_at: Optional[str] = None
+    last_sync_at: str | None = None
 
 
 class LinkedInSyncConfigCreate(BaseModel):
@@ -425,7 +470,7 @@ class LinkedInSyncConfigResponse(BaseModel):
     resource_name: str
     sync_frequency: str
     is_active: bool
-    last_sync_at: Optional[str] = None
+    last_sync_at: str | None = None
 
 
 class LinkedInSyncLogResponse(BaseModel):
@@ -438,7 +483,7 @@ class LinkedInSyncLogResponse(BaseModel):
     status: str
     ingested_count: int
     skipped_count: int
-    error_message: Optional[str] = None
+    error_message: str | None = None
     executed_at: str
 
 
@@ -462,14 +507,14 @@ class TrendFeedItem(BaseModel):
 
     content: ContentResponse
     relevance_score: float = Field(..., ge=0, le=1, description="Relevance score (0-1)")
-    matched_interests: List[str] = Field(default_factory=list, description="User interests that matched")
-    top_tags: List[str] = Field(default_factory=list, max_length=3, description="Top contributing tags")
+    matched_interests: list[str] = Field(default_factory=list, description="User interests that matched")
+    top_tags: list[str] = Field(default_factory=list, max_length=3, description="Top contributing tags")
 
 
 class TrendFeedResponse(BaseModel):
     """Trend feed response."""
 
-    items: List[TrendFeedItem]
+    items: list[TrendFeedItem]
     total: int = Field(..., ge=0, description="Total matching items")
     has_more: bool = Field(..., description="Whether more items available")
 
@@ -504,13 +549,13 @@ class AchievementProgress(BaseModel):
     is_unlocked: bool
     progress: int
     progress_percent: int
-    unlocked_at: Optional[str] = None
+    unlocked_at: str | None = None
 
 
 class AchievementsListResponse(BaseModel):
     """Schema for achievements list response."""
 
-    achievements: List[AchievementProgress]
+    achievements: list[AchievementProgress]
 
 
 class StreakStats(BaseModel):
@@ -528,7 +573,7 @@ class AchievementsStatsResponse(BaseModel):
     total_available: int
     completion_percent: int
     streak: StreakStats
-    recent_achievements: List[AchievementProgress]
+    recent_achievements: list[AchievementProgress]
 
 
 class NewAchievement(BaseModel):
@@ -543,7 +588,7 @@ class NewAchievement(BaseModel):
 class CheckAchievementsResponse(BaseModel):
     """Schema for check achievements response."""
 
-    new_achievements: List[NewAchievement]
+    new_achievements: list[NewAchievement]
 
 
 # ADV-003: Smart Reminders schemas
@@ -553,32 +598,32 @@ class ReminderPreferencesResponse(BaseModel):
     """Schema for reminder preferences response."""
 
     is_enabled: bool
-    preferred_time: Optional[str] = None
+    preferred_time: str | None = None
     frequency: str
-    quiet_hours_start: Optional[str] = None
-    quiet_hours_end: Optional[str] = None
+    quiet_hours_start: str | None = None
+    quiet_hours_end: str | None = None
     backlog_threshold: int
 
 
 class ReminderPreferencesUpdate(BaseModel):
     """Schema for updating reminder preferences."""
 
-    is_enabled: Optional[bool] = None
-    preferred_time: Optional[str] = Field(None, max_length=20)  # "HH:MM:SS" format
-    frequency: Optional[str] = Field(None, pattern="^(daily|weekly|never)$")
-    quiet_hours_start: Optional[str] = Field(None, max_length=20)  # "HH:MM:SS" format
-    quiet_hours_end: Optional[str] = Field(None, max_length=20)  # "HH:MM:SS" format
-    backlog_threshold: Optional[int] = Field(None, gt=0, le=1000)
+    is_enabled: bool | None = None
+    preferred_time: str | None = Field(None, max_length=20)  # "HH:MM:SS" format
+    frequency: str | None = Field(None, pattern="^(daily|weekly|never)$")
+    quiet_hours_start: str | None = Field(None, max_length=20)  # "HH:MM:SS" format
+    quiet_hours_end: str | None = Field(None, max_length=20)  # "HH:MM:SS" format
+    backlog_threshold: int | None = Field(None, gt=0, le=1000)
 
 
 class ReminderSuggestionResponse(BaseModel):
     """Schema for reminder suggestion response."""
 
     has_reminder: bool
-    reminder_type: Optional[str] = None
-    message: Optional[str] = None
-    priority: Optional[str] = None
-    metadata: Optional[dict] = None
+    reminder_type: str | None = None
+    message: str | None = None
+    priority: str | None = None
+    metadata: dict | None = None
 
 
 class ReminderRespondRequest(BaseModel):

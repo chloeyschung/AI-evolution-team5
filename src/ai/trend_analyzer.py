@@ -1,14 +1,32 @@
-"""Trend analyzer for personalized content ranking."""
+"""Trend analyzer for personalized content ranking.
 
-from datetime import datetime, timedelta, timezone
-from typing import List, Tuple
+TODO #6 (2026-04-14): Fixed timezone handling - use convert_to_utc from datetime_utils
+TODO #16 (2026-04-14): N+1 query already fixed - uses get_tags_for_content_ids() in _get_preferred_tags
+TODO #23 (2026-04-14): Moved hard-coded limits to constants.py
+"""
+
+from datetime import datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .categorizer import Categorizer
-from .summarizer import Summarizer
+from src.constants import (
+    ENGAGEMENT_HALF_LIFE_DAYS,
+    TREND_ANALYSIS_MONTH_CUTOFF,
+    TREND_ANALYSIS_WEEK_CUTOFF,
+    TREND_ENGAGEMENT_WEIGHT,
+    TREND_FEED_DEFAULT_NEUTRAL_SCORE,
+    TREND_FEED_MAX_LIMIT,
+    TREND_FEED_MIN_ITEMS_FOR_SCORING,
+    TREND_FEED_MIN_SCORE_THRESHOLD,
+    TREND_FEED_SAMPLE_SIZE,
+    TREND_INTEREST_MATCH_WEIGHT,
+    TREND_RECENCY_WEIGHT,
+    TREND_TAG_SIMILARITY_WEIGHT,
+)
+from src.utils.datetime_utils import convert_to_utc
+
 from ..data.models import Content, SwipeAction, utc_now
-from ..data.repository import ContentRepository, SwipeRepository, ContentTagRepository, UserProfileRepository
+from ..data.repository import ContentRepository, ContentTagRepository, SwipeRepository, UserProfileRepository
 
 
 class TrendFeedItem:
@@ -18,8 +36,8 @@ class TrendFeedItem:
         self,
         content: Content,
         relevance_score: float,
-        matched_interests: List[str],
-        top_tags: List[str],
+        matched_interests: list[str],
+        top_tags: list[str],
     ):
         self.content = content
         self.relevance_score = relevance_score
@@ -30,17 +48,17 @@ class TrendFeedItem:
 class TrendAnalyzer:
     """Analyze and rank content for personalized trend feed."""
 
-    # Scoring weights
-    INTEREST_MATCH_WEIGHT = 0.35
-    TAG_SIMILARITY_WEIGHT = 0.30
-    RECENCY_WEIGHT = 0.20
-    ENGAGEMENT_WEIGHT = 0.15
+    # Scoring weights (from constants)
+    INTEREST_MATCH_WEIGHT = TREND_INTEREST_MATCH_WEIGHT
+    TAG_SIMILARITY_WEIGHT = TREND_TAG_SIMILARITY_WEIGHT
+    RECENCY_WEIGHT = TREND_RECENCY_WEIGHT
+    ENGAGEMENT_WEIGHT = TREND_ENGAGEMENT_WEIGHT
 
-    # Configuration
-    HALF_LIFE_DAYS = 30  # Content loses half recency score after this many days
-    MIN_ITEMS_FOR_SCORING = 10  # Below this, use simple recency sort
-    DEFAULT_NEUTRAL_SCORE = 0.5  # Neutral score when no data available
-    MIN_SCORE_THRESHOLD = 0.1  # Minimum score to appear in feed
+    # Configuration (from constants)
+    HALF_LIFE_DAYS = ENGAGEMENT_HALF_LIFE_DAYS  # Content loses half recency score after this many days
+    MIN_ITEMS_FOR_SCORING = TREND_FEED_MIN_ITEMS_FOR_SCORING  # Below this, use simple recency sort
+    DEFAULT_NEUTRAL_SCORE = TREND_FEED_DEFAULT_NEUTRAL_SCORE  # Neutral score when no data available
+    MIN_SCORE_THRESHOLD = TREND_FEED_MIN_SCORE_THRESHOLD  # Minimum score to appear in feed
 
     def __init__(self, db_session: AsyncSession):
         """Initialize trend analyzer.
@@ -60,7 +78,7 @@ class TrendAnalyzer:
         offset: int = 0,
         time_range: str = "all",
         min_score: float = MIN_SCORE_THRESHOLD,
-    ) -> Tuple[List[TrendFeedItem], int]:
+    ) -> tuple[list[TrendFeedItem], int]:
         """Get personalized trend feed for user.
 
         Args:
@@ -76,7 +94,7 @@ class TrendAnalyzer:
         # Get kept content for user (with hard limit to prevent OOM)
         kept_contents = await self._content_repo.get_kept(
             user_id,
-            limit=1000,  # Hard limit to prevent memory issues with large datasets
+            limit=TREND_FEED_MAX_LIMIT,  # Hard limit to prevent memory issues with large datasets
             offset=0,
         )
 
@@ -110,7 +128,7 @@ class TrendAnalyzer:
             return items, len(kept_contents)
 
         # Calculate scores for all content
-        scored_items: List[TrendFeedItem] = []
+        scored_items: list[TrendFeedItem] = []
         for content in kept_contents:
             score, matched_interests, top_tags = await self._calculate_relevance_score(
                 content=content,
@@ -142,9 +160,9 @@ class TrendAnalyzer:
         self,
         content: Content,
         user_id: int,
-        user_interests: List[str],
-        preferred_tags: List[str],
-    ) -> Tuple[float, List[str], List[str]]:
+        user_interests: list[str],
+        preferred_tags: list[str],
+    ) -> tuple[float, list[str], list[str]]:
         """Calculate relevance score for a single content item.
 
         Args:
@@ -199,8 +217,8 @@ class TrendAnalyzer:
 
     def _calculate_interest_match_score(
         self,
-        content_tags: List[str],
-        user_interests: List[str],
+        content_tags: list[str],
+        user_interests: list[str],
     ) -> float:
         """Calculate interest match score (0-1).
 
@@ -214,17 +232,14 @@ class TrendAnalyzer:
         user_interests_lower = [interest.lower() for interest in user_interests]
 
         # Count matches (interest matches if it's in any content tag)
-        matched = sum(
-            1 for interest in user_interests_lower
-            if any(interest in tag for tag in content_tags_lower)
-        )
+        matched = sum(1 for interest in user_interests_lower if any(interest in tag for tag in content_tags_lower))
 
         return matched / len(user_interests)
 
     def _calculate_tag_similarity_score(
         self,
-        content_tags: List[str],
-        preferred_tags: List[str],
+        content_tags: list[str],
+        preferred_tags: list[str],
     ) -> float:
         """Calculate tag similarity using Jaccard similarity (0-1).
 
@@ -266,7 +281,7 @@ class TrendAnalyzer:
 
     async def _calculate_engagement_score(
         self,
-        content_tags: List[str],
+        content_tags: list[str],
         user_id: int,
     ) -> float:
         """Calculate engagement score based on keep ratio for same tags (0-1).
@@ -291,7 +306,7 @@ class TrendAnalyzer:
 
     def _calculate_overall_keep_ratio(
         self,
-        swipe_history: List,
+        swipe_history: list,
     ) -> float:
         """Calculate overall keep ratio from swipe history.
 
@@ -314,7 +329,7 @@ class TrendAnalyzer:
 
         return kept_count / total_count
 
-    async def _get_preferred_tags(self, user_id: int) -> List[str]:
+    async def _get_preferred_tags(self, user_id: int) -> list[str]:
         """Get preferred tags from user's most-kept content.
 
         Returns top tags from content user has kept (max 10 tags).
@@ -325,7 +340,7 @@ class TrendAnalyzer:
         # Get kept content
         kept_contents = await self._content_repo.get_kept(
             user_id,
-            limit=50,  # Sample size
+            limit=TREND_FEED_SAMPLE_SIZE,  # Sample size
             offset=0,
         )
 
@@ -338,7 +353,7 @@ class TrendAnalyzer:
 
         # Count tag frequency across all content
         tag_counts: dict[str, int] = {}
-        for content_id, tags in tags_by_content.items():
+        for _, tags in tags_by_content.items():
             for tag in tags:
                 tag_counts[tag] = tag_counts.get(tag, 0) + 1
 
@@ -354,19 +369,17 @@ class TrendAnalyzer:
 
         Returns:
             UTC datetime or None
+
+        TODO #6 (2026-04-14): Using convert_to_utc from datetime_utils for consistency.
         """
-        if dt is None:
-            return None
-        if dt.tzinfo is None:
-            # Assume naive datetime is UTC
-            return dt.replace(tzinfo=timezone.utc)
-        return dt
+        # Use centralized utility for timezone conversion
+        return convert_to_utc(dt)
 
     def _filter_by_time_range(
         self,
-        contents: List[Content],
+        contents: list[Content],
         time_range: str,
-    ) -> List[Content]:
+    ) -> list[Content]:
         """Filter contents by time range.
 
         Args:
@@ -381,9 +394,9 @@ class TrendAnalyzer:
 
         now = utc_now()
         if time_range == "week":
-            cutoff = now - timedelta(days=7)
+            cutoff = now - timedelta(days=TREND_ANALYSIS_WEEK_CUTOFF)
         elif time_range == "month":
-            cutoff = now - timedelta(days=30)
+            cutoff = now - timedelta(days=TREND_ANALYSIS_MONTH_CUTOFF)
         else:
             return contents
 

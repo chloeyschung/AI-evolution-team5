@@ -4,8 +4,8 @@ import pytest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
-from src.ai.metadata_extractor import ContentType
 from src.ai.trend_analyzer import TrendAnalyzer, TrendFeedItem
+from src.constants import ContentType
 from src.data.models import Content, ContentStatus, SwipeAction, SwipeHistory
 from src.data.repository import ContentRepository, SwipeRepository, ContentTagRepository, UserProfileRepository
 

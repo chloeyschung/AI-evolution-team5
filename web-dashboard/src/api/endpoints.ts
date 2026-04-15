@@ -1,5 +1,5 @@
 import { getApiClient } from './client';
-import {
+import type {
   Content,
   AuthStatus,
   PlatformCount,
@@ -26,6 +26,12 @@ export async function loginWithGoogle(
     google_id_token: idToken,
     google_user_info: userInfo,
   });
+  return response.data;
+}
+
+export async function loginWithGoogleCode(code: string) {
+  const client = getApiClient();
+  const response = await client.post('/api/v1/auth/google/code', { code });
   return response.data;
 }
 

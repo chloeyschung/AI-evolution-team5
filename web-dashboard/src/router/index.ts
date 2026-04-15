@@ -1,5 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import { setAbortController } from '../api/client';
+
+// Global abort controller for request cancellation on navigation
+let currentAbortController: AbortController | null = null;
 
 const routes = [
   {
@@ -42,6 +46,11 @@ const routes = [
     component: () => import('../views/Login.vue'),
   },
   {
+    path: '/oauth-callback',
+    name: 'OAuthCallback',
+    component: () => import('../views/OAuthCallback.vue'),
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/dashboard',
   },
@@ -52,12 +61,20 @@ const router = createRouter({
   routes,
 });
 
-// Navigation guard for auth
+// Navigation guard for auth and request cancellation
 router.beforeEach(async (to, _from, next) => {
+  // Cancel any in-flight requests from previous route
+  if (currentAbortController) {
+    currentAbortController.abort();
+  }
+  currentAbortController = new AbortController();
+  // Pass the controller to the API client
+  setAbortController(currentAbortController);
+
   const authStore = useAuthStore();
 
-  // Initialize auth if not done
-  if (!authStore.$state.isInitialized) {
+  // Initialize auth if not done (isLoading starts as true, set to false after init)
+  if (authStore.$state.isLoading) {
     await authStore.initialize();
   }
 
@@ -68,6 +85,13 @@ router.beforeEach(async (to, _from, next) => {
   } else {
     next();
   }
+});
+
+// Clean up abort controller on route success
+router.afterEach(() => {
+  // The controller is already aborted in beforeEach, just clear the reference
+  currentAbortController = null;
+  setAbortController(null);
 });
 
 export default router;

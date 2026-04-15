@@ -1,7 +1,6 @@
 """Pydantic models for LinkedIn data."""
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -22,10 +21,10 @@ class LinkedInPost(BaseModel):
     title: str = Field(..., description="Post title or first few lines")
     author: str = Field(..., description="Author name")
     author_urn: str = Field(..., description="Author LinkedIn URN")
-    published_at: Optional[datetime] = Field(None, description="Post publish time")
+    published_at: datetime | None = Field(None, description="Post publish time")
     content_type: str = Field(default="text", description="Post type: text, article, video, image")
-    text_content: Optional[str] = Field(None, description="Full text content of the post")
-    image_url: Optional[str] = Field(None, description="Thumbnail image URL if available")
+    text_content: str | None = Field(None, description="Full text content of the post")
+    image_url: str | None = Field(None, description="Thumbnail image URL if available")
 
 
 class LinkedInSyncResult(BaseModel):

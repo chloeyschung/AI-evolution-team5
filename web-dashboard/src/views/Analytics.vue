@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { getStats, getUserStatistics } from '../api/endpoints';
-import { Stats, UserStatistics } from '../types';
+import type { Stats, UserStatistics } from '../types';
 
 const stats = ref<Stats>({ pending: 0, kept: 0, discarded: 0 });
 const userStats = ref<UserStatistics>({

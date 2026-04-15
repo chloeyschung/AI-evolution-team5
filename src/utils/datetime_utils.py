@@ -4,7 +4,8 @@ This module provides common datetime operations to avoid duplication across the 
 All datetime operations should use these utilities for consistency and maintainability.
 """
 
-from datetime import datetime, timedelta, time as time_type, timezone
+from datetime import UTC, datetime, timedelta
+from datetime import time as time_type
 
 
 def utc_now() -> datetime:
@@ -13,7 +14,7 @@ def utc_now() -> datetime:
     Returns:
         Current UTC datetime with timezone info.
     """
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def convert_to_utc(dt: datetime | None) -> datetime | None:
@@ -29,8 +30,8 @@ def convert_to_utc(dt: datetime | None) -> datetime | None:
         return None
     if dt.tzinfo is None:
         # Assume naive datetime is UTC
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+        return dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
 
 
 def convert_to_local(dt: datetime | None) -> datetime | None:
@@ -46,7 +47,7 @@ def convert_to_local(dt: datetime | None) -> datetime | None:
         return None
     if dt.tzinfo is None:
         # Assume naive datetime is UTC first
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
     return dt.astimezone(time_type.min.tzinfo)
 
 
@@ -224,53 +225,12 @@ def is_quiet_hours(
 
     # Handle overnight quiet hours (e.g., 22:00 to 08:00)
     if quiet_start > quiet_end:
-        # Quiet hours span midnight
-        return current >= quiet_start or current <= quiet_end
+        # Quiet hours span midnight: from quiet_start to midnight, and from midnight to quiet_end
+        # Use >= for start (inclusive) and < for end (exclusive) to handle boundary correctly
+        return current >= quiet_start or current < quiet_end
     else:
         # Quiet hours within same day
-        return quiet_start <= current <= quiet_end
-
-
-def time_ago(dt: datetime, reference: datetime | None = None) -> str:
-    """Format datetime as relative time ago string.
-
-    Args:
-        dt: Datetime to format
-        reference: Reference datetime (defaults to UTC now)
-
-    Returns:
-        Human-readable time ago string (e.g., "2 hours ago", "3 days ago")
-    """
-    if reference is None:
-        reference = utc_now()
-
-    dt_utc = convert_to_utc(dt)
-    if dt_utc is None:
-        return "unknown"
-
-    delta = reference - dt_utc
-    seconds = int(delta.total_seconds())
-
-    if seconds < 0:
-        return "in the future"
-
-    if seconds < 60:
-        return "just now"
-    elif seconds < 3600:
-        minutes = seconds // 60
-        return f"{minutes} minute{'s' if minutes != 1 else ''} ago"
-    elif seconds < 86400:
-        hours = seconds // 3600
-        return f"{hours} hour{'s' if hours != 1 else ''} ago"
-    elif seconds < 604800:
-        days = seconds // 86400
-        return f"{days} day{'s' if days != 1 else ''} ago"
-    elif seconds < 2592000:
-        weeks = seconds // 604800
-        return f"{weeks} week{'s' if weeks != 1 else ''} ago"
-    else:
-        months = seconds // 2592000
-        return f"{months} month{'s' if months != 1 else ''} ago"
+        return quiet_start <= current < quiet_end
 
 
 def parse_iso_datetime(datetime_str: str) -> datetime:
@@ -286,8 +246,8 @@ def parse_iso_datetime(datetime_str: str) -> datetime:
         ValueError: If string cannot be parsed
     """
     # Handle 'Z' suffix (UTC)
-    if datetime_str.endswith('Z'):
-        datetime_str = datetime_str[:-1] + '+00:00'
+    if datetime_str.endswith("Z"):
+        datetime_str = datetime_str[:-1] + "+00:00"
     return datetime.fromisoformat(datetime_str)
 
 

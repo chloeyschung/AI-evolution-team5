@@ -7,23 +7,19 @@ from .exceptions import InvalidShareDataError
 
 # URL validation pattern (requires http(s):// + domain)
 URL_VALIDATION_PATTERN = re.compile(
-    r'^https?:\/\/'  # http or https
-    r'([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}'  # domain
-    r'(\/[^\s]*)?$'  # optional path
+    r"^https?:\/\/"  # http or https
+    r"([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}"  # domain
+    r"(\/[^\s]*)?$"  # optional path
 )
 
 # URL extraction pattern (matches URLs in text, including www.)
-URL_EXTRACTION_PATTERN = re.compile(
-    r'https?://[^\s<>"{}|\\^`\[\]]+|www\.[^\s<>"{}|\\^`\[\]]+'
-)
+URL_EXTRACTION_PATTERN = re.compile(r'https?://[^\s<>"{}|\\^`\[\]]+|www\.[^\s<>"{}|\\^`\[\]]+')
 
 # URL detection pattern (full match, for identifying URL share data)
-URL_DETECTION_PATTERN = re.compile(
-    r'^https?://[^\s<>"{}|\\^`\[\]]+$|^www\.[^\s<>"{}|\\^`\[\]]+$'
-)
+URL_DETECTION_PATTERN = re.compile(r'^https?://[^\s<>"{}|\\^`\[\]]+$|^www\.[^\s<>"{}|\\^`\[\]]+$')
 
 # Deep link pattern (scheme:// but not http/https)
-DEEP_LINK_PATTERN = re.compile(r'^[a-z][a-z0-9+.-]*://[^\s]+$')
+DEEP_LINK_PATTERN = re.compile(r"^[a-z][a-z0-9+.-]*://[^\s]+$")
 
 
 def validate_non_empty(content: str, error_msg: str) -> str:

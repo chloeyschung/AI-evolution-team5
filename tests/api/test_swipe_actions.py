@@ -6,12 +6,12 @@ import pytest
 class TestBatchSwipeEndpoints:
     """Tests for batch swipe recording."""
 
-    async def test_record_batch_swipes(self, async_client):
+    async def test_record_batch_swipes(self, authenticated_client):
         """Test recording multiple swipe actions atomically."""
         # Create multiple contents
         content_ids = []
         for i in range(5):
-            response = await async_client.post(
+            response = await authenticated_client.post(
                 "/api/v1/content",
                 json={
                     "platform": "Test",
@@ -22,7 +22,7 @@ class TestBatchSwipeEndpoints:
             content_ids.append(response.json()["id"])
 
         # Record batch swipe
-        response = await async_client.post(
+        response = await authenticated_client.post(
             "/api/v1/swipe",
             json={
                 "actions": [
@@ -44,10 +44,10 @@ class TestBatchSwipeEndpoints:
         assert actions[content_ids[1]] == "discard"
         assert actions[content_ids[2]] == "keep"
 
-    async def test_record_single_swipe_still_works(self, async_client):
+    async def test_record_single_swipe_still_works(self, authenticated_client):
         """Test backward compatibility with single swipe API."""
         # Create content
-        response = await async_client.post(
+        response = await authenticated_client.post(
             "/api/v1/content",
             json={
                 "platform": "Test",
@@ -58,7 +58,7 @@ class TestBatchSwipeEndpoints:
         content_id = response.json()["id"]
 
         # Record single swipe (old format)
-        response = await async_client.post(
+        response = await authenticated_client.post(
             "/api/v1/swipe",
             json={"content_id": content_id, "action": "keep"},
         )

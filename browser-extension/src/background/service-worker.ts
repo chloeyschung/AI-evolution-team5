@@ -25,10 +25,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (!tab.id) return;
 
   try {
-    await authManager.initialize();
-
     if (!(await authManager.isAuthenticated())) {
-      this.showNotification({
+      showNotification({
         type: 'error',
         message: 'Please login to Briefly first',
       });
@@ -56,13 +54,13 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
     const result = await apiClient.shareContent(metadata, selectedText);
 
-    this.showNotification({
+    showNotification({
       type: 'success',
       message: `Saved: ${result.title || 'Content'}`,
     });
   } catch (error) {
     console.error('Error saving content:', error);
-    this.showNotification({
+    showNotification({
       type: 'error',
       message: 'Failed to save content. Please try again.',
     });
@@ -72,7 +70,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 // Handle messages from content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'saveContent') {
-    this.handleSaveContent(message.data, sender as chrome.tabs.Tab).then(sendResponse);
+    handleSaveContent(message.data, sender as chrome.tabs.Tab).then(sendResponse);
     return true; // Keep message channel open for async response
   }
   return false;
@@ -80,8 +78,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 async function handleSaveContent(data: SaveRequest, tab: chrome.tabs.Tab): Promise<SaveResult> {
   try {
-    await authManager.initialize();
-
     if (!(await authManager.isAuthenticated())) {
       return {
         success: false,
@@ -91,7 +87,7 @@ async function handleSaveContent(data: SaveRequest, tab: chrome.tabs.Tab): Promi
 
     const result = await apiClient.shareContent(data.metadata, data.selectedText);
 
-    this.showNotification({
+    showNotification({
       type: 'success',
       message: `Saved: ${result.title || 'Content'}`,
     });

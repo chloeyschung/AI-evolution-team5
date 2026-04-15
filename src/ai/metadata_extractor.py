@@ -1,25 +1,16 @@
-"""Multi-Modal Metadata Extraction service for Briefly."""
+"""Multi-Modal Metadata Extraction service for Briefly.
+
+TODO #10 (2026-04-14): Removed Optional import - using | None syntax instead.
+"""
 
 from datetime import datetime
-from enum import Enum
-from typing import Optional
+from urllib.parse import ParseResult, urlparse
 
 from bs4 import BeautifulSoup, Tag
 from dateutil import parser as date_parser
-from urllib.parse import urlparse, ParseResult
 
+from ..constants import ContentType
 from .exceptions import InvalidURLError
-
-
-class ContentType(Enum):
-    """Supported content types for metadata."""
-
-    ARTICLE = "article"
-    VIDEO = "video"
-    IMAGE = "image"
-    SOCIAL_POST = "social_post"
-    PROFILE = "profile"
-    DEEP_LINK = "deep_link"
 
 
 class ContentMetadata:
@@ -69,20 +60,40 @@ class MetadataExtractor:
     """Extracts metadata from URLs and HTML content."""
 
     PLATFORM_MAPPING = {
-        "youtube.com": ("YouTube", {"/watch": ContentType.VIDEO, "/shorts": ContentType.VIDEO, "/live": ContentType.VIDEO}),
+        "youtube.com": (
+            "YouTube",
+            {"/watch": ContentType.VIDEO, "/shorts": ContentType.VIDEO, "/live": ContentType.VIDEO},
+        ),
         "youtu.be": ("YouTube", {"": ContentType.VIDEO}),
-        "linkedin.com": ("LinkedIn", {"/post/": ContentType.SOCIAL_POST, "/pulse/": ContentType.ARTICLE, "/article/": ContentType.ARTICLE, "/in/": ContentType.PROFILE}),
+        "linkedin.com": (
+            "LinkedIn",
+            {
+                "/post/": ContentType.SOCIAL_POST,
+                "/pulse/": ContentType.ARTICLE,
+                "/article/": ContentType.ARTICLE,
+                "/in/": ContentType.PROFILE,
+            },
+        ),
         "medium.com": ("Medium", {"/": ContentType.ARTICLE}),
         "twitter.com": ("Twitter/X", {"/status/": ContentType.SOCIAL_POST}),
         "x.com": ("Twitter/X", {"/status/": ContentType.SOCIAL_POST}),
-        "instagram.com": ("Instagram", {"/p/": ContentType.IMAGE, "/reel/": ContentType.VIDEO, "/tv/": ContentType.VIDEO}),
+        "instagram.com": (
+            "Instagram",
+            {"/p/": ContentType.IMAGE, "/reel/": ContentType.VIDEO, "/tv/": ContentType.VIDEO},
+        ),
         "facebook.com": ("Facebook", {"/posts/": ContentType.SOCIAL_POST, "/videos/": ContentType.VIDEO}),
         "tiktok.com": ("TikTok", {"/@": ContentType.VIDEO, "/video/": ContentType.VIDEO}),
         "reddit.com": ("Reddit", {"/comments/": ContentType.SOCIAL_POST, "/r/": ContentType.SOCIAL_POST}),
         "news.ycombinator.com": ("Hacker News", {"": ContentType.SOCIAL_POST}),
     }
 
-    TIMESTAMP_META_TAGS = ("article:published_time", "og:article:published_time", "pubdate", "dateModified", "datePublished")
+    TIMESTAMP_META_TAGS = (
+        "article:published_time",
+        "og:article:published_time",
+        "pubdate",
+        "dateModified",
+        "datePublished",
+    )
     AUTHOR_META_TAGS = ("article:author", "og:author", "author")
     THUMBNAIL_META_TAGS = ("og:image", "og:image:url", "twitter:image", "twitter:image:src")
 

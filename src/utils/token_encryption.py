@@ -1,13 +1,20 @@
-"""Token encryption utilities for secure OAuth token storage."""
+"""Token encryption utilities for secure OAuth token storage.
+
+TODO #1 (2026-04-14): ENCRYPTION_KEY validation moved to config.py for fail-fast behavior.
+This module no longer validates ENCRYPTION_KEY at runtime - it's validated at startup in Settings.
+"""
 
 import base64
 import hashlib
-import os
+
 from cryptography.fernet import Fernet, InvalidToken
+
+from src.config import settings
 
 
 class TokenEncryptionError(Exception):
     """Raised when token encryption/decryption fails."""
+
     pass
 
 
@@ -27,7 +34,8 @@ def _normalize_encryption_key(key: str) -> bytes:
         # Try to decode as base64 first
         decoded = base64.urlsafe_b64decode(key)
         if len(decoded) == 32:
-            return decoded
+            # Fernet expects the base64 string as bytes, not the raw decoded bytes
+            return key.encode()
     except Exception:
         pass
 
@@ -41,16 +49,13 @@ def _get_fernet_instance() -> Fernet:
     """Get or create Fernet instance for encryption.
 
     Returns:
-        Fernet instance initialized with encryption key.
+        Fernet instance initialized with encryption key from settings.
 
     Raises:
-        TokenEncryptionError: If ENCRYPTION_KEY is not set.
+        TokenEncryptionError: If ENCRYPTION_KEY format is invalid.
     """
-    encryption_key = os.getenv("ENCRYPTION_KEY")
-    if not encryption_key:
-        raise TokenEncryptionError(
-            "ENCRYPTION_KEY environment variable is required for token encryption"
-        )
+    # ENCRYPTION_KEY is validated at startup in config.py Settings class
+    encryption_key = settings.ENCRYPTION_KEY
 
     try:
         normalized_key = _normalize_encryption_key(encryption_key)

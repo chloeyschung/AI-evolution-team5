@@ -1,7 +1,10 @@
 import asyncio
+
 import httpx
-from .exceptions import SummarizationError, APIConnectionError, InvalidResponseError
+
 from src.utils.http_client import async_client_context
+
+from .exceptions import APIConnectionError, InvalidResponseError, SummarizationError
 
 
 class Summarizer:
@@ -71,14 +74,16 @@ class Summarizer:
                         continue
 
                     if response.status_code != 200:
-                        raise APIConnectionError(f"API request failed with status {response.status_code}: {response.text}")
+                        raise APIConnectionError(
+                            f"API request failed with status {response.status_code}: {response.text}"
+                        )
 
                     data = response.json()
 
                     try:
                         summary = data["content"][0]["text"].strip()
-                    except (KeyError, IndexError):
-                        raise InvalidResponseError("Unexpected API response format.")
+                    except (KeyError, IndexError) as e:
+                        raise InvalidResponseError("Unexpected API response format.") from e
 
                     lines = summary.split("\n")
                     if len(lines) > max_lines:
@@ -89,7 +94,7 @@ class Summarizer:
                         # Truncate to word boundary, no trailing ellipsis
                         truncated = summary[:300]
                         # Find last space to avoid cutting words
-                        last_space = truncated.rfind(' ')
+                        last_space = truncated.rfind(" ")
                         if last_space > 200:  # Ensure we have at least 200 chars
                             summary = truncated[:last_space]
                         else:
@@ -105,12 +110,12 @@ class Summarizer:
                     if attempt < max_retries - 1:
                         await asyncio.sleep(2**attempt)
                         continue
-                    raise APIConnectionError(f"Request failed: {exc}")
+                    raise APIConnectionError(f"Request failed: {exc}") from exc
                 except Exception as e:
                     last_error = e
                     if attempt < max_retries - 1:
                         await asyncio.sleep(2**attempt)
                         continue
-                    raise SummarizationError(f"Unexpected error: {e}")
+                    raise SummarizationError(f"Unexpected error: {e}") from e
 
         raise SummarizationError(f"All {max_retries} retry attempts failed. Last error: {last_error}")

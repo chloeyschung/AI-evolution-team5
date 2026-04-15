@@ -1,16 +1,31 @@
 import { AuthTokens, ExtensionSettings, DEFAULT_SETTINGS } from './types';
 
 const STORAGE_KEYS = {
-  TOKENS: 'briefly_tokens',
+  ACCESS_TOKEN: 'briefly_access_token',
+  REFRESH_TOKEN: 'briefly_refresh_token',
+  EXPIRES_AT: 'briefly_expires_at',
   SETTINGS: 'briefly_settings',
 } as const;
 
 export class StorageManager {
-  // Auth Tokens
+  // Auth Tokens - standardized keys to match web dashboard
   async getTokens(): Promise<AuthTokens | null> {
     try {
-      const result = await chrome.storage.local.get(STORAGE_KEYS.TOKENS);
-      return result[STORAGE_KEYS.TOKENS] || null;
+      const result = await chrome.storage.local.get([
+        STORAGE_KEYS.ACCESS_TOKEN,
+        STORAGE_KEYS.REFRESH_TOKEN,
+        STORAGE_KEYS.EXPIRES_AT,
+      ]);
+
+      const access_token = result[STORAGE_KEYS.ACCESS_TOKEN];
+      const refresh_token = result[STORAGE_KEYS.REFRESH_TOKEN];
+      const expires_at = result[STORAGE_KEYS.EXPIRES_AT];
+
+      if (!access_token || !refresh_token || !expires_at) {
+        return null;
+      }
+
+      return { access_token, refresh_token, expires_at };
     } catch (error) {
       console.error('Error getting tokens:', error);
       return null;
@@ -19,7 +34,11 @@ export class StorageManager {
 
   async storeTokens(tokens: AuthTokens): Promise<void> {
     try {
-      await chrome.storage.local.set({ [STORAGE_KEYS.TOKENS]: tokens });
+      await chrome.storage.local.set({
+        [STORAGE_KEYS.ACCESS_TOKEN]: tokens.access_token,
+        [STORAGE_KEYS.REFRESH_TOKEN]: tokens.refresh_token,
+        [STORAGE_KEYS.EXPIRES_AT]: tokens.expires_at,
+      });
     } catch (error) {
       console.error('Error storing tokens:', error);
       throw error;
@@ -28,7 +47,11 @@ export class StorageManager {
 
   async clearTokens(): Promise<void> {
     try {
-      await chrome.storage.local.remove(STORAGE_KEYS.TOKENS);
+      await chrome.storage.local.remove([
+        STORAGE_KEYS.ACCESS_TOKEN,
+        STORAGE_KEYS.REFRESH_TOKEN,
+        STORAGE_KEYS.EXPIRES_AT,
+      ]);
     } catch (error) {
       console.error('Error clearing tokens:', error);
       throw error;

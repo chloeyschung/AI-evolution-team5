@@ -1,21 +1,14 @@
 """YouTube API client with OAuth 2.0 authentication."""
 
 import os
-from datetime import datetime, timedelta, timezone
-from typing import Optional
-
-import httpx
-from google.oauth2 import credentials as google_credentials
-from google.oauth2 import id_token
-from google_auth_oauthlib.flow import InstalledAppFlow
+from datetime import datetime, timedelta
 
 from src.integrations.youtube.models import (
-    YouTubeChannel,
     YouTubePlaylist,
     YouTubeVideo,
 )
-from src.utils.http_client import async_client_context
 from src.utils.datetime_utils import utc_now
+from src.utils.http_client import async_client_context
 
 
 class YouTubeClientError(Exception):
@@ -44,12 +37,12 @@ class YouTubeClient:
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
-        client_id: Optional[str] = None,
-        client_secret: Optional[str] = None,
-        access_token: Optional[str] = None,
-        refresh_token: Optional[str] = None,
-        token_expires_at: Optional[datetime] = None,
+        api_key: str | None = None,
+        client_id: str | None = None,
+        client_secret: str | None = None,
+        access_token: str | None = None,
+        refresh_token: str | None = None,
+        token_expires_at: datetime | None = None,
     ):
         """Initialize YouTube client.
 
@@ -67,7 +60,7 @@ class YouTubeClient:
         self.access_token = access_token
         self.refresh_token = refresh_token
         self.token_expires_at = token_expires_at
-        self.user_id: Optional[str] = None
+        self.user_id: str | None = None
 
         if not self.api_key:
             raise YouTubeAuthError("YouTube API key not configured")
@@ -82,11 +75,7 @@ class YouTubeClient:
             YouTubeAuthError: If token cannot be obtained or refreshed.
         """
         # Check if token is still valid (with 5 minute buffer)
-        if (
-            self.token_expires_at
-            and utc_now()
-            < self.token_expires_at - timedelta(minutes=5)
-        ):
+        if self.token_expires_at and utc_now() < self.token_expires_at - timedelta(minutes=5):
             return self.access_token or ""
 
         # Need to refresh token
@@ -122,9 +111,7 @@ class YouTubeClient:
 
             data = response.json()
             self.access_token = data["access_token"]
-            self.token_expires_at = utc_now() + timedelta(
-                seconds=data.get("expires_in", 3600)
-            )
+            self.token_expires_at = utc_now() + timedelta(seconds=data.get("expires_in", 3600))
 
             return self.access_token
 
@@ -182,9 +169,7 @@ class YouTubeClient:
             data = response.json()
             return [self._parse_playlist(p) for p in data.get("items", [])]
 
-    async def get_playlist_videos(
-        self, playlist_id: str, max_results: int = 50
-    ) -> list[YouTubeVideo]:
+    async def get_playlist_videos(self, playlist_id: str, max_results: int = 50) -> list[YouTubeVideo]:
         """Get videos in a playlist.
 
         Args:
@@ -197,7 +182,7 @@ class YouTubeClient:
         access_token = await self.get_access_token()
 
         videos = []
-        page_token: Optional[str] = None
+        page_token: str | None = None
 
         async with async_client_context() as client:
             while True:
@@ -217,9 +202,7 @@ class YouTubeClient:
                     raise YouTubeAPIError(f"Failed to get playlist videos: {response.text}")
 
                 data = response.json()
-                videos.extend(
-                    [self._parse_video_item(p) for p in data.get("items", [])]
-                )
+                videos.extend([self._parse_video_item(p) for p in data.get("items", [])])
 
                 if "nextPageToken" not in data:
                     break
@@ -233,9 +216,7 @@ class YouTubeClient:
         content_details = data.get("contentDetails", {})
 
         # Check if this is the Watch Later playlist
-        is_watch_later = data["id"] == "WL" or "Watch Later" in snippet.get(
-            "title", ""
-        )
+        is_watch_later = data["id"] == "WL" or "Watch Later" in snippet.get("title", "")
 
         return YouTubePlaylist(
             playlist_id=data["id"],
@@ -251,19 +232,24 @@ class YouTubeClient:
         snippet = data.get("snippet", {})
         video_id = data.get("contentDetails", {}).get("videoId", "")
 
+        # Parse publishedAt, defaulting to utc_now() if missing or invalid
+        published_at_str = snippet.get("publishedAt", "")
+        try:
+            published_at = datetime.fromisoformat(published_at_str.replace("Z", "+00:00")) if published_at_str else utc_now()
+        except (ValueError, AttributeError):
+            published_at = utc_now()
+
         return YouTubeVideo(
             video_id=video_id,
             title=snippet.get("title", ""),
             channel_title=snippet.get("channelTitle", ""),
             channel_id=snippet.get("channelId", ""),
-            published_at=datetime.fromisoformat(
-                snippet.get("publishedAt", "").replace("Z", "+00:00")
-            ),
+            published_at=published_at,
             thumbnail_url=self._get_best_thumbnail(snippet.get("thumbnails")),
             description=snippet.get("description"),
         )
 
-    def _get_best_thumbnail(self, thumbnails: Optional[dict]) -> Optional[str]:
+    def _get_best_thumbnail(self, thumbnails: dict | None) -> str | None:
         """Get the best quality thumbnail URL."""
         if not thumbnails:
             return None

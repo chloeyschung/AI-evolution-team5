@@ -1,4 +1,4 @@
-import { authManager } from '../shared/auth';
+import { authManager, type AuthStatus } from '../shared/auth';
 import { apiClient } from '../shared/api';
 import { storageManager } from '../shared/storage';
 import { pageExtractor } from '../utils/extractor';
@@ -88,8 +88,8 @@ async function loadSettings(): Promise<void> {
 // Event Handlers
 loginBtn.addEventListener('click', async () => {
   try {
-    // Open Google OAuth flow
-    const client_id = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+    // Get Google Client ID from build-time config
+    const client_id = (window as any).__BRIEFLY_CONFIG?.GOOGLE_CLIENT_ID || '';
 
     if (!client_id) {
       alert('Google Client ID not configured. Please update the extension configuration.');
@@ -105,18 +105,58 @@ loginBtn.addEventListener('click', async () => {
       `access_type=offline&` +
       `prompt=consent`;
 
-    // Open in new tab and wait for callback
-    const { access_token, refresh_token, expires_at, user, is_new_user } =
-      await chrome.identity.launchWebAuthFlow({
-        url: authUrl,
-        interactive: true,
-      }).catch((error) => {
-        throw new Error('Login cancelled or failed');
-      });
+    // Set up listener for login completion signal
+    const loginCompletePromise = new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        chrome.runtime.onMessage.removeListener(loginListener);
+        reject(new Error('Login timeout'));
+      }, 10000); // 10 second timeout
 
-    // Store tokens and update UI
-    await authManager.loginWithGoogle(access_token, user);
-    showLoggedIn({ email: user.email });
+      const loginListener = (message: { action?: string }) => {
+        if (message.action === 'loginComplete') {
+          clearTimeout(timeout);
+          chrome.runtime.onMessage.removeListener(loginListener);
+          resolve();
+        }
+      };
+
+      chrome.runtime.onMessage.addListener(loginListener);
+    });
+
+    // Open OAuth flow - this returns when the window is closed
+    await chrome.identity.launchWebAuthFlow({
+      url: authUrl,
+      interactive: true,
+    }).catch((error) => {
+      // User cancelled or flow failed
+      if (error && error.message !== 'User closed the window') {
+        throw new Error('Login cancelled or failed');
+      }
+    });
+
+    // Wait for login completion signal from login.ts
+    try {
+      await loginCompletePromise;
+    } catch (error) {
+      // Timeout or error - fall back to checking tokens directly
+      console.warn('Login signal timeout, checking tokens directly:', error);
+    }
+
+    // Check if login was successful by verifying tokens exist
+    await authManager.initialize();
+    const tokens = await storageManager.getTokens();
+
+    if (tokens && Date.now() < tokens.expires_at) {
+      // Login successful - get user info
+      const authStatus = await authManager.getAuthStatus();
+      if (authStatus?.is_authenticated) {
+        showLoggedIn(authStatus);
+        return;
+      }
+    }
+
+    // If we get here, login failed
+    throw new Error('Login did not complete. Please try again.');
   } catch (error) {
     console.error('Login error:', error);
     showError(error instanceof Error ? error.message : 'Login failed');
@@ -140,20 +180,34 @@ saveCurrentPageBtn.addEventListener('click', async () => {
     // Save content
     const result = await apiClient.shareContent(metadata, selectedText);
 
-    // Show success
+    // Show success with animation
     saveCurrentPageBtn.textContent = '✓ Saved!';
-    saveCurrentPageBtn.style.background = '#10b981';
+    saveCurrentPageBtn.classList.add('btn-success');
+
+    setTimeout(() => {
+      saveCurrentPageBtn.textContent = 'Save Current Page';
+      saveCurrentPageBtn.classList.remove('btn-success');
+      saveCurrentPageBtn.style.background = '';
+      saveCurrentPageBtn.disabled = false;
+    }, 2000);
+  } catch (error) {
+    console.error('Save error:', error);
+    const errorMsg = error instanceof Error ? error.message : 'Failed to save content';
+
+    // Show error state on button
+    saveCurrentPageBtn.textContent = '✗ Error';
+    saveCurrentPageBtn.style.background = '#dc2626';
 
     setTimeout(() => {
       saveCurrentPageBtn.textContent = 'Save Current Page';
       saveCurrentPageBtn.style.background = '';
       saveCurrentPageBtn.disabled = false;
     }, 2000);
-  } catch (error) {
-    console.error('Save error:', error);
-    alert(error instanceof Error ? error.message : 'Failed to save content');
-    saveCurrentPageBtn.disabled = false;
-    saveCurrentPageBtn.textContent = 'Save Current Page';
+
+    // Show error after button recovers
+    setTimeout(() => {
+      alert(errorMsg);
+    }, 2200);
   }
 });
 

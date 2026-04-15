@@ -7,7 +7,8 @@ from unittest.mock import AsyncMock
 from sqlalchemy import delete, text
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from src.ai.metadata_extractor import ContentMetadata, ContentType
+from src.ai.metadata_extractor import ContentMetadata
+from src.constants import ContentType
 from src.ingestion.extractor import ContentExtractor
 from src.ai.metadata_extractor import MetadataExtractor
 from src.api.app import app
@@ -173,7 +174,7 @@ async def test_user(db, db_session: AsyncSession):
     user = UserProfile(
         email="test@example.com",
         google_sub="test_google_sub_123",
-        display_name="Test User",
+        display_name=None,
         created_at=utc_now(),
         updated_at=utc_now(),
     )
@@ -262,3 +263,16 @@ def metadata_extractor_mock_testplatform():
         )
     )
     return mock
+
+
+@pytest.fixture(autouse=True)
+def setup_share_handler():
+    """Initialize ShareHandler for testing (without summarizer)."""
+    from src.ingestion.share_handler import ShareHandler
+
+    app.state.share_handler = ShareHandler(
+        content_extractor=ContentExtractor(),
+        metadata_extractor=None,
+        summarizer=None,
+    )
+    yield

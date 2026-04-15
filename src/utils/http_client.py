@@ -14,13 +14,16 @@ Usage:
     client = get_client()
     # Use client...
     # Note: You are responsible for closing the client when done
+
+TODO #7 (2026-04-14): Added error handling for closed pool clients in async_client_context
+TODO #10 (2026-04-14): Replace Generator with | None syntax for type hints
 """
 
+import threading
+from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager
-from typing import Generator
 
 import httpx
-
 
 # Default configuration for the pooled client
 DEFAULT_TIMEOUT = httpx.Timeout(30.0)
@@ -44,7 +47,7 @@ class HttpClientPool:
     """
 
     _instance: httpx.AsyncClient | None = None
-    _lock: object = object()  # Lock for thread-safe initialization
+    _lock: threading.Lock = threading.Lock()  # Lock for thread-safe initialization
     _mounts: dict[str, httpx.AsyncHTTPTransport | httpx.AsyncHTTPTransport] | None = None
 
     @classmethod
@@ -133,7 +136,7 @@ async def async_client_context(
     timeout: httpx.Timeout | None = None,
     follow_redirects: bool = False,
     **kwargs,
-) -> Generator[httpx.AsyncClient, None, None]:
+) -> Generator[httpx.AsyncClient]:
     """Context manager for the pooled HTTP client.
 
     This is the recommended way to use the client pool. It ensures
@@ -147,13 +150,24 @@ async def async_client_context(
     Yields:
         An AsyncClient instance from the pool.
 
+    Raises:
+        RuntimeError: If the HTTP pool is being shut down.
+
     Example:
         async with async_client_context() as client:
             response = await client.get("https://api.example.com")
     """
     client = get_pooled_client(timeout, follow_redirects, **kwargs)
+
+    # TODO #7 (2026-04-14): Check if client is closed before use
+    if client.is_closed:
+        raise RuntimeError("HTTP client pool is being shut down. Cannot make requests.")
+
     try:
         yield client
+    except httpx.CloseError as e:
+        # Re-raise connection errors that occur during shutdown
+        raise RuntimeError("HTTP connection closed during request. Pool may be shutting down.") from e
     finally:
         # Don't close the client - keep it in the pool for reuse
         # The pool is closed at application shutdown via close()

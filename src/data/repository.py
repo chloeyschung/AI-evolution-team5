@@ -1,28 +1,32 @@
-"""Repository pattern for data access operations."""
+"""Repository pattern for data access operations.
+
+TODO #3 (2026-04-14): Added user_id parameter to ContentRepository.save() to prevent content leakage
+TODO #4 (2026-04-14): Fix limit=None handling in get_pending, get_kept, get_discarded methods
+TODO #6 (2026-04-14): Fix timezone handling inconsistencies in get_statistics method
+"""
 
 from datetime import date, datetime, timedelta
-from typing import List
 
-from sqlalchemy import case, delete, func, select, update
+from sqlalchemy import case, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.metadata_extractor import ContentMetadata
 
-from .models import (
-    Content,
-    SwipeHistory,
-    SwipeAction,
-    ContentStatus,
-    UserProfile,
-    UserPreferences,
-    InterestTag,
-    Theme,
-    DefaultSort,
-    utc_now,
-    AccountDeletion,
-    ContentTag,
-)
 from .base_repository import BaseRepository
+from .models import (
+    AccountDeletion,
+    Content,
+    ContentStatus,
+    ContentTag,
+    DefaultSort,
+    InterestTag,
+    SwipeAction,
+    SwipeHistory,
+    Theme,
+    UserPreferences,
+    UserProfile,
+    utc_now,
+)
 
 
 class ContentRepository(BaseRepository[Content]):
@@ -35,18 +39,21 @@ class ContentRepository(BaseRepository[Content]):
         self,
         metadata: ContentMetadata,
         status: ContentStatus = ContentStatus.INBOX,
+        user_id: int = 1,  # TODO #3 (2026-04-14): Added user_id parameter for multi-user support
     ) -> Content:
         """Save or update content from metadata.
 
         Args:
             metadata: ContentMetadata to save.
             status: Content status (default: INBOX for new content).
+            user_id: User ID to associate with content (default: 1 for backward compatibility).
 
         Returns:
             The saved or updated Content object.
         """
+        # TODO #3 (2026-04-14): Filter by both url and user_id to prevent content leakage
         result = await self.session.execute(
-            select(Content).where(Content.url == metadata.url)
+            select(Content).where(Content.url == metadata.url, Content.user_id == user_id)
         )
         existing = result.scalar_one_or_none()
 
@@ -64,7 +71,7 @@ class ContentRepository(BaseRepository[Content]):
             await self.session.commit()
             return existing
         else:
-            # Create new
+            # Create new with user_id
             content = Content(
                 platform=metadata.platform,
                 content_type=metadata.content_type.value,
@@ -75,6 +82,7 @@ class ContentRepository(BaseRepository[Content]):
                 thumbnail_url=metadata.thumbnail_url,
                 status=status,
                 summary=metadata.summary,
+                user_id=user_id,  # TODO #3 (2026-04-14): Set user_id on new content
             )
             self.session.add(content)
             await self.session.commit()
@@ -89,9 +97,7 @@ class ContentRepository(BaseRepository[Content]):
         Returns:
             Content object if found, None otherwise.
         """
-        result = await self.session.execute(
-            select(Content).where(Content.url == url)
-        )
+        result = await self.session.execute(select(Content).where(Content.url == url))
         return result.scalar_one_or_none()
 
     async def get_by_id(self, content_id: int) -> Content | None:
@@ -108,48 +114,52 @@ class ContentRepository(BaseRepository[Content]):
     async def get_all(
         self,
         user_id: int,
-        limit: int = 50,
+        limit: int | None = 50,
         offset: int = 0,
         status: ContentStatus | None = None,
-    ) -> List[Content]:
+    ) -> list[Content]:
         """Get all content with pagination.
 
         Args:
             user_id: User ID to filter content by.
-            limit: Maximum number of results.
+            limit: Maximum number of results. Set to None for unlimited.
             offset: Number of results to skip.
             status: Optional filter by content status.
 
         Returns:
             List of Content objects, optionally filtered by status.
         """
-        query = (
-            select(Content)
-            .where(Content.user_id == user_id)
-            .order_by(Content.created_at.desc())
-            .limit(limit)
-            .offset(offset)
-        )
+        # TODO #4 (2026-04-14): Build query without limit first, apply conditionally
+        query = select(Content).where(Content.user_id == user_id).order_by(Content.created_at.desc()).offset(offset)
+        # Only apply limit if not None (SQLAlchemy .limit(None) still limits!)
+        if limit is not None:
+            query = query.limit(limit)
         if status is not None:
             query = query.where(Content.status == status)
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
-    async def update_status(self, content_id: int, new_status: ContentStatus) -> Content:
+    async def update_status(
+        self, content_id: int, new_status: ContentStatus, user_id: int | None = None
+    ) -> Content:
         """Update content status (INBOX → ARCHIVED transition).
 
         Args:
             content_id: The content ID to update.
             new_status: The new status (ARCHIVED only, one-way transition).
+            user_id: Optional user ID for ownership check.
 
         Returns:
             Updated Content object.
 
         Raises:
             ValueError: If content is already ARCHIVED (one-way transition).
-            RuntimeError: If content not found.
+            RuntimeError: If content not found or ownership mismatch.
         """
-        result = await self.session.execute(select(Content).where(Content.id == content_id))
+        query = select(Content).where(Content.id == content_id)
+        if user_id is not None:
+            query = query.where(Content.user_id == user_id)
+        result = await self.session.execute(query)
         content = result.scalar_one_or_none()
 
         if content is None:
@@ -168,7 +178,7 @@ class ContentRepository(BaseRepository[Content]):
         self,
         base_query: select,
         platform: str | None = None,
-        tags: List[str] | None = None,
+        tags: list[str] | None = None,
     ) -> select:
         """Apply common filters to a content query.
 
@@ -194,29 +204,35 @@ class ContentRepository(BaseRepository[Content]):
     async def get_pending(
         self,
         user_id: int,
-        limit: int = 50,
+        limit: int | None = 50,
+        offset: int = 0,
         platform: str | None = None,
-        tags: List[str] | None = None,
-    ) -> List[Content]:
+        tags: list[str] | None = None,
+    ) -> list[Content]:
         """Get content that hasn't been swiped yet.
 
         Args:
             user_id: User ID to filter content by.
-            limit: Maximum number of results.
+            limit: Maximum number of results. Set to None for unlimited.
+            offset: Pagination offset.
             platform: Optional platform filter (case-insensitive).
             tags: Optional list of AI-generated tags to filter by (F-014).
 
         Returns:
             List of Content objects that have no swipe history.
         """
+        # TODO #4 (2026-04-14): Build query without limit first, apply conditionally
         base_query = (
             select(Content)
             .where(Content.user_id == user_id)
             .outerjoin(SwipeHistory, Content.id == SwipeHistory.content_id)
             .where(SwipeHistory.id.is_(None))
             .order_by(Content.created_at.desc())
-            .limit(limit)
+            .offset(offset)
         )
+        # Only apply limit if not None (SQLAlchemy .limit(None) still limits!)
+        if limit is not None:
+            base_query = base_query.limit(limit)
 
         query = self._build_content_query_with_filters(base_query, platform, tags)
 
@@ -226,16 +242,16 @@ class ContentRepository(BaseRepository[Content]):
     async def get_kept(
         self,
         user_id: int,
-        limit: int = 50,
+        limit: int | None = 50,
         offset: int = 0,
         platform: str | None = None,
-        tags: List[str] | None = None,
-    ) -> List[Content]:
+        tags: list[str] | None = None,
+    ) -> list[Content]:
         """Get content that was swiped Keep.
 
         Args:
             user_id: User ID to filter content by.
-            limit: Maximum number of results.
+            limit: Maximum number of results. Set to None for unlimited.
             offset: Pagination offset.
             platform: Optional platform filter (case-insensitive).
             tags: Optional list of AI-generated tags to filter by (F-014).
@@ -243,6 +259,7 @@ class ContentRepository(BaseRepository[Content]):
         Returns:
             List of Content objects that were kept, ordered by recency.
         """
+        # TODO #4 (2026-04-14): Build query without limit first, apply conditionally
         base_query = (
             select(Content)
             .where(Content.user_id == user_id)
@@ -250,8 +267,10 @@ class ContentRepository(BaseRepository[Content]):
             .where(SwipeHistory.action == SwipeAction.KEEP)
             .order_by(SwipeHistory.swiped_at.desc())
             .offset(offset)
-            .limit(limit)
         )
+        # Only apply limit if not None (SQLAlchemy .limit(None) still limits!)
+        if limit is not None:
+            base_query = base_query.limit(limit)
 
         query = self._build_content_query_with_filters(base_query, platform, tags)
 
@@ -261,16 +280,16 @@ class ContentRepository(BaseRepository[Content]):
     async def get_discarded(
         self,
         user_id: int,
-        limit: int = 50,
+        limit: int | None = 50,
         offset: int = 0,
         platform: str | None = None,
-        tags: List[str] | None = None,
-    ) -> List[Content]:
+        tags: list[str] | None = None,
+    ) -> list[Content]:
         """Get content that was swiped Discard.
 
         Args:
             user_id: User ID to filter content by.
-            limit: Maximum number of results.
+            limit: Maximum number of results. Set to None for unlimited.
             offset: Pagination offset.
             platform: Optional platform filter (case-insensitive).
             tags: Optional list of AI-generated tags to filter by (F-014).
@@ -278,6 +297,7 @@ class ContentRepository(BaseRepository[Content]):
         Returns:
             List of Content objects that were discarded, ordered by recency.
         """
+        # TODO #4 (2026-04-14): Build query without limit first, apply conditionally
         base_query = (
             select(Content)
             .where(Content.user_id == user_id)
@@ -285,25 +305,31 @@ class ContentRepository(BaseRepository[Content]):
             .where(SwipeHistory.action == SwipeAction.DISCARD)
             .order_by(SwipeHistory.swiped_at.desc())
             .offset(offset)
-            .limit(limit)
         )
+        # Only apply limit if not None (SQLAlchemy .limit(None) still limits!)
+        if limit is not None:
+            base_query = base_query.limit(limit)
 
         query = self._build_content_query_with_filters(base_query, platform, tags)
 
         result = await self.session.execute(query)
         return list(result.scalars().unique().all())
 
-    async def get_platform_counts(self) -> List[tuple[str, int]]:
+    async def get_platform_counts(self, user_id: int | None = None) -> list[tuple[str, int]]:
         """Get list of platforms with content counts.
+
+        Args:
+            user_id: Optional user ID to filter content by.
 
         Returns:
             List of (platform, count) tuples, sorted by count descending.
         """
-        result = await self.session.execute(
-            select(Content.platform, func.count(Content.id))
-            .group_by(Content.platform)
-            .order_by(func.count(Content.id).desc())
+        query = select(Content.platform, func.count(Content.id)).group_by(Content.platform).order_by(
+            func.count(Content.id).desc()
         )
+        if user_id is not None:
+            query = query.where(Content.user_id == user_id)
+        result = await self.session.execute(query)
         return [(row[0], row[1]) for row in result.fetchall()]
 
     async def search_content(
@@ -312,7 +338,7 @@ class ContentRepository(BaseRepository[Content]):
         query: str,
         limit: int = 50,
         offset: int = 0,
-    ) -> List[Content]:
+    ) -> list[Content]:
         """Search content by title, author, or AI-generated tags (F-016).
 
         Args:
@@ -334,11 +360,11 @@ class ContentRepository(BaseRepository[Content]):
             .where(Content.user_id == user_id)
             .outerjoin(ContentTag, Content.id == ContentTag.content_id)
             .where(
-                (Content.title.isnot(None)) &  # Must have title
-                (
-                    (Content.title.ilike(query_pattern)) |
-                    (Content.author.ilike(query_pattern)) |
-                    (ContentTag.tag.ilike(query_pattern))  # F-016: Tag search
+                (Content.title.isnot(None))  # Must have title
+                & (
+                    (Content.title.ilike(query_pattern))
+                    | (Content.author.ilike(query_pattern))
+                    | (ContentTag.tag.ilike(query_pattern))  # F-016: Tag search
                 )
             )
             .order_by(Content.created_at.desc())
@@ -352,21 +378,32 @@ class ContentRepository(BaseRepository[Content]):
 
         return results
 
-    async def get_stats(self) -> dict:
+    async def get_stats(self, user_id: int | None = None) -> dict:
         """Get content statistics.
+
+        Args:
+            user_id: Optional user ID to filter content by.
 
         Returns:
             Dictionary with pending, kept, discarded counts.
         """
-        all_count = (await self.session.execute(select(func.count(Content.id)))).scalar()
+        # Build base query with optional user filter
+        content_query = select(Content)
+        swipe_query = select(SwipeHistory)
+        if user_id is not None:
+            content_query = content_query.where(Content.user_id == user_id)
+            swipe_query = swipe_query.where(SwipeHistory.user_id == user_id)
+
+        all_count = (await self.session.execute(select(func.count()).select_from(content_query.subquery()))).scalar()
         kept_count = (
             await self.session.execute(
-                select(func.count(SwipeHistory.content_id)).where(SwipeHistory.action == SwipeAction.KEEP)
+                select(func.count()).select_from(swipe_query.where(SwipeHistory.action == SwipeAction.KEEP).subquery())
             )
         ).scalar()
         discarded_count = (
             await self.session.execute(
-                select(func.count(SwipeHistory.content_id)).where(SwipeHistory.action == SwipeAction.DISCARD)
+                select(func.count())
+                .select_from(swipe_query.where(SwipeHistory.action == SwipeAction.DISCARD).subquery())
             )
         ).scalar()
 
@@ -376,21 +413,79 @@ class ContentRepository(BaseRepository[Content]):
             "discarded": discarded_count,
         }
 
+    async def get_all_ordered(
+        self,
+        user_id: int | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[Content]:
+        """Get all content ordered by creation date (newest first).
 
-class SwipeRepository:
+        Args:
+            user_id: Optional user ID to filter content by.
+            limit: Maximum number of results.
+            offset: Pagination offset.
+
+        Returns:
+            List of Content objects ordered by created_at descending.
+        """
+        query = select(Content).order_by(Content.created_at.desc()).offset(offset).limit(limit)
+        if user_id is not None:
+            query = query.where(Content.user_id == user_id)
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+    async def delete_content(self, content_id: int, user_id: int) -> bool:
+        """Delete content and related records for a user.
+
+        Args:
+            content_id: Content ID to delete.
+            user_id: User ID (for ownership verification).
+
+        Returns:
+            True if deleted, False if not found or not owned by user.
+        """
+        from sqlalchemy import delete
+
+        # Check ownership
+        result = await self.session.execute(
+            select(Content).where(Content.id == content_id, Content.user_id == user_id)
+        )
+        content = result.scalar_one_or_none()
+
+        if content is None:
+            return False
+
+        # Delete related records first
+        await self.session.execute(
+            delete(ContentTag).where(ContentTag.content_id == content_id)
+        )
+        await self.session.execute(
+            delete(SwipeHistory).where(SwipeHistory.content_id == content_id)
+        )
+
+        # Delete the content
+        await self.session.execute(delete(Content).where(Content.id == content_id))
+        await self.session.commit()
+
+        return True
+
+
+class SwipeRepository(BaseRepository[SwipeHistory]):
     """Repository for SwipeHistory operations."""
 
     def __init__(self, session: AsyncSession):
-        self.session = session
+        super().__init__(session)
 
     async def record_swipe(
-        self, content_id: int, action: SwipeAction
+        self, content_id: int, action: SwipeAction, user_id: int = 1
     ) -> SwipeHistory:
         """Record a swipe action.
 
         Args:
             content_id: The content ID.
             action: The swipe action (KEEP or DISCARD).
+            user_id: User ID (default: 1 for backward compatibility).
                 - KEEP: Content remains INBOX
                 - DISCARD: Content status changes to ARCHIVED
 
@@ -400,6 +495,7 @@ class SwipeRepository:
         history = SwipeHistory(
             content_id=content_id,
             action=action,
+            user_id=user_id,
             swiped_at=utc_now(),
         )
         self.session.add(history)
@@ -419,14 +515,10 @@ class SwipeRepository:
             content_id: The content ID to update.
             new_status: The new status to set.
         """
-        stmt = (
-            update(Content)
-            .where(Content.id == content_id)
-            .values(status=new_status, updated_at=utc_now())
-        )
+        stmt = update(Content).where(Content.id == content_id).values(status=new_status, updated_at=utc_now())
         await self.session.execute(stmt)
 
-    async def get_history(self, content_id: int) -> List[SwipeHistory]:
+    async def get_history(self, content_id: int) -> list[SwipeHistory]:
         """Get swipe history for a content.
 
         Args:
@@ -435,12 +527,10 @@ class SwipeRepository:
         Returns:
             List of SwipeHistory objects.
         """
-        result = await self.session.execute(
-            select(SwipeHistory).where(SwipeHistory.content_id == content_id)
-        )
+        result = await self.session.execute(select(SwipeHistory).where(SwipeHistory.content_id == content_id))
         return list(result.scalars().all())
 
-    async def get_all_history(self) -> List[SwipeHistory]:
+    async def get_all_history(self) -> list[SwipeHistory]:
         """Get all swipe history (for achievement tracking).
 
         Returns:
@@ -450,14 +540,15 @@ class SwipeRepository:
         return list(result.scalars().all())
 
     async def record_swipes_batch(
-        self, actions: List[tuple[int, SwipeAction]]
-    ) -> List[SwipeHistory]:
+        self, actions: list[tuple[int, SwipeAction]], user_id: int = 1
+    ) -> list[SwipeHistory]:
         """Record multiple swipe actions atomically.
 
         All actions succeed or all fail - no partial commits.
 
         Args:
             actions: List of (content_id, action) tuples.
+            user_id: User ID (default: 1 for backward compatibility).
 
         Returns:
             List of created SwipeHistory objects.
@@ -467,6 +558,7 @@ class SwipeRepository:
             SwipeHistory(
                 content_id=content_id,
                 action=action,
+                user_id=user_id,
                 swiped_at=now,
             )
             for content_id, action in actions
@@ -488,24 +580,46 @@ class UserProfileRepository(BaseRepository[UserProfile]):
     def __init__(self, session: AsyncSession):
         super().__init__(session)
 
-    async def get_or_create_profile(self) -> UserProfile:
+    async def get_or_create_profile(self, user_id: int | None = None) -> UserProfile:
         """Get existing profile or create default.
+
+        Args:
+            user_id: Optional user ID to filter by.
 
         Returns:
             UserProfile object (existing or newly created).
         """
-        return await self._get_or_create_base(
-            UserProfile,
-            True,  # Get first record
-            lambda: {"display_name": None, "avatar_url": None, "bio": None},
+        query = select(UserProfile)
+        if user_id is not None:
+            query = query.where(UserProfile.id == user_id)
+        result = await self.session.execute(query)
+        profile = result.scalar_one_or_none()
+
+        if profile:
+            return profile
+
+        # Create default profile
+        profile = UserProfile(
+            display_name=None,
+            avatar_url=None,
+            bio=None,
         )
+        self.session.add(profile)
+        await self.session.commit()
+        await self.session.refresh(profile)
+        return profile
 
     async def update_profile(
-        self, display_name: str | None = None, avatar_url: str | None = None, bio: str | None = None
+        self,
+        user_id: int | None = None,
+        display_name: str | None = None,
+        avatar_url: str | None = None,
+        bio: str | None = None,
     ) -> UserProfile:
         """Update profile fields.
 
         Args:
+            user_id: Optional user ID to filter by.
             display_name: Optional display name to update.
             avatar_url: Optional avatar URL to update.
             bio: Optional bio to update.
@@ -513,7 +627,7 @@ class UserProfileRepository(BaseRepository[UserProfile]):
         Returns:
             Updated UserProfile object.
         """
-        profile = await self.get_or_create_profile()
+        profile = await self.get_or_create_profile(user_id=user_id)
 
         if display_name is not None:
             profile.display_name = display_name
@@ -620,23 +734,35 @@ class UserProfileRepository(BaseRepository[UserProfile]):
         retention_rate = total_kept / total_swipes if total_swipes > 0 else 0.0
 
         # Calculate streak using unique active dates (O(1) query instead of O(N) loop)
+        # TODO #6 (2026-04-14): Fixed timezone handling - always convert to UTC before date comparison
         streak_days = 0
         if first_swipe_at is not None:
-            today = date.today()
+            # Convert to UTC first to ensure consistent date comparison
+            from src.utils.datetime_utils import convert_to_utc, utc_now
+
+            first_swipe_utc = convert_to_utc(first_swipe_at)
+            last_swipe_utc = convert_to_utc(last_swipe_at) if last_swipe_at else None
+
+            # Use UTC date for comparison to avoid timezone mismatch
+            today = utc_now().date()
             yesterday = today - timedelta(days=1)
-            end_date = yesterday if last_swipe_at is None or last_swipe_at.date() < today else today
+            end_date = yesterday if last_swipe_utc is None or last_swipe_utc.date() < today else today
 
             # Get all unique active dates in descending order (single query)
             dates_result = await self.session.execute(
-                select(func.date(SwipeHistory.swiped_at)).distinct()
+                select(func.date(SwipeHistory.swiped_at))
+                .distinct()
                 .where(
                     func.date(SwipeHistory.swiped_at) <= end_date,
-                    func.date(SwipeHistory.swiped_at) >= first_swipe_at.date()
+                    func.date(SwipeHistory.swiped_at) >= first_swipe_utc.date(),
                 )
                 .order_by(func.date(SwipeHistory.swiped_at).desc())
             )
             # Convert database dates to Python date objects for comparison
-            active_dates = {date.fromisoformat(str(row[0])) if isinstance(row[0], str) else row[0] for row in dates_result.fetchall()}
+            active_dates = {
+                date.fromisoformat(str(row[0])) if isinstance(row[0], str) else row[0]
+                for row in dates_result.fetchall()
+            }
 
             # Count consecutive days from end_date backwards
             current_date = end_date
@@ -668,9 +794,7 @@ class UserProfileRepository(BaseRepository[UserProfile]):
 
         # Check if tag already exists (case-insensitive)
         result = await self.session.execute(
-            select(InterestTag).where(
-                InterestTag.user_id == user_id, InterestTag.tag.ilike(tag_normalized)
-            )
+            select(InterestTag).where(InterestTag.user_id == user_id, InterestTag.tag.ilike(tag_normalized))
         )
         existing = result.scalar_one_or_none()
 
@@ -695,13 +819,11 @@ class UserProfileRepository(BaseRepository[UserProfile]):
         tag_normalized = tag.strip().lower()
 
         await self.session.execute(
-            delete(InterestTag).where(
-                InterestTag.user_id == user_id, InterestTag.tag.ilike(tag_normalized)
-            )
+            delete(InterestTag).where(InterestTag.user_id == user_id, InterestTag.tag.ilike(tag_normalized))
         )
         await self.session.commit()
 
-    async def get_interest_tags(self, user_id: int) -> List[str]:
+    async def get_interest_tags(self, user_id: int) -> list[str]:
         """Get all user interest tags.
 
         Args:
@@ -724,9 +846,7 @@ class UserProfileRepository(BaseRepository[UserProfile]):
         Returns:
             UserProfile if found, None otherwise.
         """
-        result = await self.session.execute(
-            select(UserProfile).where(UserProfile.email == email)
-        )
+        result = await self.session.execute(select(UserProfile).where(UserProfile.email == email))
         return result.scalar_one_or_none()
 
     async def get_user_by_google_sub(self, google_sub: str) -> UserProfile | None:
@@ -738,9 +858,7 @@ class UserProfileRepository(BaseRepository[UserProfile]):
         Returns:
             UserProfile if found, None otherwise.
         """
-        result = await self.session.execute(
-            select(UserProfile).where(UserProfile.google_sub == google_sub)
-        )
+        result = await self.session.execute(select(UserProfile).where(UserProfile.google_sub == google_sub))
         return result.scalar_one_or_none()
 
     async def create_user(
@@ -785,9 +903,7 @@ class UserProfileRepository(BaseRepository[UserProfile]):
         Returns:
             Updated UserProfile.
         """
-        result = await self.session.execute(
-            select(UserProfile).where(UserProfile.id == user_id)
-        )
+        result = await self.session.execute(select(UserProfile).where(UserProfile.id == user_id))
         profile = result.scalar_one_or_none()
 
         if profile:
@@ -798,11 +914,11 @@ class UserProfileRepository(BaseRepository[UserProfile]):
         return profile
 
 
-class AccountDeletionRepository:
+class AccountDeletionRepository(BaseRepository[AccountDeletion]):
     """Repository for account deletion tracking (AUTH-002, AUTH-004)."""
 
     def __init__(self, session: AsyncSession):
-        self.session = session
+        super().__init__(session)
 
     async def is_account_blocked(
         self, email: str | None = None, google_sub: str | None = None
@@ -830,7 +946,7 @@ class AccountDeletionRepository:
         if not conditions:
             return False, None
 
-        query = select(AccountDeletion).where(func.or_(*conditions))
+        query = select(AccountDeletion).where(or_(*conditions))
         result = await self.session.execute(query)
         deletion = result.scalar_one_or_none()
 
@@ -848,6 +964,7 @@ class AccountDeletionRepository:
         email: str,
         google_sub: str | None = None,
         block_days: int = 30,
+        confirmation_token: str | None = None,
     ) -> AccountDeletion:
         """Record account deletion for 30-day re-registration block (AUTH-004).
 
@@ -855,6 +972,7 @@ class AccountDeletionRepository:
             email: User email address.
             google_sub: Optional Google user ID.
             block_days: Number of days to block re-registration (default: 30).
+            confirmation_token: Optional token for two-step deletion confirmation.
 
         Returns:
             Created AccountDeletion record.
@@ -867,20 +985,57 @@ class AccountDeletionRepository:
             google_sub=google_sub,
             deleted_at=now,
             block_expires_at=block_expires_at,
+            confirmation_token=confirmation_token,
         )
         self.session.add(deletion)
         await self.session.commit()
         await self.session.refresh(deletion)
         return deletion
 
+    async def get_confirmation_token(self, email: str) -> str | None:
+        """Get confirmation token for a pending account deletion.
 
-class ContentTagRepository:
+        Args:
+            email: User email address.
+
+        Returns:
+            Confirmation token if exists and not expired, None otherwise.
+        """
+        now = utc_now()
+        result = await self.session.execute(
+            select(AccountDeletion.confirmation_token)
+            .where(AccountDeletion.email == email)
+            .where(AccountDeletion.confirmation_token.isnot(None))
+            .where(AccountDeletion.block_expires_at > now)
+        )
+        return result.scalar_one_or_none()
+
+    async def clear_confirmation_token(self, email: str) -> bool:
+        """Clear the confirmation token after successful deletion.
+
+        Args:
+            email: User email address.
+
+        Returns:
+            True if token was cleared, False if no token found.
+        """
+        result = await self.session.execute(
+            update(AccountDeletion)
+            .where(AccountDeletion.email == email)
+            .where(AccountDeletion.confirmation_token.isnot(None))
+            .values(confirmation_token=None)
+        )
+        await self.session.commit()
+        return result.rowcount > 0
+
+
+class ContentTagRepository(BaseRepository[ContentTag]):
     """Repository for content tag operations (AI-003)."""
 
     def __init__(self, session: AsyncSession):
-        self.session = session
+        super().__init__(session)
 
-    async def add_tags(self, content_id: int, tags: List[str]) -> List[ContentTag]:
+    async def add_tags(self, content_id: int, tags: list[str]) -> list[ContentTag]:
         """Add tags to content (optimized: single query instead of N+1).
 
         Args:
@@ -891,9 +1046,7 @@ class ContentTagRepository:
             List of created ContentTag objects.
         """
         # Fetch all existing tags for this content in one query
-        result = await self.session.execute(
-            select(ContentTag).where(ContentTag.content_id == content_id)
-        )
+        result = await self.session.execute(select(ContentTag).where(ContentTag.content_id == content_id))
         existing_tags = {t.tag.lower() for t in result.scalars().all()}
 
         # Build new tags (avoid duplicates)
@@ -906,10 +1059,7 @@ class ContentTagRepository:
                 continue  # Skip duplicates
             seen.add(tag_lower)
 
-            content_tag = ContentTag(
-                content_id=content_id,
-                tag=tag_lower
-            )
+            content_tag = ContentTag(content_id=content_id, tag=tag_lower)
             self.session.add(content_tag)
             created_tags.append(content_tag)
 
@@ -921,7 +1071,7 @@ class ContentTagRepository:
 
         return created_tags
 
-    async def get_tags(self, content_id: int) -> List[str]:
+    async def get_tags(self, content_id: int) -> list[str]:
         """Get all tags for content.
 
         Args:
@@ -931,15 +1081,11 @@ class ContentTagRepository:
             List of tag strings.
         """
         result = await self.session.execute(
-            select(ContentTag.tag)
-            .where(ContentTag.content_id == content_id)
-            .order_by(ContentTag.tag)
+            select(ContentTag.tag).where(ContentTag.content_id == content_id).order_by(ContentTag.tag)
         )
         return [row[0] for row in result.fetchall()]
 
-    async def get_tags_for_content_ids(
-        self, content_ids: List[int]
-    ) -> dict[int, List[str]]:
+    async def get_tags_for_content_ids(self, content_ids: list[int]) -> dict[int, list[str]]:
         """Get all tags for multiple content IDs in a single query (batch optimization).
 
         This method avoids N+1 query pattern by fetching all tags in one query.
@@ -961,7 +1107,7 @@ class ContentTagRepository:
         )
 
         # Build dictionary mapping content_id -> list of tags
-        tags_by_content: dict[int, List[str]] = {}
+        tags_by_content: dict[int, list[str]] = {}
         for row in result.fetchall():
             cid, tag = row[0], row[1]
             if cid not in tags_by_content:
@@ -976,7 +1122,5 @@ class ContentTagRepository:
         Args:
             content_id: Content ID.
         """
-        await self.session.execute(
-            delete(ContentTag).where(ContentTag.content_id == content_id)
-        )
+        await self.session.execute(delete(ContentTag).where(ContentTag.content_id == content_id))
         await self.session.commit()

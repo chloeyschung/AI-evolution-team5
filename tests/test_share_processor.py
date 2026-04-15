@@ -2,7 +2,8 @@
 
 import pytest
 
-from src.ai.metadata_extractor import ContentMetadata, ContentType
+from src.ai.metadata_extractor import ContentMetadata
+from src.constants import ContentType
 from src.ingestion.share_processor import (
     URLShareProcessor,
     PlainTextProcessor,

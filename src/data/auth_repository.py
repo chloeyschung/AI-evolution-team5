@@ -1,23 +1,26 @@
-"""Repository for authentication operations."""
+"""Repository for authentication operations.
 
-from datetime import datetime, timezone, timedelta
-from typing import Optional
-from uuid import uuid4
+TODO #10 (2026-04-14): Removed Optional import - using | None syntax instead.
+"""
 
-from sqlalchemy import select
+from datetime import timedelta
+
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.data.models import AuthenticationToken, UserProfile
 from src.auth import tokens as token_utils
+from src.data.base_repository import BaseRepository
+from src.data.models import AuthenticationToken
 from src.utils.datetime_utils import utc_now
-from src.utils.token_hashing import hash_access_token, verify_access_token
+from src.utils.token_hashing import hash_access_token
 
 
-class AuthenticationRepository:
+class AuthenticationRepository(BaseRepository[AuthenticationToken]):
     """Repository for authentication token management."""
 
     def __init__(self, db: AsyncSession):
-        self.db = db
+        super().__init__(db)
+        self.db = db  # Keep for backward compatibility
 
     async def create_tokens(
         self,
@@ -101,6 +104,7 @@ class AuthenticationRepository:
             # Check if token is expired
             # Convert to UTC to handle timezone-aware/naive comparison
             from src.utils.datetime_utils import convert_to_utc
+
             expires_at_utc = convert_to_utc(token.expires_at)
             if expires_at_utc and expires_at_utc < utc_now():
                 return None
@@ -185,7 +189,12 @@ class AuthenticationRepository:
     async def _revoke_existing_tokens(self, user_id: int) -> None:
         """Revoke existing tokens for a user (internal helper).
 
+        Physically deletes old tokens to avoid unique constraint violation on user_id.
+
         Args:
             user_id: The user ID to revoke tokens for
         """
-        await self.revoke_token_by_user_id(user_id)
+        await self.db.execute(
+            delete(AuthenticationToken).where(AuthenticationToken.user_id == user_id)
+        )
+        await self.db.commit()

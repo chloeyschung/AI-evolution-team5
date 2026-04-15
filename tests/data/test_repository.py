@@ -3,7 +3,8 @@
 import pytest
 from datetime import datetime, timezone
 
-from src.ai.metadata_extractor import ContentMetadata, ContentType
+from src.ai.metadata_extractor import ContentMetadata
+from src.constants import ContentType
 from src.data.models import SwipeAction, Content, UserProfile
 from src.data.repository import ContentRepository, SwipeRepository
 from src.utils.datetime_utils import utc_now

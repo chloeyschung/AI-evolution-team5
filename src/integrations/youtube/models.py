@@ -1,7 +1,6 @@
 """Pydantic models for YouTube integration."""
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -14,8 +13,8 @@ class YouTubeVideo(BaseModel):
     channel_title: str = Field(..., description="Channel name")
     channel_id: str = Field(..., description="Channel ID")
     published_at: datetime = Field(..., description="Publish timestamp")
-    thumbnail_url: Optional[str] = Field(None, description="Thumbnail URL")
-    description: Optional[str] = Field(None, description="Video description")
+    thumbnail_url: str | None = Field(None, description="Thumbnail URL")
+    description: str | None = Field(None, description="Video description")
 
 
 class YouTubePlaylist(BaseModel):
@@ -23,8 +22,8 @@ class YouTubePlaylist(BaseModel):
 
     playlist_id: str = Field(..., description="Playlist ID")
     title: str = Field(..., description="Playlist title")
-    description: Optional[str] = Field(None, description="Playlist description")
-    thumbnail_url: Optional[str] = Field(None, description="Thumbnail URL")
+    description: str | None = Field(None, description="Playlist description")
+    thumbnail_url: str | None = Field(None, description="Thumbnail URL")
     video_count: int = Field(default=0, description="Number of videos")
     is_watch_later: bool = Field(default=False, description="Is Watch Later playlist")
 
@@ -34,9 +33,9 @@ class YouTubeChannel(BaseModel):
 
     channel_id: str = Field(..., description="Channel ID")
     title: str = Field(..., description="Channel name")
-    description: Optional[str] = Field(None, description="Channel description")
-    thumbnail_url: Optional[str] = Field(None, description="Channel avatar URL")
-    subscriber_count: Optional[int] = Field(None, description="Subscriber count")
+    description: str | None = Field(None, description="Channel description")
+    thumbnail_url: str | None = Field(None, description="Channel avatar URL")
+    subscriber_count: int | None = Field(None, description="Subscriber count")
 
 
 class SyncConfig(BaseModel):
@@ -66,5 +65,5 @@ class SyncLog(BaseModel):
     status: str = Field(..., description="success, failed, partial")
     ingested_count: int
     skipped_count: int
-    error_message: Optional[str] = None
+    error_message: str | None = None
     executed_at: datetime

@@ -1,7 +1,7 @@
 """Data layer for Briefly storage engine."""
 
-from .models import Base, Content, SwipeHistory, SwipeAction
-from .database import engine, get_db, init_db, AsyncSessionLocal
+from .database import AsyncSessionLocal, engine, get_db, init_db
+from .models import Base, Content, SwipeAction, SwipeHistory
 from .repository import ContentRepository, SwipeRepository
 
 __all__ = [

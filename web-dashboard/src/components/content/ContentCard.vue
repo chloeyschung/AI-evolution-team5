@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { Content } from '../../types';
+import { Content, SwipeAction } from '../../types';
 
-defineProps<{
+const props = defineProps<{
   content: Content;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'delete', id: number): void;
-  (e: 'swipe', action: { content_id: number; action: 'keep' | 'discard' }): void;
+  (e: 'swipe', action: SwipeAction): void;
 }>();
 
 const formatDate = (dateString: string) => {
@@ -33,6 +33,20 @@ const getPlatformIcon = (platform: string) => {
   };
   return icons[platform.toLowerCase()] || '📄';
 };
+
+const handleKeep = () => {
+  emit('swipe', { content_id: props.content.id, action: 'keep' });
+};
+
+const handleDiscard = () => {
+  emit('swipe', { content_id: props.content.id, action: 'discard' });
+};
+
+const handleDelete = () => {
+  if (confirm('Are you sure you want to delete this item?')) {
+    emit('delete', props.content.id);
+  }
+};
 </script>
 
 <template>
@@ -43,13 +57,23 @@ const getPlatformIcon = (platform: string) => {
         <span class="platform-name">{{ content.platform }}</span>
       </div>
       <div class="card-actions">
-        <button class="action-btn keep-btn" title="Keep">
+        <button
+          v-if="content.status === 'inbox'"
+          @click="handleKeep"
+          class="action-btn keep-btn"
+          title="Keep"
+        >
           ✓
         </button>
-        <button class="action-btn discard-btn" title="Discard">
+        <button
+          v-if="content.status === 'inbox'"
+          @click="handleDiscard"
+          class="action-btn discard-btn"
+          title="Discard"
+        >
           ✕
         </button>
-        <button class="action-btn delete-btn" title="Delete">
+        <button @click="handleDelete" class="action-btn delete-btn" title="Delete">
           🗑
         </button>
       </div>

@@ -6,9 +6,9 @@ import pytest
 class TestContentEndpoints:
     """Tests for content API endpoints."""
 
-    async def test_create_content(self, async_client):
+    async def test_create_content(self, authenticated_client):
         """Test creating new content."""
-        response = await async_client.post(
+        response = await authenticated_client.post(
             "/api/v1/content",
             json={
                 "platform": "YouTube",
@@ -26,9 +26,9 @@ class TestContentEndpoints:
         assert data["url"] == "https://youtube.com/watch?v=test123"
         assert data["id"] is not None
 
-    async def test_create_content_minimal(self, async_client):
+    async def test_create_content_minimal(self, authenticated_client):
         """Test creating content with minimal fields."""
-        response = await async_client.post(
+        response = await authenticated_client.post(
             "/api/v1/content",
             json={
                 "platform": "Web",
@@ -43,17 +43,17 @@ class TestContentEndpoints:
         assert data["title"] is None
         assert data["author"] is None
 
-    async def test_list_content(self, async_client):
+    async def test_list_content(self, authenticated_client):
         """Test listing all content."""
-        response = await async_client.get("/api/v1/content")
+        response = await authenticated_client.get("/api/v1/content")
 
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
 
-    async def test_list_content_with_limit(self, async_client):
+    async def test_list_content_with_limit(self, authenticated_client):
         """Test listing content with limit parameter."""
-        response = await async_client.get("/api/v1/content?limit=10")
+        response = await authenticated_client.get("/api/v1/content?limit=10")
 
         assert response.status_code == 200
         data = response.json()
@@ -63,10 +63,10 @@ class TestContentEndpoints:
 class TestSwipeEndpoints:
     """Tests for swipe API endpoints."""
 
-    async def test_record_swipe_keep(self, async_client):
+    async def test_record_swipe_keep(self, authenticated_client):
         """Test recording KEEP swipe action."""
         # First create a content
-        create_response = await async_client.post(
+        create_response = await authenticated_client.post(
             "/api/v1/content",
             json={
                 "platform": "Test",
@@ -77,7 +77,7 @@ class TestSwipeEndpoints:
         content_id = create_response.json()["id"]
 
         # Record swipe
-        response = await async_client.post(
+        response = await authenticated_client.post(
             "/api/v1/swipe",
             json={"content_id": content_id, "action": "keep"},
         )
@@ -87,10 +87,10 @@ class TestSwipeEndpoints:
         assert data["content_id"] == content_id
         assert data["action"] == "keep"
 
-    async def test_record_swipe_discard(self, async_client):
+    async def test_record_swipe_discard(self, authenticated_client):
         """Test recording DISCARD swipe action."""
         # First create a content
-        create_response = await async_client.post(
+        create_response = await authenticated_client.post(
             "/api/v1/content",
             json={
                 "platform": "Test",
@@ -101,7 +101,7 @@ class TestSwipeEndpoints:
         content_id = create_response.json()["id"]
 
         # Record swipe
-        response = await async_client.post(
+        response = await authenticated_client.post(
             "/api/v1/swipe",
             json={"content_id": content_id, "action": "discard"},
         )
@@ -149,7 +149,7 @@ class TestPendingContentEndpoints:
             json={
                 "platform": "Test",
                 "content_type": "article",
-                "url": "https://example.com/swiped",
+                "url": "https://example.com/swiped-unique-test",
             },
         )
         content_id = create_response.json()["id"]
@@ -191,10 +191,10 @@ class TestPendingContentEndpoints:
 class TestContentDetailEndpoint:
     """Tests for GET /content/{content_id} endpoint (UX-003)."""
 
-    async def test_get_content_detail(self, async_client):
+    async def test_get_content_detail(self, authenticated_client):
         """Test getting content detail with all fields."""
         # Create content with summary
-        create_response = await async_client.post(
+        create_response = await authenticated_client.post(
             "/api/v1/content",
             json={
                 "platform": "YouTube",
@@ -207,7 +207,7 @@ class TestContentDetailEndpoint:
         content_id = create_response.json()["id"]
 
         # Get content detail
-        response = await async_client.get(f"/api/v1/content/{content_id}")
+        response = await authenticated_client.get(f"/api/v1/content/{content_id}")
 
         assert response.status_code == 200
         data = response.json()
@@ -222,18 +222,18 @@ class TestContentDetailEndpoint:
         assert data["swipe_history"] is None
         assert "created_at" in data
 
-    async def test_get_content_detail_not_found(self, async_client):
+    async def test_get_content_detail_not_found(self, authenticated_client):
         """Test getting non-existent content returns 404."""
-        response = await async_client.get("/api/v1/content/9999")
+        response = await authenticated_client.get("/api/v1/content/9999")
 
         assert response.status_code == 404
         data = response.json()
         assert "detail" in data
 
-    async def test_get_content_detail_with_swipe_history(self, async_client):
+    async def test_get_content_detail_with_swipe_history(self, authenticated_client):
         """Test getting content detail with swipe history."""
         # Create content
-        create_response = await async_client.post(
+        create_response = await authenticated_client.post(
             "/api/v1/content",
             json={
                 "platform": "Test",
@@ -244,13 +244,13 @@ class TestContentDetailEndpoint:
         content_id = create_response.json()["id"]
 
         # Record swipe
-        await async_client.post(
+        await authenticated_client.post(
             "/api/v1/swipe",
             json={"content_id": content_id, "action": "keep"},
         )
 
         # Get content detail
-        response = await async_client.get(f"/api/v1/content/{content_id}")
+        response = await authenticated_client.get(f"/api/v1/content/{content_id}")
 
         assert response.status_code == 200
         data = response.json()

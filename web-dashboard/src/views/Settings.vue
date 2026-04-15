@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { AppSettings, DEFAULT_SETTINGS, ViewMode } from '../types';
+import type { AppSettings, ViewMode } from '../types';
+import { DEFAULT_SETTINGS } from '../types';
 
 const settings = ref<AppSettings>({ ...DEFAULT_SETTINGS });
 const isSaving = ref(false);
@@ -36,8 +37,7 @@ const saveSettings = async () => {
 };
 
 const applyTheme = (theme: string) => {
-  const root = document.documentElement;
-  root.style.setProperty('--theme', theme);
+  document.documentElement.setAttribute('data-theme', theme);
 };
 
 const viewModes: { value: ViewMode; label: string }[] = [

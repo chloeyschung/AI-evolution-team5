@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 
 class ShareDataType(Enum):
@@ -20,5 +19,5 @@ class ShareData:
 
     data_type: ShareDataType
     content: str
-    metadata: Optional[dict] = None
-    source_platform: Optional[str] = None
+    metadata: dict | None = None
+    source_platform: str | None = None

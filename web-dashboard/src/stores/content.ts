@@ -10,7 +10,7 @@ import {
   getPlatforms,
   searchContent,
 } from '../api/endpoints';
-import {
+import type {
   Content,
   PlatformCount,
   ContentFilters,

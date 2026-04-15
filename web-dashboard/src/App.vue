@@ -1,24 +1,28 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { RouterView } from 'vue-router';
-import { useAuthStore } from './stores/auth';
+import { RouterView, useRoute } from 'vue-router';
 import Header from './components/layout/Header.vue';
+import ErrorBoundary from './components/ErrorBoundary.vue';
 
-const authStore = useAuthStore();
+const route = useRoute();
 
-const showHeader = computed(() => {
-  const route = authStore.$state.currentRoute;
-  return route?.name !== 'Login';
-});
+const showHeader = computed(() => route.name !== 'Login' && route.name !== 'OAuthCallback');
+
+const handleError = (error: Error) => {
+  console.error('Global error:', error);
+  // Could send to error tracking service here
+};
 </script>
 
 <template>
-  <div id="app">
-    <Header v-if="showHeader" />
-    <main class="main-content">
-      <RouterView />
-    </main>
-  </div>
+  <ErrorBoundary :onError="handleError">
+    <div id="app">
+      <Header v-if="showHeader" />
+      <main class="main-content">
+        <RouterView />
+      </main>
+    </div>
+  </ErrorBoundary>
 </template>
 
 <style scoped>

@@ -1,12 +1,12 @@
 """YouTube sync service for ingesting videos into Briefly."""
 
 import asyncio
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
-from src.ai.metadata_extractor import ContentMetadata, ContentType
+from src.ai.metadata_extractor import ContentMetadata
 from src.ai.summarizer import Summarizer
-from src.data.models import ContentStatus, Provider, utc_now
+from src.constants import ContentType, Provider
+from src.data.models import ContentStatus, utc_now
 from src.data.repository import ContentRepository
 from src.integrations.repositories.integration import IntegrationRepository
 from src.integrations.youtube.client import YouTubeClient, YouTubeClientError
@@ -27,7 +27,7 @@ class YouTubeSyncService:
         youtube_client: YouTubeClient,
         content_repo: ContentRepository,
         integration_repo: IntegrationRepository,
-        summarizer: Optional[Summarizer] = None,
+        summarizer: Summarizer | None = None,
     ):
         """Initialize sync service.
 
@@ -46,7 +46,7 @@ class YouTubeSyncService:
         self,
         user_id: int,
         playlist_id: str,
-        since: Optional[datetime] = None,
+        since: datetime | None = None,
     ) -> SyncResult:
         """Sync a YouTube playlist, ingesting new videos.
 
@@ -66,9 +66,7 @@ class YouTubeSyncService:
 
         try:
             # Get last sync time for this playlist
-            last_sync = await self.integration_repo.get_last_sync(
-                user_id, Provider.YOUTUBE.value, playlist_id
-            )
+            last_sync = await self.integration_repo.get_last_sync(user_id, Provider.YOUTUBE.value, playlist_id)
             effective_since = since or last_sync
 
             # Fetch videos from YouTube
@@ -76,8 +74,9 @@ class YouTubeSyncService:
 
             # Filter to new videos only
             new_videos = [
-                v for v in videos
-                if v.published_at and v.published_at > (effective_since or datetime.min.replace(tzinfo=timezone.utc))
+                v
+                for v in videos
+                if v.published_at and v.published_at > (effective_since or datetime.min.replace(tzinfo=UTC))
             ]
 
             if not new_videos:
@@ -96,19 +95,19 @@ class YouTubeSyncService:
                         skipped += 1
 
                 except Exception as e:
-                    errors.append({
-                        "video_id": video.video_id,
-                        "title": video.title,
-                        "error": str(e),
-                    })
+                    errors.append(
+                        {
+                            "video_id": video.video_id,
+                            "title": video.title,
+                            "error": str(e),
+                        }
+                    )
 
             # Calculate duration
             duration = (utc_now() - start_time).total_seconds()
 
             # Update last sync timestamp
-            await self.integration_repo.update_last_sync(
-                user_id, Provider.YOUTUBE.value, playlist_id, utc_now()
-            )
+            await self.integration_repo.update_last_sync(user_id, Provider.YOUTUBE.value, playlist_id, utc_now())
 
             return SyncResult(
                 ingested=ingested,
@@ -118,9 +117,9 @@ class YouTubeSyncService:
             )
 
         except YouTubeClientError as e:
-            raise YouTubeSyncError(f"YouTube API error during sync: {e}")
+            raise YouTubeSyncError(f"YouTube API error during sync: {e}") from e
         except Exception as e:
-            raise YouTubeSyncError(f"Unexpected error during sync: {e}")
+            raise YouTubeSyncError(f"Unexpected error during sync: {e}") from e
 
     async def _ingest_video(
         self,
@@ -155,6 +154,7 @@ class YouTubeSyncService:
             except Exception as e:
                 # Log but don't fail - summary can be generated later
                 import logging
+
                 logging.warning(f"Failed to generate summary for video {video.video_id}: {e}")
 
         # Create content metadata
@@ -170,7 +170,7 @@ class YouTubeSyncService:
         )
 
         # Create content record
-        content = await self.content_repo.save(metadata, status=ContentStatus.INBOX)
+        await self.content_repo.save(metadata, status=ContentStatus.INBOX)
 
         return "ingested"
 
@@ -191,16 +191,12 @@ class YouTubeSyncService:
 
         # Sync each playlist concurrently
         results = {}
-        tasks = [
-            self.sync_playlist(user_id, config.playlist_id)
-            for config in configs
-            if config.is_active
-        ]
+        tasks = [self.sync_playlist(user_id, config.playlist_id) for config in configs if config.is_active]
 
         if tasks:
             sync_results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            for config, result in zip(configs, sync_results):
+            for config, result in zip(configs, sync_results, strict=False):
                 if isinstance(result, Exception):
                     results[config.playlist_id] = SyncResult(
                         ingested=0,

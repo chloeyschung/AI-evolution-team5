@@ -19,9 +19,9 @@ async def client(async_client):
 class TestProfileEndpoints:
     """Tests for /profile endpoints."""
 
-    async def test_get_profile_creates_default(self, client):
+    async def test_get_profile_creates_default(self, authenticated_client):
         """Test GET /profile creates default profile if none exists."""
-        response = await client.get("/api/v1/profile")
+        response = await authenticated_client.get("/api/v1/profile")
 
         assert response.status_code == 200
         data = response.json()
@@ -32,21 +32,21 @@ class TestProfileEndpoints:
         assert "created_at" in data
         assert "updated_at" in data
 
-    async def test_get_profile_returns_existing(self, client):
+    async def test_get_profile_returns_existing(self, authenticated_client):
         """Test GET /profile returns existing profile."""
         # First request creates profile
-        response1 = await client.get("/api/v1/profile")
+        response1 = await authenticated_client.get("/api/v1/profile")
         profile_id = response1.json()["id"]
 
         # Second request should return same profile
-        response2 = await client.get("/api/v1/profile")
+        response2 = await authenticated_client.get("/api/v1/profile")
         assert response2.status_code == 200
         assert response2.json()["id"] == profile_id
 
-    async def test_update_profile(self, client):
+    async def test_update_profile(self, authenticated_client):
         """Test PATCH /profile updates profile fields."""
         # Update profile
-        response = await client.patch(
+        response = await authenticated_client.patch(
             "/api/v1/profile",
             json={"display_name": "Test User", "bio": "Test bio"}
         )
@@ -56,16 +56,16 @@ class TestProfileEndpoints:
         assert data["display_name"] == "Test User"
         assert data["bio"] == "Test bio"
 
-    async def test_update_profile_partial(self, client):
+    async def test_update_profile_partial(self, authenticated_client):
         """Test PATCH /profile with partial update."""
         # First create profile with all fields
-        await client.patch(
+        await authenticated_client.patch(
             "/api/v1/profile",
             json={"display_name": "Original", "bio": "Original bio", "avatar_url": "https://example.com/avatar.jpg"}
         )
 
         # Update only display_name
-        response = await client.patch(
+        response = await authenticated_client.patch(
             "/api/v1/profile",
             json={"display_name": "Updated"}
         )
@@ -135,9 +135,9 @@ class TestPreferencesEndpoints:
 class TestStatisticsEndpoints:
     """Tests for /user/statistics endpoint."""
 
-    async def test_get_statistics_empty(self, client):
+    async def test_get_statistics_empty(self, authenticated_client):
         """Test GET /user/statistics with no swipe history."""
-        response = await client.get("/api/v1/user/statistics")
+        response = await authenticated_client.get("/api/v1/user/statistics")
 
         assert response.status_code == 200
         data = response.json()
@@ -231,7 +231,7 @@ class TestInterestsEndpoints:
         tags = await authenticated_client.get("/api/v1/interests")
         assert "testtag" not in tags.json()
 
-    async def test_remove_interest_case_insensitive(self, authenticated_client):
+    async def test_remove_interest_case_insensitive(self, authenticated_client, db):
         """Test DELETE /interests/{tag} is case-insensitive."""
         # Add tag
         await authenticated_client.post("/api/v1/interests", json={"tag": "TestTag"})

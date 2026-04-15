@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { checkAuthStatus, loginWithGoogle, logout } from '../api/endpoints';
-import { AuthStatus, User } from '../types';
+import { checkAuthStatus, logout } from '../api/endpoints';
+import type { AuthStatus, User } from '../types';
 
 export const useAuthStore = defineStore('auth', () => {
   // State
@@ -16,6 +16,14 @@ export const useAuthStore = defineStore('auth', () => {
   // Actions
   async function initialize(): Promise<void> {
     try {
+      // Check if we have a valid token before making the request
+      const token = localStorage.getItem('briefly_access_token');
+      if (!token) {
+        isAuthenticated.value = false;
+        isLoading.value = false;
+        return;
+      }
+
       const status: AuthStatus = await checkAuthStatus();
       isAuthenticated.value = status.is_authenticated;
 
@@ -27,18 +35,22 @@ export const useAuthStore = defineStore('auth', () => {
       }
     } catch (error) {
       console.error('Auth initialization failed:', error);
+      // Clear invalid tokens
+      localStorage.removeItem('briefly_access_token');
+      localStorage.removeItem('briefly_refresh_token');
       isAuthenticated.value = false;
+      user.value = null;
     } finally {
       isLoading.value = false;
     }
   }
 
-  async function performLogin(authData: AuthStatus): Promise<void> {
+  function performLogin(authData: AuthStatus): void {
     if (authData.user_id && authData.email) {
       user.value = {
         id: authData.user_id,
         email: authData.email,
-        display_name: authData.email, // Will be updated from profile
+        display_name: authData.email,
       };
     }
     isAuthenticated.value = true;
@@ -50,11 +62,15 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      user.value = null;
-      isAuthenticated.value = false;
-      localStorage.removeItem('briefly_access_token');
-      localStorage.removeItem('briefly_refresh_token');
+      clearAuth();
     }
+  }
+
+  function clearAuth(): void {
+    user.value = null;
+    isAuthenticated.value = false;
+    localStorage.removeItem('briefly_access_token');
+    localStorage.removeItem('briefly_refresh_token');
   }
 
   function saveTokens(accessToken: string, refreshToken: string): void {
@@ -76,6 +92,7 @@ export const useAuthStore = defineStore('auth', () => {
     initialize,
     performLogin,
     performLogout,
+    clearAuth,
     saveTokens,
   };
 });

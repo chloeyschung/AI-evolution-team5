@@ -1,15 +1,14 @@
 """Utilities package for Briefly."""
 
+from .datetime_utils import (
+    convert_to_local,
+    convert_to_utc,
+    utc_now,
+)
 from .http_client import (
+    HttpClientPool,
     async_client_context,
     get_pooled_client,
-    HttpClientPool,
-)
-
-from .datetime_utils import (
-    utc_now,
-    convert_to_utc,
-    convert_to_local,
 )
 
 __all__ = [

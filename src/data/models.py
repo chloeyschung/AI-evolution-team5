@@ -3,13 +3,13 @@
 from datetime import datetime
 
 import sqlalchemy
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Float, Integer, String, Text, Enum as SQLEnum
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import declarative_base, relationship
 
 from src.constants import (
     ContentStatus,
     DefaultSort,
-    Provider,
     SwipeAction,
     Theme,
 )
@@ -41,8 +41,10 @@ class Content(Base):
     swipe_history = relationship("SwipeHistory", back_populates="content")
     user = relationship("UserProfile", back_populates="content")
 
+    # TODO #17 (2026-04-14): Added compound index for common query pattern (user_id + created_at)
     # Unique constraint for user_id + url combination
     __table_args__ = (
+        sqlalchemy.Index("ix_content_user_created", "user_id", "created_at"),
         sqlalchemy.UniqueConstraint("user_id", "url", name="unique_user_content_url"),
     )
 
@@ -69,7 +71,9 @@ class UserProfile(Base):
     __tablename__ = "user_profile"
 
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(320), unique=True, nullable=True, index=True)  # AUTH-002 (nullable for backward compatibility)
+    email = Column(
+        String(320), unique=True, nullable=True, index=True
+    )  # AUTH-002 (nullable for backward compatibility)
     google_sub = Column(String(100), unique=True, nullable=True, index=True)  # AUTH-002
     display_name = Column(String(100))
     avatar_url = Column(String(500))
@@ -107,9 +111,7 @@ class InterestTag(Base):
     tag = Column(String(100), nullable=False)
 
     # Unique constraint for user_id + tag combination
-    __table_args__ = (
-        sqlalchemy.UniqueConstraint("user_id", "tag", name="unique_user_tag"),
-    )
+    __table_args__ = (sqlalchemy.UniqueConstraint("user_id", "tag", name="unique_user_tag"),)
 
 
 class AuthenticationToken(Base):
@@ -139,6 +141,7 @@ class AccountDeletion(Base):
     google_sub = Column(String(100), unique=True, nullable=True, index=True)
     deleted_at = Column(DateTime, default=utc_now, nullable=False, index=True)
     block_expires_at = Column(DateTime, nullable=False, index=True)  # deleted_at + 30 days
+    confirmation_token = Column(String(100), nullable=True, index=True)  # For two-step deletion
 
 
 class ContentTag(Base):
@@ -155,9 +158,7 @@ class ContentTag(Base):
     content = relationship("Content", backref="tags")
 
     # Unique constraint for content_id + tag combination
-    __table_args__ = (
-        sqlalchemy.UniqueConstraint("content_id", "tag", name="unique_content_tag"),
-    )
+    __table_args__ = (sqlalchemy.UniqueConstraint("content_id", "tag", name="unique_content_tag"),)
 
 
 class IntegrationTokens(Base):
@@ -178,9 +179,7 @@ class IntegrationTokens(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
     # Unique constraint for user_id + provider combination
-    __table_args__ = (
-        sqlalchemy.UniqueConstraint("user_id", "provider", name="unique_user_provider_tokens"),
-    )
+    __table_args__ = (sqlalchemy.UniqueConstraint("user_id", "provider", name="unique_user_provider_tokens"),)
 
     @classmethod
     def with_encrypted_tokens(
@@ -251,11 +250,7 @@ class IntegrationSyncConfig(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
     # Unique constraint for user_id + provider + resource_id combination
-    __table_args__ = (
-        sqlalchemy.UniqueConstraint(
-            "user_id", "provider", "resource_id", name="unique_sync_config"
-        ),
-    )
+    __table_args__ = (sqlalchemy.UniqueConstraint("user_id", "provider", "resource_id", name="unique_sync_config"),)
 
 
 class IntegrationSyncLog(Base):
@@ -308,9 +303,7 @@ class UserAchievement(Base):
     achievement_definition = relationship("AchievementDefinition", backref="user_achievements")
 
     # Unique constraint for user_id + achievement_id combination
-    __table_args__ = (
-        sqlalchemy.UniqueConstraint("user_id", "achievement_id", name="unique_user_achievement"),
-    )
+    __table_args__ = (sqlalchemy.UniqueConstraint("user_id", "achievement_id", name="unique_user_achievement"),)
 
 
 class UserStreak(Base):
