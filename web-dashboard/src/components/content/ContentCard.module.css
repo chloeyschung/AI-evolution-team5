@@ -1,0 +1,158 @@
+.contentCard {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: box-shadow 0.2s;
+}
+
+.contentCard:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.platformInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.platformIcon {
+  font-size: 18px;
+}
+
+.platformName {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+
+.cardActions {
+  display: flex;
+  gap: 4px;
+}
+
+.actionBtn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.keepBtn {
+  color: #10b981;
+}
+
+.keepBtn:hover {
+  background: #10b981;
+  color: white;
+}
+
+.discardBtn {
+  color: #f59e0b;
+}
+
+.discardBtn:hover {
+  background: #f59e0b;
+  color: white;
+}
+
+.deleteBtn {
+  color: #ef4444;
+}
+
+.deleteBtn:hover {
+  background: #ef4444;
+  color: white;
+}
+
+.cardContent {
+  flex: 1;
+}
+
+.cardTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+}
+
+.cardAuthor {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 8px 0;
+}
+
+.cardSummary {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.cardDate {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.cardStatus {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.cardStatus.inbox {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.cardStatus.archived {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.cardLink {
+  display: block;
+  text-align: center;
+  padding: 12px;
+  margin: -4px -20px -20px;
+  background: var(--bg-tertiary);
+  color: var(--primary-color);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 0 0 12px 12px;
+  transition: background 0.2s;
+}
+
+.cardLink:hover {
+  background: var(--bg-secondary);
+}

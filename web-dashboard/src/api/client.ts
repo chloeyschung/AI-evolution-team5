@@ -1,21 +1,7 @@
-import axios, { type AxiosRequestConfig, type AxiosResponse, type AxiosError } from 'axios';
+import axios, { type AxiosRequestConfig, type AxiosResponse, type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from '../types';
 
-// Define types compatible with axios 1.x
-type AxiosInstance = {
-  (config: AxiosRequestConfig<any>): Promise<AxiosResponse<any>>;
-  (url: string, config?: AxiosRequestConfig<any>): Promise<AxiosResponse<any>>;
-  get<T = any>(url: string, config?: AxiosRequestConfig<any>): Promise<AxiosResponse<T>>;
-  post<T = any>(url: string, data?: any, config?: AxiosRequestConfig<any>): Promise<AxiosResponse<T>>;
-  put<T = any>(url: string, data?: any, config?: AxiosRequestConfig<any>): Promise<AxiosResponse<T>>;
-  delete<T = any>(url: string, config?: AxiosRequestConfig<any>): Promise<AxiosResponse<T>>;
-  interceptors: {
-    request: { use: (onFulfilled: (config: AxiosRequestConfig) => AxiosRequestConfig | Promise<AxiosRequestConfig>) => void };
-    response: { use: (onFulfilled: (response: AxiosResponse) => AxiosResponse | Promise<AxiosResponse>) => void };
-  };
-};
-
-let apiClient: AxiosInstance | null = null;
+let apiClient: ReturnType<typeof axios.create> | null = null;
 let refreshPromise: Promise<void> | null = null;
 let currentAbortController: AbortController | null = null;
 
@@ -27,7 +13,7 @@ function getApiBaseUrl(): string {
   return import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 }
 
-export function getApiClient(): AxiosInstance {
+export function getApiClient(): ReturnType<typeof axios.create> {
   if (!apiClient) {
     apiClient = axios.create({
       baseURL: getApiBaseUrl(),
@@ -37,26 +23,26 @@ export function getApiClient(): AxiosInstance {
       },
       // Use AbortSignal for cancellation
       signal: currentAbortController?.signal,
-    }) as AxiosInstance;
+    });
 
     // Request interceptor for auth token
     apiClient.interceptors.request.use(
-      (config: AxiosRequestConfig) => {
+      (config: InternalAxiosRequestConfig) => {
         const token = localStorage.getItem(ACCESS_TOKEN_KEY);
         if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
+          config.headers!.Authorization = `Bearer ${token}`;
         }
         if (currentAbortController) {
           config.signal = currentAbortController.signal;
         }
         return config;
       },
-      (error) => Promise.reject(error)
+      (error: AxiosError) => Promise.reject(error)
     );
 
     // Response interceptor for token refresh with deduplication
     apiClient.interceptors.response.use(
-      (response) => response,
+      (response: AxiosResponse) => response,
       async (error: AxiosError) => {
         if (error.response?.status !== 401) {
           return Promise.reject(error);
@@ -86,8 +72,8 @@ export function getApiClient(): AxiosInstance {
         if (error.config) {
           const token = localStorage.getItem(ACCESS_TOKEN_KEY);
           if (token) {
-            error.config.headers.Authorization = `Bearer ${token}`;
-            return apiClient.request(error.config);
+            error.config.headers!.Authorization = `Bearer ${token}`;
+            return apiClient!.request(error.config);
           }
         }
 

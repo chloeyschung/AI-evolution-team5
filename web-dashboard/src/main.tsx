@@ -1,7 +1,7 @@
-import { createApp } from 'vue';
-import { createPinia } from 'pinia';
-import App from './App.vue';
-import router from './router';
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { RouterProvider } from 'react-router-dom';
+import { router } from './router';
 import './styles/main.css';
 
 // Apply theme on mount
@@ -27,9 +27,8 @@ function applyTheme() {
 
 applyTheme();
 
-const app = createApp(App);
-const pinia = createPinia();
-
-app.use(pinia);
-app.use(router);
-app.mount('#app');
+ReactDOM.createRoot(document.getElementById('app')!).render(
+  <React.StrictMode>
+    <RouterProvider router={router} />
+  </React.StrictMode>
+);

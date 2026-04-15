@@ -1,0 +1,113 @@
+import { create } from 'zustand';
+import { checkAuthStatus, logout } from '../api/endpoints';
+import type { AuthStatus, User } from '../types';
+import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from '../types';
+
+interface AuthState {
+  // State
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+
+  // Actions
+  initialize: () => Promise<void>;
+  performLogin: (authData: AuthStatus) => void;
+  performLogout: () => Promise<void>;
+  clearAuth: () => void;
+  saveTokens: (accessToken: string, refreshToken: string) => void;
+
+  // Getters
+  getUserEmail: () => string;
+  getUserName: () => string;
+}
+
+export const useAuthStore = create<AuthState>((set, get) => ({
+  // Initial state
+  user: null,
+  isAuthenticated: false,
+  isLoading: true,
+
+  // Getters
+  getUserEmail: () => get().user?.email || '',
+  getUserName: () => {
+    const user = get().user;
+    return user?.display_name || get().getUserEmail();
+  },
+
+  // Actions
+  initialize: async () => {
+    try {
+      const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+      if (!token) {
+        set({
+          isAuthenticated: false,
+          isLoading: false,
+        });
+        return;
+      }
+
+      const status: AuthStatus = await checkAuthStatus();
+      set({
+        isAuthenticated: status.is_authenticated,
+      });
+
+      if (status.is_authenticated && status.user_id && status.email) {
+        set({
+          user: {
+            id: status.user_id,
+            email: status.email,
+          },
+        });
+      }
+    } catch (error) {
+      console.error('Auth initialization failed:', error);
+      localStorage.removeItem(ACCESS_TOKEN_KEY);
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
+      set({
+        isAuthenticated: false,
+        user: null,
+      });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  performLogin: (authData: AuthStatus) => {
+    if (authData.user_id && authData.email) {
+      set({
+        user: {
+          id: authData.user_id,
+          email: authData.email,
+          display_name: authData.email,
+        },
+        isAuthenticated: true,
+      });
+    } else {
+      set({ isAuthenticated: true });
+    }
+  },
+
+  performLogout: async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      get().clearAuth();
+    }
+  },
+
+  clearAuth: () => {
+    set({
+      user: null,
+      isAuthenticated: false,
+    });
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+  },
+
+  saveTokens: (accessToken: string, refreshToken: string) => {
+    localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  },
+}));
