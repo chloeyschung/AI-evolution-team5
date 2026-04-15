@@ -1,110 +1,53 @@
-.analytics {
-  padding: 24px;
-  max-width: 1000px;
-  margin: 0 auto;
-}
-
-.pageHeader {
-  margin-bottom: 32px;
-}
-
-.pageHeader h1 {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 8px;
-}
-
-.pageHeader p {
-  color: var(--text-secondary);
-  font-size: 16px;
-}
-
-.loading {
-  text-align: center;
-  padding: 48px;
-  color: var(--text-secondary);
-}
-
-.statsGrid {
+.page {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 24px;
-  margin-bottom: 48px;
+  gap: 16px;
 }
 
-.statCard {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 24px;
-  text-align: center;
+.kicker {
+  font-family: var(--font-mono);
+  color: var(--gold);
+  font-size: 0.78rem;
+  text-transform: uppercase;
 }
 
-.statValue {
-  font-size: 36px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 8px;
+.hero h1 {
+  margin-top: 6px;
 }
 
-.statLabel {
-  font-size: 14px;
+.message {
   color: var(--text-secondary);
 }
 
-.statCard.pending .statValue {
-  color: #3b82f6;
-}
-
-.statCard.kept .statValue {
-  color: #10b981;
-}
-
-.statCard.discarded .statValue {
-  color: #f59e0b;
-}
-
-.detailedStats {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 24px;
-}
-
-.detailedStats h2 {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 24px;
-}
-
-.statsRow {
+.statGrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-  padding: 16px 0;
-  border-bottom: 1px solid var(--border-color);
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
-.statsRow:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
+.statCard,
+.detailCard {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  background: var(--bg-surface);
 }
 
-.statItem {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.statCard h2 {
+  font-size: 1.8rem;
 }
 
-.statItemLabel {
-  font-size: 13px;
+.statCard p,
+.detailCard span {
   color: var(--text-secondary);
 }
 
-.statItemValue {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
+.detailCard {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.detailCard div {
+  display: grid;
+  gap: 4px;
 }

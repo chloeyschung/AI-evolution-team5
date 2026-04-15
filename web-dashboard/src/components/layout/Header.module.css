@@ -1,114 +1,141 @@
 .header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  background: color-mix(in srgb, var(--bg-base) 86%, transparent);
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
-  padding: 0 24px;
-  height: 64px;
-  background: var(--bg-primary);
-  border-bottom: 1px solid var(--border-color);
+  gap: 14px;
 }
 
-.headerLeft {
+.brandRow {
   display: flex;
   align-items: center;
-  gap: 32px;
+  gap: 14px;
+  min-width: 0;
 }
 
-.logo {
-  display: flex;
+.brandButton {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 20px;
+  gap: 10px;
   color: var(--text-primary);
+  min-height: 44px;
+  border-radius: 12px;
+  padding: 8px 12px;
 }
 
-.logoIcon {
-  font-size: 24px;
+.brandBadge {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--gold), var(--gold-bright));
+  color: var(--text-inverse);
+  font-weight: 700;
+}
+
+.brandText {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.brandTagline {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  border-left: 1px solid var(--border-gold);
+  padding-left: 10px;
+  white-space: nowrap;
 }
 
 .nav {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .navItem {
-  display: flex;
+  min-height: 44px;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-radius: 8px;
-  text-decoration: none;
+  padding: 0 14px;
+  border-radius: 999px;
   color: var(--text-secondary);
-  font-size: 14px;
-  transition: all 0.2s;
+  border: 1px solid var(--border);
 }
 
 .navItem:hover {
-  background: var(--bg-secondary);
   color: var(--text-primary);
+  border-color: var(--border-hover);
 }
 
 .navItem.active {
-  background: var(--primary-color);
-  color: white;
+  color: var(--text-inverse);
+  background: linear-gradient(135deg, var(--gold), var(--gold-bright));
+  border-color: transparent;
 }
 
-.navIcon {
-  font-size: 16px;
-}
-
-.headerRight {
+.actionsRow {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
+  min-width: min(520px, 100%);
 }
 
-.searchBox {
-  position: relative;
+.searchLabel {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
 }
 
 .searchInput {
-  padding: 8px 16px;
-  border: 1px solid var(--border-color);
-  border-radius: 20px;
-  background: var(--bg-secondary);
+  min-height: 44px;
+  flex: 1;
+  min-width: 140px;
+  border-radius: 12px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
   color: var(--text-primary);
-  font-size: 14px;
-  width: 240px;
-  transition: all 0.2s;
-}
-
-.searchInput:focus {
-  outline: none;
-  border-color: var(--primary-color);
-  width: 280px;
-}
-
-.userMenu {
-  display: flex;
-  align-items: center;
-  gap: 12px;
 }
 
 .userEmail {
-  font-size: 14px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
   color: var(--text-secondary);
+  white-space: nowrap;
 }
 
 .logoutBtn {
-  padding: 8px 16px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
 }
 
 .logoutBtn:hover {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  border-color: var(--gold-line);
+  background: var(--gold-dim);
+}
+
+@media (max-width: 920px) {
+  .header {
+    padding: 10px;
+  }
+
+  .actionsRow {
+    min-width: 100%;
+  }
+
+  .brandTagline,
+  .userEmail,
+  .searchLabel {
+    display: none;
+  }
 }

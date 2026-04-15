@@ -3,34 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Briefly - Login</title>
+  <title>Briefly Login</title>
   <link rel="stylesheet" href="login.css">
 </head>
 <body>
-  <div id="app">
-    <div class="container">
-      <div class="logo">
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-          <path d="M2 17l10 5 10-5"/>
-          <path d="M2 12l10 5 10-5"/>
-        </svg>
-      </div>
-      <h1>Briefly</h1>
-      <p>Save & summarize web content with AI</p>
+  <div class="container">
+    <p class="eyebrow">Briefly Secure Login</p>
+    <h1>Finishing sign in…</h1>
+    <p class="subtitle">We are linking your account and returning you to the extension.</p>
 
-      <div id="loading" class="hidden">
-        <div class="spinner"></div>
-        <p>Completing login...</p>
-      </div>
+    <div id="loading" role="status" aria-live="polite">
+      <div class="spinner" aria-hidden="true"></div>
+      <p>Completing login…</p>
+    </div>
 
-      <div id="error" class="hidden">
-        <p class="error-message" id="error-message"></p>
-        <button id="back-btn" class="btn btn-secondary">Go Back</button>
-      </div>
+    <div id="error" class="hidden" aria-live="polite">
+      <p class="error-message" id="error-message"></p>
+      <button id="back-btn" class="btn">Close</button>
     </div>
   </div>
-
   <script type="module" src="login.ts"></script>
 </body>
 </html>

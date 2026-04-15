@@ -8,45 +8,31 @@ export default function Archive() {
 
   useEffect(() => {
     contentStore.updateFilters({ status: 'archived' });
-    contentStore.loadContent(1);
+    void contentStore.loadContent(1);
   }, []);
 
   const handleDelete = async (id: number) => {
-    try {
-      await contentStore.deleteItem(id);
-    } catch (error) {
-      console.error('Delete failed:', error);
-    }
+    await contentStore.deleteItem(id);
   };
 
   return (
-    <div className={styles.archive}>
-      <div className={styles.pageHeader}>
-        <h1>Archive</h1>
-        <p>Your kept content library</p>
-      </div>
+    <section className={styles.page} data-testid="archive-page">
+      <header className={styles.hero}>
+        <p className={styles.kicker}>Saved Wisdom</p>
+        <h1>Your kept insights live here.</h1>
+      </header>
 
-      <div className={styles.contentGrid}>
+      {contentStore.isLoading ? <p className={styles.message}>Loading your library…</p> : null}
+
+      {!contentStore.items.length && !contentStore.isLoading ? (
+        <p className={styles.message}>No kept cards yet. Hit Keep on any inbox card to build this library.</p>
+      ) : null}
+
+      <div className={styles.grid}>
         {contentStore.items.map((item) => (
-          <ContentCard
-            key={item.id}
-            content={item}
-            onDelete={handleDelete}
-          />
+          <ContentCard key={item.id} content={item} onDelete={handleDelete} />
         ))}
       </div>
-
-      {contentStore.isLoading && (
-        <div className={styles.loading}>
-          Loading...
-        </div>
-      )}
-
-      {!contentStore.items.length && !contentStore.isLoading && (
-        <div className={styles.empty}>
-          <p>No archived content yet. Keep some items from your inbox!</p>
-        </div>
-      )}
-    </div>
+    </section>
   );
 }

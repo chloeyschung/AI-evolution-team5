@@ -19,10 +19,7 @@ export default function Analytics() {
   useEffect(() => {
     const loadStats = async () => {
       try {
-        const [statsData, userStatsData] = await Promise.all([
-          getStats(),
-          getUserStatistics(),
-        ]);
+        const [statsData, userStatsData] = await Promise.all([getStats(), getUserStatistics()]);
         setStats(statsData);
         setUserStats(userStatsData);
       } catch (error) {
@@ -32,90 +29,34 @@ export default function Analytics() {
       }
     };
 
-    loadStats();
+    void loadStats();
   }, []);
 
-  const totalContent = () => stats.pending + stats.kept + stats.discarded;
-
   if (isLoading) {
-    return (
-      <div className={styles.analytics}>
-        <div className={styles.loading}>Loading...</div>
-      </div>
-    );
+    return <section className={styles.page}><p className={styles.message}>Loading your progress…</p></section>;
   }
 
+  const total = stats.pending + stats.kept + stats.discarded;
+
   return (
-    <div className={styles.analytics}>
-      <div className={styles.pageHeader}>
-        <h1>Analytics</h1>
-        <p>Your reading insights and statistics</p>
+    <section className={styles.page} data-testid="analytics-page">
+      <header className={styles.hero}>
+        <p className={styles.kicker}>Knowledge Gain</p>
+        <h1>Measure learning momentum, not backlog.</h1>
+      </header>
+
+      <div className={styles.statGrid}>
+        <article className={styles.statCard}><h2>{total}</h2><p>Total cards</p></article>
+        <article className={styles.statCard}><h2>{stats.pending}</h2><p>To digest</p></article>
+        <article className={styles.statCard}><h2>{stats.kept}</h2><p>Kept</p></article>
+        <article className={styles.statCard}><h2>{stats.discarded}</h2><p>Cleared</p></article>
       </div>
 
-      <div className={styles.statsGrid}>
-        <div className={styles.statCard}>
-          <div className={styles.statValue}>{totalContent()}</div>
-          <div className={styles.statLabel}>Total Content</div>
-        </div>
-
-        <div className={`${styles.statCard} ${styles.pending}`}>
-          <div className={styles.statValue}>{stats.pending}</div>
-          <div className={styles.statLabel}>In Inbox</div>
-        </div>
-
-        <div className={`${styles.statCard} ${styles.kept}`}>
-          <div className={styles.statValue}>{stats.kept}</div>
-          <div className={styles.statLabel}>Archived</div>
-        </div>
-
-        <div className={`${styles.statCard} ${styles.discarded}`}>
-          <div className={styles.statValue}>{stats.discarded}</div>
-          <div className={styles.statLabel}>Discarded</div>
-        </div>
-      </div>
-
-      <div className={styles.detailedStats}>
-        <h2>Detailed Statistics</h2>
-
-        <div className={styles.statsRow}>
-          <div className={styles.statItem}>
-            <span className={styles.statItemLabel}>Total Swipes</span>
-            <span className={styles.statItemValue}>{userStats.total_swipes}</span>
-          </div>
-
-          <div className={styles.statItem}>
-            <span className={styles.statItemLabel}>Retention Rate</span>
-            <span className={styles.statItemValue}>
-              {(userStats.retention_rate * 100).toFixed(1)}%
-            </span>
-          </div>
-
-          <div className={styles.statItem}>
-            <span className={styles.statItemLabel}>Current Streak</span>
-            <span className={styles.statItemValue}>{userStats.streak_days} days</span>
-          </div>
-        </div>
-
-        <div className={styles.statsRow}>
-          <div className={styles.statItem}>
-            <span className={styles.statItemLabel}>First Swipe</span>
-            <span className={styles.statItemValue}>
-              {userStats.first_swipe_at
-                ? new Date(userStats.first_swipe_at).toLocaleDateString()
-                : 'N/A'}
-            </span>
-          </div>
-
-          <div className={styles.statItem}>
-            <span className={styles.statItemLabel}>Last Swipe</span>
-            <span className={styles.statItemValue}>
-              {userStats.last_swipe_at
-                ? new Date(userStats.last_swipe_at).toLocaleDateString()
-                : 'N/A'}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
+      <section className={styles.detailCard}>
+        <div><span>Total swipes</span><strong>{userStats.total_swipes}</strong></div>
+        <div><span>Retention rate</span><strong>{(userStats.retention_rate * 100).toFixed(1)}%</strong></div>
+        <div><span>Current streak</span><strong>{userStats.streak_days} days</strong></div>
+      </section>
+    </section>
   );
 }

@@ -1,34 +1,33 @@
-.dashboard {
-  padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.pageHeader {
-  margin-bottom: 32px;
-}
-
-.pageHeader h1 {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 8px;
-}
-
-.pageHeader p {
-  color: var(--text-secondary);
-  font-size: 16px;
-}
-
-.contentGrid {
+.page {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 24px;
+  gap: 16px;
 }
 
-.loading,
-.empty {
-  text-align: center;
-  padding: 48px;
+.hero {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 18px;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--gold-dim) 84%, transparent), transparent 70%);
+}
+
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  margin: 6px 0;
+}
+
+.description,
+.message {
   color: var(--text-secondary);
+}
+
+.grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
 }

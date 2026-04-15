@@ -1,34 +1,25 @@
-.archive {
-  padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.pageHeader {
-  margin-bottom: 24px;
-}
-
-.pageHeader h1 {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 8px;
-}
-
-.pageHeader p {
-  color: var(--text-secondary);
-  font-size: 16px;
-}
-
-.contentGrid {
+.page {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 24px;
+  gap: 14px;
 }
 
-.loading,
-.empty {
-  text-align: center;
-  padding: 48px;
+.kicker {
+  font-family: var(--font-mono);
+  color: var(--gold);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  margin-top: 6px;
+}
+
+.message {
   color: var(--text-secondary);
+}
+
+.grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
 }

@@ -7,114 +7,88 @@ interface ContentCardProps {
   onSwipe?: (action: SwipeAction) => void;
 }
 
+const PLATFORM_ICONS: Record<string, string> = {
+  youtube: 'Play',
+  linkedin: 'In',
+  twitter: 'X',
+  x: 'X',
+  medium: 'M',
+  instagram: 'IG',
+  facebook: 'F',
+  tiktok: 'TT',
+  reddit: 'R',
+  web: 'Web',
+};
+
 export default function ContentCard({ content, onDelete, onSwipe }: ContentCardProps) {
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
+  const createdAt = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: '2-digit',
+    year: 'numeric',
+  }).format(new Date(content.created_at));
 
-  const getPlatformIcon = (platform: string) => {
-    const icons: Record<string, string> = {
-      youtube: '📺',
-      linkedin: '💼',
-      twitter: '🐦',
-      x: '🐦',
-      medium: '✍️',
-      instagram: '📷',
-      facebook: '👍',
-      tiktok: '🎵',
-      reddit: '👽',
-      web: '🌐',
-    };
-    return icons[platform.toLowerCase()] || '📄';
-  };
-
-  const handleKeep = () => {
-    if (onSwipe) {
-      onSwipe({ content_id: content.id, action: 'keep' });
-    }
-  };
-
-  const handleDiscard = () => {
-    if (onSwipe) {
-      onSwipe({ content_id: content.id, action: 'discard' });
-    }
-  };
+  const platformKey = content.platform.toLowerCase();
 
   const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this item?')) {
+    if (window.confirm('Remove this item from Briefly?')) {
       onDelete(content.id);
     }
   };
 
   return (
-    <article className={styles.contentCard}>
-      <div className={styles.cardHeader}>
-        <div className={styles.platformInfo}>
-          <span className={styles.platformIcon}>{getPlatformIcon(content.platform)}</span>
+    <article className={styles.card} data-testid={`content-card-${content.id}`}>
+      <div className={styles.metaRow}>
+        <div className={styles.platformPill}>
+          <span className={styles.platformMark} aria-hidden="true">{PLATFORM_ICONS[platformKey] || 'Doc'}</span>
           <span className={styles.platformName}>{content.platform}</span>
         </div>
-        <div className={styles.cardActions}>
-          {content.status === 'inbox' && onSwipe && (
-            <>
-              <button
-                onClick={handleKeep}
-                className={styles.keepBtn}
-                title="Keep"
-              >
-                ✓
-              </button>
-              <button
-                onClick={handleDiscard}
-                className={styles.discardBtn}
-                title="Discard"
-              >
-                ✕
-              </button>
-            </>
-          )}
-          <button onClick={handleDelete} className={styles.deleteBtn} title="Delete">
-            🗑
-          </button>
-        </div>
-      </div>
-
-      <div className={styles.cardContent}>
-        <h3 className={styles.cardTitle}>
-          {content.title || 'Untitled'}
-        </h3>
-
-        {content.author && (
-          <p className={styles.cardAuthor}>
-            by {content.author}
-          </p>
-        )}
-
-        {content.summary && (
-          <p className={styles.cardSummary}>
-            {content.summary}
-          </p>
-        )}
-      </div>
-
-      <div className={styles.cardFooter}>
-        <span className={styles.cardDate}>{formatDate(content.created_at)}</span>
-        <span className={`${styles.cardStatus} ${styles[content.status]}`}>
-          {content.status === 'inbox' ? 'Inbox' : 'Archived'}
+        <span className={`${styles.statusPill} ${content.status === 'inbox' ? styles.inbox : styles.archive}`}>
+          {content.status === 'inbox' ? 'Ready to digest' : 'Captured'}
         </span>
       </div>
 
-      <a
-        href={content.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={styles.cardLink}
-      >
-        Open original →
-      </a>
+      <div className={styles.body}>
+        <h3 className={styles.title}>{content.title || 'Untitled note'}</h3>
+        {content.author ? <p className={styles.author}>by {content.author}</p> : null}
+        <p className={styles.summary}>
+          {content.summary || 'No summary yet. Open it once and Briefly will produce your bite-sized takeaway.'}
+        </p>
+      </div>
+
+      <div className={styles.footerRow}>
+        <span className={styles.date}>{createdAt}</span>
+        <a href={content.url} target="_blank" rel="noopener noreferrer" className={styles.openLink}>
+          Open source
+        </a>
+      </div>
+
+      <div className={styles.actions}>
+        {content.status === 'inbox' && onSwipe ? (
+          <>
+            <button
+              onClick={() => onSwipe({ content_id: content.id, action: 'keep' })}
+              className={`${styles.actionBtn} ${styles.keepBtn}`}
+              aria-label="Keep this card"
+            >
+              Keep
+            </button>
+            <button
+              onClick={() => onSwipe({ content_id: content.id, action: 'discard' })}
+              className={`${styles.actionBtn} ${styles.discardBtn}`}
+              aria-label="Discard this card"
+            >
+              Clear
+            </button>
+          </>
+        ) : null}
+        <button
+          onClick={handleDelete}
+          className={`${styles.actionBtn} ${styles.deleteBtn}`}
+          aria-label="Delete this card"
+        >
+          Delete
+        </button>
+      </div>
     </article>
   );
 }

@@ -9,7 +9,6 @@ export default function Settings() {
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    // Load settings from localStorage
     const saved = localStorage.getItem('briefly_settings');
     if (saved) {
       setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(saved) });
@@ -19,129 +18,75 @@ export default function Settings() {
   const saveSettings = async () => {
     setIsSaving(true);
     setSaveMessage(null);
-
     try {
       localStorage.setItem('briefly_settings', JSON.stringify(settings));
-      setSaveMessage('Settings saved successfully!');
-
-      // Apply theme
-      applyTheme(settings.theme);
-
-      setTimeout(() => {
-        setSaveMessage(null);
-      }, 3000);
-    } catch (error) {
-      setSaveMessage('Failed to save settings');
+      document.documentElement.setAttribute('data-theme', settings.theme);
+      setSaveMessage('Saved. Your workspace is updated.');
+      setTimeout(() => setSaveMessage(null), 2500);
     } finally {
       setIsSaving(false);
     }
   };
 
-  const applyTheme = (theme: string) => {
-    document.documentElement.setAttribute('data-theme', theme);
-  };
-
   const viewModes: { value: ViewMode; label: string }[] = [
-    { value: 'grid', label: 'Grid View' },
-    { value: 'list', label: 'List View' },
-  ];
-
-  const themes: { value: string; label: string }[] = [
-    { value: 'light', label: 'Light' },
-    { value: 'dark', label: 'Dark' },
-    { value: 'system', label: 'System' },
+    { value: 'grid', label: 'Grid' },
+    { value: 'list', label: 'List' },
   ];
 
   return (
-    <div className={styles.settings}>
-      <div className={styles.pageHeader}>
-        <h1>Settings</h1>
-        <p>Customize your Briefly experience</p>
-      </div>
+    <section className={styles.page} data-testid="settings-page">
+      <header className={styles.hero}>
+        <p className={styles.kicker}>Control Room</p>
+        <h1>Tune Briefly for your daily rhythm.</h1>
+      </header>
 
-      {saveMessage && (
-        <div className={`${styles.message} ${styles.success}`}>
-          {saveMessage}
-        </div>
-      )}
+      {saveMessage ? <p className={styles.toast} role="status">{saveMessage}</p> : null}
 
-      <div className={styles.settingsCard}>
-        <h2>Appearance</h2>
+      <div className={styles.form}>
+        <label htmlFor="theme">Theme</label>
+        <select
+          id="theme"
+          value={settings.theme}
+          onChange={(e) => setSettings({ ...settings, theme: e.target.value as AppSettings['theme'] })}
+        >
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+          <option value="system">System</option>
+        </select>
 
-        <div className={styles.settingGroup}>
-          <label className={styles.settingLabel}>Theme</label>
-          <div className={styles.settingOptions}>
-            {themes.map((theme) => (
-              <button
-                key={theme.value}
-                className={`${styles.optionBtn} ${settings.theme === theme.value ? styles.active : ''}`}
-                onClick={() => setSettings({ ...settings, theme: theme.value as any })}
-              >
-                {theme.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        <label htmlFor="default-view">Default view</label>
+        <select
+          id="default-view"
+          value={settings.defaultView}
+          onChange={(e) => setSettings({ ...settings, defaultView: e.target.value as ViewMode })}
+        >
+          {viewModes.map((view) => <option key={view.value} value={view.value}>{view.label}</option>)}
+        </select>
 
-        <div className={styles.settingGroup}>
-          <label className={styles.settingLabel}>Default View</label>
-          <div className={styles.settingOptions}>
-            {viewModes.map((view) => (
-              <button
-                key={view.value}
-                className={`${styles.optionBtn} ${settings.defaultView === view.value ? styles.active : ''}`}
-                onClick={() => setSettings({ ...settings, defaultView: view.value })}
-              >
-                {view.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        <label htmlFor="items-per-page">Items per page</label>
+        <input
+          id="items-per-page"
+          type="number"
+          min={10}
+          max={100}
+          step={10}
+          value={settings.itemsPerPage}
+          onChange={(e) => setSettings({ ...settings, itemsPerPage: Number(e.target.value) })}
+        />
 
-        <div className={styles.settingGroup}>
-          <label className={styles.settingLabel}>Items Per Page</label>
-          <input
-            type="number"
-            min={10}
-            max={100}
-            step={10}
-            value={settings.itemsPerPage}
-            onChange={(e) =>
-              setSettings({ ...settings, itemsPerPage: Number(e.target.value) })
-            }
-            className={styles.numberInput}
-          />
-        </div>
-      </div>
+        <label htmlFor="api-url">API base URL</label>
+        <input
+          id="api-url"
+          type="url"
+          inputMode="url"
+          value={settings.apiBaseUrl}
+          onChange={(e) => setSettings({ ...settings, apiBaseUrl: e.target.value.trim() })}
+        />
 
-      <div className={styles.settingsCard}>
-        <h2>API Configuration</h2>
-
-        <div className={styles.settingGroup}>
-          <label className={styles.settingLabel} htmlFor="api-url">
-            API Base URL
-          </label>
-          <input
-            id="api-url"
-            type="text"
-            placeholder="http://localhost:8000"
-            value={settings.apiBaseUrl}
-            onChange={(e) =>
-              setSettings({ ...settings, apiBaseUrl: e.target.value })
-            }
-            className={styles.textInput}
-          />
-          <p className={styles.settingHelp}>
-            The URL of your Briefly backend API server.
-          </p>
-        </div>
-      </div>
-
-      <div className={styles.settingsActions}>
-        <button onClick={saveSettings} disabled={isSaving} className={styles.saveBtn}>
-          {isSaving ? 'Saving...' : 'Save Settings'}
+        <button onClick={saveSettings} disabled={isSaving}>
+          {isSaving ? 'Saving…' : 'Save settings'}
         </button>
       </div>
-    </div>
+    </section>
   );
 }

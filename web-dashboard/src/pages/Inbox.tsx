@@ -9,23 +9,15 @@ export default function Inbox() {
 
   useEffect(() => {
     contentStore.updateFilters({ status: 'inbox' });
-    contentStore.loadPlatforms();
+    void contentStore.loadPlatforms();
   }, []);
 
-  const handleDelete = async (id: number) => {
-    try {
-      await contentStore.deleteItem(id);
-    } catch (error) {
-      console.error('Delete failed:', error);
-    }
+  const handleSwipe = async (action: { content_id: number; action: 'keep' | 'discard' }) => {
+    await contentStore.performSwipe(action);
   };
 
-  const handleSwipe = async (action: { content_id: number; action: 'keep' | 'discard' }) => {
-    try {
-      await contentStore.performSwipe(action);
-    } catch (error) {
-      console.error('Swipe failed:', error);
-    }
+  const handleDelete = async (id: number) => {
+    await contentStore.deleteItem(id);
   };
 
   const handlePlatformChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -35,31 +27,36 @@ export default function Inbox() {
   };
 
   return (
-    <div className={styles.inbox}>
-      <div className={styles.pageHeader}>
-        <h1>Inbox</h1>
-        <p>Content waiting to be processed</p>
+    <section className={styles.page} data-testid="inbox-page">
+      <header className={styles.hero}>
+        <p className={styles.kicker}>Swipe Queue</p>
+        <h1>One card at a time, no backlog guilt.</h1>
+      </header>
+
+      <div className={styles.filterRow}>
+        <label htmlFor="platform-filter">Source</label>
+        <select
+          id="platform-filter"
+          value={selectedPlatform}
+          onChange={handlePlatformChange}
+          className={styles.select}
+        >
+          <option value="">All platforms</option>
+          {contentStore.platforms.map((platform) => (
+            <option key={platform.platform} value={platform.platform}>
+              {platform.platform} ({platform.count})
+            </option>
+          ))}
+        </select>
       </div>
 
-      <div className={styles.filters}>
-        <label className={styles.filterLabel}>
-          Platform:
-          <select
-            value={selectedPlatform}
-            onChange={handlePlatformChange}
-            className={styles.filterSelect}
-          >
-            <option value="">All Platforms</option>
-            {contentStore.platforms.map((platform) => (
-              <option key={platform.platform} value={platform.platform}>
-                {platform.platform} ({platform.count})
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      {contentStore.isLoading ? <p className={styles.message}>Refreshing queue…</p> : null}
 
-      <div className={styles.contentGrid}>
+      {!contentStore.items.length && !contentStore.isLoading ? (
+        <p className={styles.message}>Inbox clear. You&apos;re fully caught up.</p>
+      ) : null}
+
+      <div className={styles.grid}>
         {contentStore.items.map((item) => (
           <ContentCard
             key={item.id}
@@ -69,18 +66,6 @@ export default function Inbox() {
           />
         ))}
       </div>
-
-      {contentStore.isLoading && (
-        <div className={styles.loading}>
-          Loading...
-        </div>
-      )}
-
-      {!contentStore.items.length && !contentStore.isLoading && (
-        <div className={styles.empty}>
-          <p>Your inbox is empty! 🎉</p>
-        </div>
-      )}
-    </div>
+    </section>
   );
 }

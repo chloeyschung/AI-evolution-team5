@@ -14,7 +14,11 @@
     "test:e2e:headed": "PW_HEADED=true playwright test",
     "test:e2e:debug": "playwright test --debug",
     "lint": "eslint src --ext .ts,.tsx",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:e2e:circle1": "playwright test tests/e2e/circle1.frontend-frontend.spec.ts",
+    "test:e2e:circle2": "playwright test -c playwright.integration.config.ts tests/e2e/circle2.backend-frontend.spec.ts",
+    "test:e2e:circle3": "playwright test -c playwright.integration.config.ts tests/e2e/circle3.db-backend-frontend.spec.ts",
+    "test:e2e:circles": "npm run test:e2e:circle1 && npm run test:e2e:circle2 && npm run test:e2e:circle3"
   },
   "dependencies": {
     "react": "^18.2.0",
