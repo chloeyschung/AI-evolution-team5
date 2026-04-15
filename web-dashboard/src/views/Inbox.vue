@@ -7,7 +7,6 @@ const contentStore = useContentStore();
 
 onMounted(async () => {
   contentStore.updateFilters({ status: 'inbox' });
-  await contentStore.loadContent(1);
   await contentStore.loadPlatforms();
 });
 

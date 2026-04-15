@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { checkAuthStatus, logout } from '../api/endpoints';
 import type { AuthStatus, User } from '../types';
+import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from '../types';
 
 export const useAuthStore = defineStore('auth', () => {
   // State
@@ -16,8 +17,7 @@ export const useAuthStore = defineStore('auth', () => {
   // Actions
   async function initialize(): Promise<void> {
     try {
-      // Check if we have a valid token before making the request
-      const token = localStorage.getItem('briefly_access_token');
+      const token = localStorage.getItem(ACCESS_TOKEN_KEY);
       if (!token) {
         isAuthenticated.value = false;
         isLoading.value = false;
@@ -35,9 +35,8 @@ export const useAuthStore = defineStore('auth', () => {
       }
     } catch (error) {
       console.error('Auth initialization failed:', error);
-      // Clear invalid tokens
-      localStorage.removeItem('briefly_access_token');
-      localStorage.removeItem('briefly_refresh_token');
+      localStorage.removeItem(ACCESS_TOKEN_KEY);
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
       isAuthenticated.value = false;
       user.value = null;
     } finally {
@@ -69,13 +68,13 @@ export const useAuthStore = defineStore('auth', () => {
   function clearAuth(): void {
     user.value = null;
     isAuthenticated.value = false;
-    localStorage.removeItem('briefly_access_token');
-    localStorage.removeItem('briefly_refresh_token');
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
   }
 
   function saveTokens(accessToken: string, refreshToken: string): void {
-    localStorage.setItem('briefly_access_token', accessToken);
-    localStorage.setItem('briefly_refresh_token', refreshToken);
+    localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
   }
 
   return {

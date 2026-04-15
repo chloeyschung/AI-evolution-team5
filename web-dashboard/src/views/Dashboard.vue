@@ -6,8 +6,10 @@ import ContentCard from '../components/content/ContentCard.vue';
 const contentStore = useContentStore();
 
 onMounted(async () => {
-  await contentStore.loadContent(1);
-  await contentStore.loadPlatforms();
+  await Promise.all([
+    contentStore.loadContent(1),
+    contentStore.loadPlatforms(),
+  ]);
 });
 
 const handleDelete = async (id: number) => {

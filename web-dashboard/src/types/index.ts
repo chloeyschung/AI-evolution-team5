@@ -90,3 +90,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultView: 'grid',
   itemsPerPage: 20,
 };
+
+// Storage keys
+export const ACCESS_TOKEN_KEY = 'briefly_access_token';
+export const REFRESH_TOKEN_KEY = 'briefly_refresh_token';
+
+// Pagination constants
+export const DEFAULT_PAGE_SIZE = 20;

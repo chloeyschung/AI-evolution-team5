@@ -17,6 +17,7 @@ import type {
   ContentSort,
   SwipeAction,
 } from '../types';
+import { DEFAULT_PAGE_SIZE } from '../types';
 
 export const useContentStore = defineStore('content', () => {
   // State
@@ -69,11 +70,11 @@ export const useContentStore = defineStore('content', () => {
       let newItems: Content[];
 
       if (filters.value.status === 'inbox') {
-        newItems = await getPendingContent(20, filters.value.platform || undefined);
+        newItems = await getPendingContent(DEFAULT_PAGE_SIZE, filters.value.platform || undefined);
       } else if (filters.value.status === 'archived') {
-        newItems = await getKeptContent(20, (newPage - 1) * 20);
+        newItems = await getKeptContent(DEFAULT_PAGE_SIZE, (newPage - 1) * DEFAULT_PAGE_SIZE);
       } else {
-        const result = await getContent(filters.value, sort.value, newPage, 20);
+        const result = await getContent(filters.value, sort.value, newPage, DEFAULT_PAGE_SIZE);
         newItems = result.items;
       }
 
@@ -84,7 +85,7 @@ export const useContentStore = defineStore('content', () => {
       }
 
       page.value = newPage;
-      hasMore.value = newItems.length === 20;
+      hasMore.value = newItems.length === DEFAULT_PAGE_SIZE;
       selectedIds.value.clear();
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to load content';
@@ -111,9 +112,9 @@ export const useContentStore = defineStore('content', () => {
 
     isLoading.value = true;
     try {
-      const results = await searchContent(query, 20, 0);
+      const results = await searchContent(query, DEFAULT_PAGE_SIZE, 0);
       items.value = results;
-      hasMore.value = results.length === 20;
+      hasMore.value = results.length === DEFAULT_PAGE_SIZE;
       page.value = 1;
       selectedIds.value.clear();
     } catch (err) {

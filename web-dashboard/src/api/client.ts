@@ -1,4 +1,5 @@
 import axios, { type AxiosRequestConfig, type AxiosResponse, type AxiosError } from 'axios';
+import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from '../types';
 
 // Define types compatible with axios 1.x
 type AxiosInstance = {
@@ -16,8 +17,6 @@ type AxiosInstance = {
 
 let apiClient: AxiosInstance | null = null;
 let refreshPromise: Promise<void> | null = null;
-
-// Import abort controller from router for request cancellation
 let currentAbortController: AbortController | null = null;
 
 export function setAbortController(controller: AbortController | null): void {
@@ -43,11 +42,10 @@ export function getApiClient(): AxiosInstance {
     // Request interceptor for auth token
     apiClient.interceptors.request.use(
       (config: AxiosRequestConfig) => {
-        const token = localStorage.getItem('briefly_access_token');
+        const token = localStorage.getItem(ACCESS_TOKEN_KEY);
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
-        // Attach current abort signal if available
         if (currentAbortController) {
           config.signal = currentAbortController.signal;
         }
@@ -60,12 +58,10 @@ export function getApiClient(): AxiosInstance {
     apiClient.interceptors.response.use(
       (response) => response,
       async (error: AxiosError) => {
-        // Only attempt refresh for 401 errors
         if (error.response?.status !== 401) {
           return Promise.reject(error);
         }
 
-        // If already refreshing, wait for that to complete
         if (refreshPromise) {
           try {
             await refreshPromise;
@@ -73,15 +69,13 @@ export function getApiClient(): AxiosInstance {
             // Refresh failed, will redirect below
           }
         } else {
-          // Start a new refresh
           try {
             refreshPromise = refreshAccessToken();
             await refreshPromise;
           } catch {
-            // Refresh failed, clear tokens and redirect
             refreshPromise = null;
-            localStorage.removeItem('briefly_access_token');
-            localStorage.removeItem('briefly_refresh_token');
+            localStorage.removeItem(ACCESS_TOKEN_KEY);
+            localStorage.removeItem(REFRESH_TOKEN_KEY);
             if (window.location.pathname !== '/login') {
               window.location.href = '/login';
             }
@@ -89,9 +83,8 @@ export function getApiClient(): AxiosInstance {
           }
         }
 
-        // Retry original request with new token
         if (error.config) {
-          const token = localStorage.getItem('briefly_access_token');
+          const token = localStorage.getItem(ACCESS_TOKEN_KEY);
           if (token) {
             error.config.headers.Authorization = `Bearer ${token}`;
             return apiClient.request(error.config);
@@ -107,12 +100,11 @@ export function getApiClient(): AxiosInstance {
 }
 
 export async function refreshAccessToken(): Promise<void> {
-  const refreshToken = localStorage.getItem('briefly_refresh_token');
+  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
   if (!refreshToken) {
     throw new Error('No refresh token available');
   }
 
-  // Deduplicate concurrent refresh calls
   if (refreshPromise) {
     return refreshPromise;
   }
@@ -124,8 +116,8 @@ export async function refreshAccessToken(): Promise<void> {
         { refresh_token: refreshToken }
       );
       const { access_token, refresh_token } = response.data;
-      localStorage.setItem('briefly_access_token', access_token);
-      localStorage.setItem('briefly_refresh_token', refresh_token);
+      localStorage.setItem(ACCESS_TOKEN_KEY, access_token);
+      localStorage.setItem(REFRESH_TOKEN_KEY, refresh_token);
     } finally {
       refreshPromise = null;
     }
