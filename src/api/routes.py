@@ -215,8 +215,8 @@ async def list_pending_content(
     Returns content ordered by recency (newest first).
     Optionally filter by platform and AI-generated tags.
     """
-    service = ContentService(db)
-    contents = await service.get_pending_content(user_id, limit=limit)
+    repo = ContentRepository(db)
+    contents = await repo.get_pending(user_id, limit=limit, platform=platform, tags=tags)
 
     return [ContentResponse.from_content(c) for c in contents]
 
@@ -681,7 +681,7 @@ async def get_user_statistics(
     Returns aggregated metrics including swipe counts, retention rate, and streak.
     """
     repo = UserProfileRepository(db)
-    stats = await repo.get_statistics()
+    stats = await repo.get_statistics(user_id)
 
     return UserStatisticsResponse(
         total_swipes=stats["total_swipes"],
@@ -689,8 +689,8 @@ async def get_user_statistics(
         total_discarded=stats["total_discarded"],
         retention_rate=stats["retention_rate"],
         streak_days=stats["streak_days"],
-        first_swipe_at=stats["first_swipe_at"].isoformat() if stats["first_swipe_at"] else None,
-        last_swipe_at=stats["last_swipe_at"].isoformat() if stats["last_swipe_at"] else None,
+        first_swipe_at=stats["first_swipe_at"].isoformat() + "Z" if stats["first_swipe_at"] else None,
+        last_swipe_at=stats["last_swipe_at"].isoformat() + "Z" if stats["last_swipe_at"] else None,
     )
 
 
@@ -765,9 +765,12 @@ async def get_auth_status(
         return AuthStatusResponse(is_authenticated=False)
 
     # Return authenticated status
+    user_repo = UserProfileRepository(db)
+    user = await user_repo.get_user_by_id(token_record.user_id)
     return AuthStatusResponse(
         is_authenticated=True,
         user_id=token_record.user_id,
+        email=user.email if user else None,
         token_expires_at=token_record.expires_at.isoformat(),
     )
 
@@ -894,6 +897,7 @@ async def google_login(
         expires_at=token_record.expires_at.isoformat(),
         user=UserProfileResponse(
             id=existing_user.id,
+            email=existing_user.email,
             display_name=existing_user.display_name,
             avatar_url=existing_user.avatar_url,
             bio=existing_user.bio,
@@ -1009,6 +1013,7 @@ async def google_login_with_code(
         expires_at=token_record.expires_at.isoformat(),
         user=UserProfileResponse(
             id=existing_user.id,
+            email=existing_user.email,
             display_name=existing_user.display_name,
             avatar_url=existing_user.avatar_url,
             bio=existing_user.bio,
@@ -1115,6 +1120,7 @@ async def delete_account(
             },
         )
 
+    auth_repo = AuthenticationRepository(db)
     deletion_repo = AccountDeletionRepository(db)
 
     # Step 1: Generate confirmation token (if no token provided)
@@ -1132,8 +1138,9 @@ async def delete_account(
         )
 
         return AccountDeleteResponse(
-            message="Confirmation token generated. Please confirm to proceed with deletion.",
-            block_expires_at=block_expires_at.isoformat(),
+            message="Confirmation token generated. Submit this token to confirm deletion.",
+            block_expires_at=block_expires_at.isoformat() + "Z",
+            confirmation_token=confirmation_token,
         )
 
     # Step 2: Validate confirmation token
@@ -1681,7 +1688,12 @@ async def connect_youtube(
         401: Not authenticated.
     """
     import os
+    import secrets
+    from datetime import timedelta
     from urllib.parse import urlencode
+
+    from src.integrations.repositories.integration import IntegrationRepository
+    from src.utils.datetime_utils import utc_now
 
     # Get OAuth credentials
     client_id = os.getenv("YOUTUBE_CLIENT_ID")
@@ -1692,6 +1704,16 @@ async def connect_youtube(
     scope = "https://www.googleapis.com/auth/youtube.readonly"
     redirect_uri = os.getenv("YOUTUBE_REDIRECT_URI", "http://localhost:8000/api/v1/integrations/youtube/callback")
 
+    # Generate cryptographically random CSRF state token and store server-side (SEC-002)
+    state_token = secrets.token_urlsafe(16)
+    repo = IntegrationRepository(db)
+    await repo.save_oauth_state(
+        user_id=user_id,
+        provider=Provider.YOUTUBE.value,
+        state_token=state_token,
+        expires_at=utc_now() + timedelta(minutes=15),
+    )
+
     auth_url = "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(
         {
             "client_id": client_id,
@@ -1700,7 +1722,7 @@ async def connect_youtube(
             "scope": scope,
             "access_type": "offline",
             "prompt": "consent",
-            "state": str(user_id),  # Use user_id as state
+            "state": state_token,
         }
     )
 
@@ -1710,7 +1732,7 @@ async def connect_youtube(
 @router.get("/integrations/youtube/callback")
 async def youtube_callback(
     code: str = Query(...),
-    state: str = Query(..., description="User ID"),
+    state: str = Query(..., description="CSRF state token"),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Handle YouTube OAuth callback.
@@ -1719,7 +1741,7 @@ async def youtube_callback(
 
     Args:
         code: Authorization code from YouTube.
-        state: User ID (passed from connect endpoint).
+        state: CSRF state token (issued by connect endpoint, single-use).
         db: Database session.
 
     Returns:
@@ -1735,11 +1757,11 @@ async def youtube_callback(
 
     from src.integrations.repositories.integration import IntegrationRepository
 
-    # Validate state (user_id)
-    try:
-        user_id = int(state)
-    except ValueError:
-        raise HTTPException(status_code=400, detail=ErrorCode.INVALID_STATE) from None
+    # Validate and consume CSRF state token — derives user_id from server-side record (SEC-002)
+    repo = IntegrationRepository(db)
+    user_id = await repo.get_and_consume_oauth_state(state, Provider.YOUTUBE.value)
+    if user_id is None:
+        raise HTTPException(status_code=400, detail=ErrorCode.INVALID_STATE)
 
     # Get OAuth credentials
     client_id = os.getenv("YOUTUBE_CLIENT_ID")
@@ -1770,7 +1792,6 @@ async def youtube_callback(
     token_data = response.json()
 
     # Store tokens
-    repo = IntegrationRepository(db)
     expires_at = utc_now() + timedelta(seconds=token_data.get("expires_in", 3600))
 
     await repo.save_tokens(

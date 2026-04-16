@@ -636,3 +636,73 @@ async def test_get_and_consume_wrong_provider_returns_none(db_session):
 
     result = await repo.get_and_consume_oauth_state("linkedin_token", "youtube")
     assert result is None
+
+
+# ---------------------------------------------------------------------------
+# SEC-002: connect_youtube and youtube_callback route fixes
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_connect_youtube_state_is_opaque(authenticated_client):
+    """connect_youtube must embed a non-integer opaque state in the auth URL."""
+    import os
+    from urllib.parse import urlparse, parse_qs
+
+    os.environ["YOUTUBE_CLIENT_ID"] = "test_client_id"
+    try:
+        response = await authenticated_client.post("/api/v1/integrations/youtube/connect")
+        assert response.status_code == 200
+        auth_url = response.json()["auth_url"]
+        state = parse_qs(urlparse(auth_url).query)["state"][0]
+        # Must NOT be parseable as an integer (old vulnerable pattern was str(user_id))
+        try:
+            int(state)
+            assert False, f"state should be opaque, got integer-like: {state!r}"
+        except ValueError:
+            pass  # expected — token_urlsafe produces non-integer strings
+    finally:
+        os.environ.pop("YOUTUBE_CLIENT_ID", None)
+
+
+@pytest.mark.asyncio
+async def test_callback_integer_state_rejected(async_client):
+    """Old state=<integer> pattern must be rejected — no longer a valid user lookup."""
+    response = await async_client.get(
+        "/api/v1/integrations/youtube/callback",
+        params={"code": "fake_code", "state": "42"},
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "invalid_state"
+
+
+@pytest.mark.asyncio
+async def test_callback_unknown_opaque_state_rejected(async_client):
+    """Unknown opaque state token rejected with 400."""
+    response = await async_client.get(
+        "/api/v1/integrations/youtube/callback",
+        params={"code": "fake_code", "state": "totally_unknown_token_xyz"},
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "invalid_state"
+
+
+@pytest.mark.asyncio
+async def test_callback_expired_state_rejected(async_client, db_session):
+    """Expired state token rejected with 400."""
+    from src.utils.datetime_utils import utc_now
+
+    repo = IntegrationRepository(db_session)
+    await repo.save_oauth_state(
+        user_id=1,
+        provider="youtube",
+        state_token="expired_cb_token",
+        expires_at=utc_now() - timedelta(minutes=1),
+    )
+    await db_session.commit()
+
+    response = await async_client.get(
+        "/api/v1/integrations/youtube/callback",
+        params={"code": "fake_code", "state": "expired_cb_token"},
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "invalid_state"
