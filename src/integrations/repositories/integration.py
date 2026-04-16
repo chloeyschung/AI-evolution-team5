@@ -15,6 +15,7 @@ from src.data.models import (
     IntegrationSyncConfig,
     IntegrationSyncLog,
     IntegrationTokens,
+    OAuthState,
 )
 from src.integrations.youtube.models import SyncConfig, SyncLog
 
@@ -403,3 +404,68 @@ class IntegrationRepository:
             select(IntegrationSyncConfig).where(IntegrationSyncConfig.is_active & (hourly_due | daily_due | weekly_due))
         )
         return result.scalars().all()
+
+    # OAuth CSRF State Tokens (SEC-002)
+
+    async def save_oauth_state(
+        self,
+        user_id: int,
+        provider: str,
+        state_token: str,
+        expires_at: datetime,
+    ) -> OAuthState:
+        """Store a single-use OAuth CSRF state token.
+
+        Args:
+            user_id: User initiating the OAuth flow.
+            provider: Provider name (e.g., 'youtube').
+            state_token: Cryptographically random token from secrets.token_urlsafe.
+            expires_at: When this token expires (15-minute TTL recommended).
+
+        Returns:
+            Created OAuthState record.
+        """
+        record = OAuthState(
+            user_id=user_id,
+            provider=provider,
+            state_token=state_token,
+            expires_at=expires_at,
+        )
+        self.session.add(record)
+        await self.session.flush()
+        return record
+
+    async def get_and_consume_oauth_state(
+        self,
+        state_token: str,
+        provider: str,
+    ) -> int | None:
+        """Look up a valid unexpired state token, delete it, and return its user_id.
+
+        Single-use: the row is deleted on first match. Subsequent calls with the
+        same token return None (replay protection).
+
+        Args:
+            state_token: Token from OAuth callback query param.
+            provider: Provider name to scope the lookup.
+
+        Returns:
+            user_id if token is valid and unexpired, else None.
+        """
+        now = datetime.now(UTC)
+        result = await self.session.execute(
+            select(OAuthState).where(
+                OAuthState.state_token == state_token,
+                OAuthState.provider == provider,
+                OAuthState.expires_at > now,
+            )
+        )
+        record = result.scalar_one_or_none()
+        if record is None:
+            return None
+
+        user_id = record.user_id
+        await self.session.execute(
+            delete(OAuthState).where(OAuthState.id == record.id)
+        )
+        return user_id
