@@ -358,6 +358,59 @@ class LogoutResponse(BaseModel):
     message: str
 
 
+# AUTH-005: Email/password auth schemas
+
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+
+
+class RegisterResponse(BaseModel):
+    message: str
+
+
+class VerifyEmailResponse(BaseModel):
+    message: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    expires_at: str
+
+
+class PasswordResetRequestSchema(BaseModel):
+    email: str
+
+
+class PasswordResetRequestResponse(BaseModel):
+    message: str
+
+
+class PasswordResetConfirmSchema(BaseModel):
+    token: str
+    new_password: str
+
+
+class PasswordResetConfirmResponse(BaseModel):
+    message: str
+
+
+class LinkAccountRequest(BaseModel):
+    email: str
+    password: str
+
+
+class LinkAccountResponse(BaseModel):
+    message: str
+
+
 class AccountDeleteRequest(BaseModel):
     """Schema for account deletion request."""
 

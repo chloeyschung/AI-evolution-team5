@@ -28,7 +28,13 @@ from ..data.models import (
     ContentTag,
     IntegrationSyncConfig,
     SwipeHistory,
+    UserAuthMethod,
+    UserProfile,
 )
+from ..data.email_auth_repository import EmailAuthRepository
+from ..auth.email_auth import hash_password, hmac_email, encrypt_email, verify_password, generate_token
+from ..constants import AuthProvider
+from ..services.email_service import EmailService
 from ..data.repository import (
     ContentRepository,
     ContentTagRepository,
@@ -40,6 +46,17 @@ from ..middleware.rate_limiter import limiter
 from .schemas import (
     AccountDeleteRequest,
     AccountDeleteResponse,
+    LinkAccountRequest,
+    LinkAccountResponse,
+    LoginRequest,
+    LoginResponse,
+    PasswordResetConfirmResponse,
+    PasswordResetConfirmSchema,
+    PasswordResetRequestResponse,
+    PasswordResetRequestSchema,
+    RegisterRequest,
+    RegisterResponse,
+    VerifyEmailResponse,
     AchievementProgress,
     AchievementsListResponse,
     AchievementsStatsResponse,
@@ -1048,6 +1065,193 @@ async def google_login_with_code(
         ),
         is_new_user=is_new_user,
     )
+
+
+# AUTH-005: Email/Password auth routes ────────────────────────────────────────
+
+
+@router.post("/auth/register", status_code=201)
+async def register(
+    request: RegisterRequest,
+    db: AsyncSession = Depends(get_db),
+) -> RegisterResponse:
+    from datetime import timedelta
+
+    email_repo = EmailAuthRepository(db)
+    provider_id = hmac_email(request.email)
+
+    existing = await email_repo.get_auth_method_by_provider(AuthProvider.EMAIL_PASSWORD, provider_id)
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail={"error": "email_exists"},
+        )
+
+    user = UserProfile(
+        email=request.email.strip().lower(),
+        created_at=utc_now(),
+        updated_at=utc_now(),
+    )
+    db.add(user)
+    await db.flush()
+
+    await email_repo.create_auth_method(
+        user_id=user.id,
+        provider=AuthProvider.EMAIL_PASSWORD,
+        provider_id=provider_id,
+        password_hash=hash_password(request.password),
+        email_encrypted=encrypt_email(request.email),
+    )
+
+    raw_token, token_hash = generate_token()
+    await email_repo.create_verification_token(
+        user_id=user.id,
+        token_hash=token_hash,
+        expires_at=utc_now() + timedelta(hours=24),
+    )
+    await db.commit()
+
+    EmailService().send_verification_email(request.email, raw_token)
+
+    return RegisterResponse(message="Verification email sent. Please check your inbox.")
+
+
+@router.get("/auth/verify-email")
+async def verify_email(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+) -> VerifyEmailResponse:
+    import hashlib
+
+    email_repo = EmailAuthRepository(db)
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    token_rec = await email_repo.consume_verification_token(token_hash)
+    if token_rec is None:
+        raise HTTPException(status_code=400, detail={"error": "invalid_or_expired_token"})
+
+    result = await db.execute(
+        select(UserAuthMethod).where(
+            UserAuthMethod.user_id == token_rec.user_id,
+            UserAuthMethod.provider == AuthProvider.EMAIL_PASSWORD,
+        )
+    )
+    method = result.scalar_one_or_none()
+    if method:
+        await email_repo.mark_email_verified(method.id)
+
+    return VerifyEmailResponse(message="Email verified. You can now sign in.")
+
+
+@router.post("/auth/login")
+async def login_email(
+    request: LoginRequest,
+    db: AsyncSession = Depends(get_db),
+) -> LoginResponse:
+    email_repo = EmailAuthRepository(db)
+    provider_id = hmac_email(request.email)
+
+    method = await email_repo.get_auth_method_by_provider(AuthProvider.EMAIL_PASSWORD, provider_id)
+    if method is None or not verify_password(request.password, method.password_hash or ""):
+        raise HTTPException(status_code=401, detail={"error": "invalid_credentials"})
+
+    if not method.email_verified:
+        raise HTTPException(status_code=403, detail={"error": "email_not_verified"})
+
+    user = await db.get(UserProfile, method.user_id)
+    if user is None:
+        raise HTTPException(status_code=401, detail={"error": "invalid_credentials"})
+
+    user_repo = UserProfileRepository(db)
+    await user_repo.update_last_login(user.id)
+    auth_repo = AuthenticationRepository(db)
+    token_record, access_token = await auth_repo.create_tokens(user.id)
+
+    return LoginResponse(
+        access_token=access_token,
+        refresh_token=token_record.refresh_token,
+        expires_at=token_record.expires_at.isoformat(),
+    )
+
+
+@router.post("/auth/password-reset/request")
+async def password_reset_request(
+    request: PasswordResetRequestSchema,
+    db: AsyncSession = Depends(get_db),
+) -> PasswordResetRequestResponse:
+    from datetime import timedelta
+
+    email_repo = EmailAuthRepository(db)
+    provider_id = hmac_email(request.email)
+    method = await email_repo.get_auth_method_by_provider(AuthProvider.EMAIL_PASSWORD, provider_id)
+
+    if method:
+        raw_token, token_hash = generate_token()
+        await email_repo.create_reset_token(
+            user_id=method.user_id,
+            token_hash=token_hash,
+            expires_at=utc_now() + timedelta(hours=1),
+        )
+        await db.commit()
+        try:
+            EmailService().send_password_reset_email(request.email, raw_token)
+        except Exception:
+            pass  # Never reveal whether email exists
+
+    return PasswordResetRequestResponse(message="If that email is registered, a reset link has been sent.")
+
+
+@router.post("/auth/password-reset/confirm")
+async def password_reset_confirm(
+    request: PasswordResetConfirmSchema,
+    db: AsyncSession = Depends(get_db),
+) -> PasswordResetConfirmResponse:
+    import hashlib
+
+    email_repo = EmailAuthRepository(db)
+    token_hash = hashlib.sha256(request.token.encode()).hexdigest()
+    token_rec = await email_repo.consume_reset_token(token_hash)
+    if token_rec is None:
+        raise HTTPException(status_code=400, detail={"error": "invalid_or_expired_token"})
+
+    result = await db.execute(
+        select(UserAuthMethod).where(
+            UserAuthMethod.user_id == token_rec.user_id,
+            UserAuthMethod.provider == AuthProvider.EMAIL_PASSWORD,
+        )
+    )
+    method = result.scalar_one_or_none()
+    if method is None:
+        raise HTTPException(status_code=400, detail={"error": "invalid_or_expired_token"})
+
+    await email_repo.update_password(method.id, hash_password(request.new_password))
+    return PasswordResetConfirmResponse(message="Password updated. You can now sign in.")
+
+
+@router.post("/auth/link-account")
+async def link_account(
+    request: LinkAccountRequest,
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+) -> LinkAccountResponse:
+    """Link an email/password identity to an existing account (re-auth required)."""
+    email_repo = EmailAuthRepository(db)
+    provider_id = hmac_email(request.email)
+
+    existing_method = await email_repo.get_auth_method_by_provider(AuthProvider.EMAIL_PASSWORD, provider_id)
+    if existing_method and existing_method.user_id != user_id:
+        raise HTTPException(status_code=409, detail={"error": "email_taken_by_another_account"})
+    if existing_method and existing_method.user_id == user_id:
+        raise HTTPException(status_code=409, detail={"error": "already_linked"})
+
+    await email_repo.create_auth_method(
+        user_id=user_id,
+        provider=AuthProvider.EMAIL_PASSWORD,
+        provider_id=provider_id,
+        password_hash=hash_password(request.password),
+        email_encrypted=encrypt_email(request.email),
+    )
+
+    return LinkAccountResponse(message="Email/password identity linked. Verify your email to activate it.")
 
 
 # AUTH-003: Logout endpoint
