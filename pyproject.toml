@@ -1,0 +1,68 @@
+[project]
+name = "briefly"
+version = "0.1.0"
+description = "A swipe-based knowledge management app for bite-sized content summaries"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "beautifulsoup4>=4.14.3",
+    "httpx>=0.28.1",
+    "python-dateutil>=2.9.0",
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.3.0",
+    "sqlalchemy>=2.0",
+    "asyncpg>=0.29",
+    "fastapi>=0.109",
+    "uvicorn>=0.27",
+    "aiosqlite>=0.19",
+    "pyjwt>=2.12.1",
+    "google-auth-oauthlib>=1.3.1",
+    "argon2-cffi>=25.1.0",
+    "authlib>=1.6.11",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[dependency-groups]
+agents = [
+    "cryptography>=46.0.7",
+    "openpyxl>=3.1.5",
+    "slowapi>=0.1.9",
+]
+dev = [
+    "black>=24.0.0",
+    "ruff>=0.4.0",
+]
+
+[tool.black]
+line-length = 120
+target-version = ["py313"]
+include = '\.pyi?$'
+exclude = '''
+/(\.git|\.venv|venv|build|dist)/
+'''
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # Pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (black handles this)
+    "B008",  # do not use function calls in default arguments (used for utc_now)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]

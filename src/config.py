@@ -52,6 +52,23 @@ class Settings:
         )
     GOOGLE_REDIRECT_URI: str = _google_redirect_uri
 
+    # AUTH-005: Email/password auth settings
+    _email_lookup_key: str | None = os.getenv("EMAIL_LOOKUP_KEY")
+    if _email_lookup_key is None:
+        raise RuntimeError("EMAIL_LOOKUP_KEY environment variable is required for email credential lookup")
+    EMAIL_LOOKUP_KEY: str = _email_lookup_key
+
+    _smtp_host: str | None = os.getenv("SMTP_HOST")
+    if _smtp_host is None:
+        raise RuntimeError("SMTP_HOST environment variable is required")
+    SMTP_HOST: str = _smtp_host
+
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER: str = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    EMAIL_FROM: str = os.getenv("EMAIL_FROM", "noreply@briefly.app")
+    APP_BASE_URL: str = os.getenv("APP_BASE_URL", "http://localhost:5173")
+
     # API Settings
     API_PREFIX: str = "/api/v1"
 
