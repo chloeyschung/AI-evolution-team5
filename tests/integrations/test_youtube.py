@@ -523,3 +523,116 @@ async def test_integration_repo_get_due_syncs_inactive(db_session):
 
     # Should not be due (inactive)
     assert len(due) == 0
+
+
+# ---------------------------------------------------------------------------
+# SEC-002: OAuthState model + repository methods
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_oauth_state_table_exists(db_session):
+    """OAuthState rows can be inserted and queried."""
+    from src.data.models import OAuthState
+    from src.utils.datetime_utils import utc_now
+
+    record = OAuthState(
+        user_id=1,
+        provider="youtube",
+        state_token="test_token_abc",
+        expires_at=utc_now() + timedelta(minutes=15),
+    )
+    db_session.add(record)
+    await db_session.flush()
+
+    assert record.id is not None
+    assert record.state_token == "test_token_abc"
+    assert record.created_at is not None
+
+
+@pytest.mark.asyncio
+async def test_save_oauth_state_returns_record(db_session):
+    """save_oauth_state stores token and returns the record."""
+    from src.utils.datetime_utils import utc_now
+
+    repo = IntegrationRepository(db_session)
+    expires = utc_now() + timedelta(minutes=15)
+    record = await repo.save_oauth_state(
+        user_id=7,
+        provider="youtube",
+        state_token="unique_token_xyz",
+        expires_at=expires,
+    )
+    await db_session.flush()
+
+    assert record.id is not None
+    assert record.user_id == 7
+    assert record.state_token == "unique_token_xyz"
+
+
+@pytest.mark.asyncio
+async def test_get_and_consume_valid_state(db_session):
+    """get_and_consume_oauth_state returns user_id and deletes the row."""
+    from sqlalchemy import select
+    from src.data.models import OAuthState
+    from src.utils.datetime_utils import utc_now
+
+    repo = IntegrationRepository(db_session)
+    await repo.save_oauth_state(
+        user_id=7,
+        provider="youtube",
+        state_token="consume_me",
+        expires_at=utc_now() + timedelta(minutes=15),
+    )
+    await db_session.flush()
+
+    user_id = await repo.get_and_consume_oauth_state("consume_me", "youtube")
+    assert user_id == 7
+
+    result = await db_session.execute(
+        select(OAuthState).where(OAuthState.state_token == "consume_me")
+    )
+    assert result.scalar_one_or_none() is None
+
+
+@pytest.mark.asyncio
+async def test_get_and_consume_unknown_token_returns_none(db_session):
+    """Unknown state token yields None."""
+    repo = IntegrationRepository(db_session)
+    result = await repo.get_and_consume_oauth_state("does_not_exist", "youtube")
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_and_consume_expired_token_returns_none(db_session):
+    """Expired state token yields None."""
+    from src.utils.datetime_utils import utc_now
+
+    repo = IntegrationRepository(db_session)
+    await repo.save_oauth_state(
+        user_id=7,
+        provider="youtube",
+        state_token="expired_token",
+        expires_at=utc_now() - timedelta(minutes=1),
+    )
+    await db_session.flush()
+
+    result = await repo.get_and_consume_oauth_state("expired_token", "youtube")
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_and_consume_wrong_provider_returns_none(db_session):
+    """State token scoped to wrong provider yields None."""
+    from src.utils.datetime_utils import utc_now
+
+    repo = IntegrationRepository(db_session)
+    await repo.save_oauth_state(
+        user_id=7,
+        provider="linkedin",
+        state_token="linkedin_token",
+        expires_at=utc_now() + timedelta(minutes=15),
+    )
+    await db_session.flush()
+
+    result = await repo.get_and_consume_oauth_state("linkedin_token", "youtube")
+    assert result is None

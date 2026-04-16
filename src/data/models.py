@@ -269,6 +269,23 @@ class IntegrationSyncLog(Base):
     executed_at = Column(DateTime, default=utc_now, nullable=False, index=True)
 
 
+class OAuthState(Base):
+    """Single-use CSRF tokens for OAuth flows (SEC-002).
+
+    Generated at connect time, consumed on first valid callback.
+    Prevents CSRF attacks where the state=user_id pattern is spoofable.
+    """
+
+    __tablename__ = "oauth_states"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    provider = Column(String(50), nullable=False, index=True)
+    state_token = Column(String(64), nullable=False, unique=True, index=True)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+
 # ADV-002: Gamified Achievement System models
 
 
