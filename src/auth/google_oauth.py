@@ -152,44 +152,29 @@ async def exchange_auth_code_for_tokens(
     GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 
     try:
-        async with async_client_context() as client:
-            response = await client.post(
+        from authlib.integrations.httpx_client import AsyncOAuth2Client
+
+        async with AsyncOAuth2Client(
+            client_id=client_id,
+            client_secret=client_secret,
+            redirect_uri=redirect_uri,
+        ) as authlib_client:
+            token_data = await authlib_client.fetch_token(
                 GOOGLE_TOKEN_URL,
-                data={
-                    "code": code,
-                    "client_id": client_id,
-                    "client_secret": client_secret,
-                    "redirect_uri": redirect_uri,
-                    "grant_type": "authorization_code",
-                },
-                timeout=10.0,
+                code=code,
+                grant_type="authorization_code",
             )
 
-            if response.status_code != 200:
-                raise GoogleTokenVerificationError(
-                    f"Google code exchange failed: {response.status_code}"
-                )
+        id_token = token_data.get("id_token")
+        access_token = token_data.get("access_token")
 
-            token_data = response.json()
+        if not id_token:
+            raise GoogleTokenVerificationError("No ID token in Google response")
 
-            # Check for error in response
-            if "error" in token_data:
-                raise GoogleTokenVerificationError(
-                    f"Google code exchange error: {token_data['error']}"
-                )
+        user_info = await get_google_user_info(access_token)
+        return id_token, user_info
 
-            id_token = token_data.get("id_token")
-            access_token = token_data.get("access_token")
-
-            if not id_token:
-                raise GoogleTokenVerificationError("No ID token in Google response")
-
-            # Get user info using the access token
-            user_info = await get_google_user_info(access_token)
-
-            return id_token, user_info
-
-    except httpx.HTTPError as e:
+    except GoogleTokenVerificationError:
+        raise
+    except Exception as e:
         raise GoogleTokenVerificationError(f"Failed to exchange OAuth code: {e}") from e
-    except ValueError as e:
-        raise GoogleTokenVerificationError(f"Invalid Google token response: {e}") from e
