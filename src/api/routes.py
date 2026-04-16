@@ -1693,7 +1693,6 @@ async def connect_youtube(
     from urllib.parse import urlencode
 
     from src.integrations.repositories.integration import IntegrationRepository
-    from src.utils.datetime_utils import utc_now
 
     # Get OAuth credentials
     client_id = os.getenv("YOUTUBE_CLIENT_ID")

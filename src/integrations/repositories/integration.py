@@ -17,6 +17,7 @@ from src.data.models import (
     IntegrationTokens,
     OAuthState,
 )
+from src.utils.datetime_utils import utc_now
 from src.integrations.youtube.models import SyncConfig, SyncLog
 
 
@@ -425,6 +426,14 @@ class IntegrationRepository:
         Returns:
             Created OAuthState record.
         """
+        # Prune any already-expired tokens for this user+provider before inserting
+        await self.session.execute(
+            delete(OAuthState).where(
+                OAuthState.user_id == user_id,
+                OAuthState.provider == provider,
+                OAuthState.expires_at <= utc_now(),
+            )
+        )
         record = OAuthState(
             user_id=user_id,
             provider=provider,
@@ -452,7 +461,7 @@ class IntegrationRepository:
         Returns:
             user_id if token is valid and unexpired, else None.
         """
-        now = datetime.now(UTC)
+        now = utc_now()
         result = await self.session.execute(
             select(OAuthState).where(
                 OAuthState.state_token == state_token,
