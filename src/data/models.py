@@ -8,6 +8,7 @@ from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import declarative_base, relationship
 
 from src.constants import (
+    AuthProvider,
     ContentStatus,
     DefaultSort,
     SwipeAction,
@@ -74,7 +75,7 @@ class UserProfile(Base):
     email = Column(
         String(320), unique=True, nullable=True, index=True
     )  # AUTH-002 (nullable for backward compatibility)
-    google_sub = Column(String(100), unique=True, nullable=True, index=True)  # AUTH-002
+    google_sub = Column(String(100), unique=True, nullable=True, index=True)  # AUTH-002; DEPRECATED AUTH-005 — migrated to user_auth_methods
     display_name = Column(String(100))
     avatar_url = Column(String(500))
     bio = Column(String(500))
@@ -397,3 +398,60 @@ class UserActivityPattern(Base):
 
     # Relationship
     user = relationship("UserProfile", backref="activity_pattern")
+
+
+# ── AUTH-005: Identity table + token tables ───────────────────────────────────
+
+class UserAuthMethod(Base):
+    """Per-provider identity row for a user (AUTH-005).
+
+    One row per (user, provider). Replaces UserProfile.google_sub for Google
+    and stores email/password credentials for email_password provider.
+    """
+
+    __tablename__ = "user_auth_methods"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("user_profile.id", ondelete="CASCADE"), nullable=False, index=True)
+    provider = Column(SQLEnum(AuthProvider), nullable=False, index=True)
+    # OAuth: provider's user ID (e.g. google_sub).
+    # email_password: HMAC-SHA256(normalized_email, EMAIL_LOOKUP_KEY) — deterministic, indexable.
+    provider_id = Column(String(500), nullable=False)
+    password_hash = Column(Text, nullable=True)    # Argon2id; NULL for OAuth rows
+    email_encrypted = Column(Text, nullable=True)  # Fernet-encrypted; NULL for OAuth rows
+    email_verified = Column(Boolean, nullable=False, default=False)
+    verified_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+    user = relationship("UserProfile", backref="auth_methods")
+
+    __table_args__ = (
+        sqlalchemy.UniqueConstraint("provider", "provider_id", name="uq_auth_method_provider_id"),
+    )
+
+
+class EmailVerificationToken(Base):
+    """Single-use email verification tokens (AUTH-005)."""
+
+    __tablename__ = "email_verification_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("user_profile.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    used_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+class PasswordResetToken(Base):
+    """Single-use password reset tokens (AUTH-005)."""
+
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("user_profile.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    used_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
