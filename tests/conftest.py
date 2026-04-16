@@ -30,6 +30,9 @@ from src.data.models import (
     ReminderLog,
     UserActivityPattern,
     AuthenticationToken,
+    UserAuthMethod,
+    EmailVerificationToken,
+    PasswordResetToken,
 )
 from src.data import database as db_module
 
@@ -92,6 +95,9 @@ async def setup_test_database():
         await session.execute(delete(IntegrationSyncConfig))
         await session.execute(delete(IntegrationTokens))
         await session.execute(delete(AuthenticationToken))
+        await session.execute(delete(PasswordResetToken))
+        await session.execute(delete(EmailVerificationToken))
+        await session.execute(delete(UserAuthMethod))
         await session.execute(delete(InterestTag))
         await session.execute(delete(UserPreferences))
         await session.execute(delete(UserProfile))
@@ -123,6 +129,9 @@ async def test_db_session():
         await session.execute(delete(IntegrationSyncConfig))
         await session.execute(delete(IntegrationTokens))
         await session.execute(delete(AuthenticationToken))
+        await session.execute(delete(PasswordResetToken))
+        await session.execute(delete(EmailVerificationToken))
+        await session.execute(delete(UserAuthMethod))
         await session.execute(delete(InterestTag))
         await session.execute(delete(UserPreferences))
         await session.execute(delete(UserProfile))
@@ -168,21 +177,28 @@ async def test_user(db, db_session: AsyncSession):
     """
     from src.utils.datetime_utils import utc_now
     from src.utils.token_hashing import hash_access_token
+    from src.constants import AuthProvider
     from datetime import timedelta
 
-    # Create a test user (using OAuth-style fields, no password)
     user = UserProfile(
         email="test@example.com",
-        google_sub="test_google_sub_123",
         display_name=None,
         created_at=utc_now(),
         updated_at=utc_now(),
     )
     db_session.add(user)
-    await db_session.commit()
-    await db_session.refresh(user)
+    await db_session.flush()
 
-    # Create authentication token for the user
+    # Create Google auth method row (replaces google_sub)
+    auth_method = UserAuthMethod(
+        user_id=user.id,
+        provider=AuthProvider.GOOGLE,
+        provider_id="test_google_sub_123",
+        email_verified=True,
+        verified_at=utc_now(),
+    )
+    db_session.add(auth_method)
+
     access_token = create_access_token(user.id)
     refresh_token = create_refresh_token()
     expires_at = utc_now() + timedelta(hours=1)
