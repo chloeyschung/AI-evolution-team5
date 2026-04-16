@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { checkAuthStatus, logout } from '../api/endpoints';
+import { checkAuthStatus, logout, loginWithEmailPassword } from '../api/endpoints';
 import type { AuthStatus, User } from '../types';
 import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from '../types';
 
@@ -8,10 +8,12 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  pendingLinkConflict: { providers: string[] } | null;
 
   // Actions
   initialize: () => Promise<void>;
   performLogin: (authData: AuthStatus) => void;
+  loginWithEmail: (email: string, password: string) => Promise<void>;
   performLogout: () => Promise<void>;
   clearAuth: () => void;
   saveTokens: (accessToken: string, refreshToken: string) => void;
@@ -26,6 +28,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
   isLoading: true,
+  pendingLinkConflict: null,
 
   // Getters
   getUserEmail: () => get().user?.email || '',
@@ -69,6 +72,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
     } finally {
       set({ isLoading: false });
+    }
+  },
+
+  loginWithEmail: async (email: string, password: string) => {
+    const data = await loginWithEmailPassword(email, password);
+    get().saveTokens(data.access_token, data.refresh_token);
+    const status: AuthStatus = await checkAuthStatus();
+    if (status.is_authenticated && status.user_id && status.email) {
+      set({
+        user: { id: status.user_id, email: status.email },
+        isAuthenticated: true,
+      });
     }
   },
 

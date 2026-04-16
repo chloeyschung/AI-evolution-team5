@@ -41,6 +41,33 @@ export async function logout() {
   return response.data;
 }
 
+export async function loginWithEmailPassword(email: string, password: string) {
+  const client = getApiClient();
+  const response = await client.post('/api/v1/auth/login', { email, password });
+  return response.data as { access_token: string; refresh_token: string; expires_at: string };
+}
+
+export async function registerWithEmail(email: string, password: string) {
+  const client = getApiClient();
+  const response = await client.post('/api/v1/auth/register', { email, password });
+  return response.data as { message: string };
+}
+
+export async function requestPasswordReset(email: string) {
+  const client = getApiClient();
+  const response = await client.post('/api/v1/auth/password-reset/request', { email });
+  return response.data as { message: string };
+}
+
+export async function confirmPasswordReset(token: string, newPassword: string) {
+  const client = getApiClient();
+  const response = await client.post('/api/v1/auth/password-reset/confirm', {
+    token,
+    new_password: newPassword,
+  });
+  return response.data as { message: string };
+}
+
 // Content
 export async function getContent(
   filters: ContentFilters,

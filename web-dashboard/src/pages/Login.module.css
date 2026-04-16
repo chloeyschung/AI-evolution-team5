@@ -57,3 +57,25 @@
   background: transparent;
   color: var(--text-primary);
 }
+
+.input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 1rem;
+  box-sizing: border-box;
+}
+
+.input:focus {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.form {
+  display: grid;
+  gap: 10px;
+}

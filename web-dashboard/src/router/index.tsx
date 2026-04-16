@@ -23,7 +23,11 @@ const Inbox = lazyLoad(() => import('../pages/Inbox'));
 const Archive = lazyLoad(() => import('../pages/Archive'));
 const Analytics = lazyLoad(() => import('../pages/Analytics'));
 const Settings = lazyLoad(() => import('../pages/Settings'));
-const Login = lazyLoad(() => import('../pages/Login'));
+const SignIn = lazyLoad(() => import('../pages/SignIn'));
+const SignUp = lazyLoad(() => import('../pages/SignUp'));
+const ForgotPassword = lazyLoad(() => import('../pages/ForgotPassword'));
+const ResetPassword = lazyLoad(() => import('../pages/ResetPassword'));
+const VerifyEmail = lazyLoad(() => import('../pages/VerifyEmail'));
 const OAuthCallback = lazyLoad(() => import('../pages/OAuthCallback'));
 
 function lazyLoad(importFn: () => Promise<{ default: React.ComponentType }>) {
@@ -115,7 +119,23 @@ const router = createBrowserRouter([
       },
       {
         path: 'login',
-        element: <Login />,
+        element: <SignIn />,
+      },
+      {
+        path: 'signup',
+        element: <SignUp />,
+      },
+      {
+        path: 'forgot-password',
+        element: <ForgotPassword />,
+      },
+      {
+        path: 'reset-password',
+        element: <ResetPassword />,
+      },
+      {
+        path: 'verify-email',
+        element: <VerifyEmail />,
       },
       {
         path: 'oauth-callback',
