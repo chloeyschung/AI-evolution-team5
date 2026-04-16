@@ -2,6 +2,11 @@
 
 Handles CRUD for user_auth_methods, email_verification_tokens,
 and password_reset_tokens.
+
+Commit boundary policy:
+  - create_* methods commit internally (callers depend on it for generated IDs).
+  - consume_*, mark_email_verified, update_password do NOT commit; callers
+    must commit to keep these mutations atomic with surrounding operations.
 """
 from datetime import datetime
 
@@ -58,25 +63,22 @@ class EmailAuthRepository:
         return list(result.scalars().all())
 
     async def mark_email_verified(self, method_id: int) -> UserAuthMethod:
+        """Mark auth method as email-verified. Caller must commit."""
         result = await self._db.execute(
             select(UserAuthMethod).where(UserAuthMethod.id == method_id)
         )
         method = result.scalar_one()
         method.email_verified = True
         method.verified_at = utc_now()
-        await self._db.commit()
-        await self._db.refresh(method)
         return method
 
     async def update_password(self, method_id: int, new_hash: str) -> UserAuthMethod:
+        """Update stored password hash. Caller must commit."""
         result = await self._db.execute(
             select(UserAuthMethod).where(UserAuthMethod.id == method_id)
         )
         method = result.scalar_one()
         method.password_hash = new_hash
-        method.updated_at = utc_now()
-        await self._db.commit()
-        await self._db.refresh(method)
         return method
 
     # ── EmailVerificationToken ────────────────────────────────────────────
@@ -91,6 +93,7 @@ class EmailAuthRepository:
         return token
 
     async def consume_verification_token(self, token_hash: str) -> EmailVerificationToken | None:
+        """Mark token used. Does NOT commit — caller commits atomically with mark_email_verified."""
         result = await self._db.execute(
             select(EmailVerificationToken).where(
                 EmailVerificationToken.token_hash == token_hash,
@@ -102,8 +105,6 @@ class EmailAuthRepository:
         if token is None:
             return None
         token.used_at = utc_now()
-        await self._db.commit()
-        await self._db.refresh(token)
         return token
 
     # ── PasswordResetToken ────────────────────────────────────────────────
@@ -118,6 +119,7 @@ class EmailAuthRepository:
         return token
 
     async def consume_reset_token(self, token_hash: str) -> PasswordResetToken | None:
+        """Mark token used. Does NOT commit — caller commits atomically with update_password."""
         result = await self._db.execute(
             select(PasswordResetToken).where(
                 PasswordResetToken.token_hash == token_hash,
@@ -129,6 +131,4 @@ class EmailAuthRepository:
         if token is None:
             return None
         token.used_at = utc_now()
-        await self._db.commit()
-        await self._db.refresh(token)
         return token

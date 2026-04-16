@@ -383,6 +383,8 @@ class LoginResponse(BaseModel):
     access_token: str
     refresh_token: str
     expires_at: str
+    user_id: int
+    email: str
 
 
 class PasswordResetRequestSchema(BaseModel):

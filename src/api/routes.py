@@ -8,7 +8,7 @@ TODO #25 (2026-04-14): Move direct DB delete() calls to ContentRepository.delete
 
 import asyncio
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from fastapi import Request as FastAPIRequest
@@ -35,6 +35,7 @@ from ..data.email_auth_repository import EmailAuthRepository
 from ..auth.email_auth import hash_password, hmac_email, encrypt_email, verify_password, generate_token
 from ..constants import AuthProvider
 from ..services.email_service import EmailService
+from ..utils.token_hashing import hash_access_token as _hash_token
 from ..data.repository import (
     ContentRepository,
     ContentTagRepository,
@@ -906,12 +907,10 @@ async def google_login(
         is_new_user = True
 
     # Upsert user_auth_methods row for Google provider (AUTH-005)
-    from src.data.email_auth_repository import EmailAuthRepository
-    from src.constants import AuthProvider
-    _email_auth_repo = EmailAuthRepository(db)
-    _existing_method = await _email_auth_repo.get_auth_method_by_provider(AuthProvider.GOOGLE, google_sub)
-    if not _existing_method:
-        await _email_auth_repo.create_auth_method(
+    email_auth_repo = EmailAuthRepository(db)
+    existing_method = await email_auth_repo.get_auth_method_by_provider(AuthProvider.GOOGLE, google_sub)
+    if not existing_method:
+        await email_auth_repo.create_auth_method(
             user_id=existing_user.id,
             provider=AuthProvider.GOOGLE,
             provider_id=google_sub,
@@ -1035,12 +1034,10 @@ async def google_login_with_code(
         is_new_user = True
 
     # Upsert user_auth_methods row for Google provider (AUTH-005)
-    from src.data.email_auth_repository import EmailAuthRepository
-    from src.constants import AuthProvider
-    _email_auth_repo = EmailAuthRepository(db)
-    _existing_method = await _email_auth_repo.get_auth_method_by_provider(AuthProvider.GOOGLE, google_sub)
-    if not _existing_method:
-        await _email_auth_repo.create_auth_method(
+    email_auth_repo = EmailAuthRepository(db)
+    existing_method = await email_auth_repo.get_auth_method_by_provider(AuthProvider.GOOGLE, google_sub)
+    if not existing_method:
+        await email_auth_repo.create_auth_method(
             user_id=existing_user.id,
             provider=AuthProvider.GOOGLE,
             provider_id=google_sub,
@@ -1075,8 +1072,6 @@ async def register(
     request: RegisterRequest,
     db: AsyncSession = Depends(get_db),
 ) -> RegisterResponse:
-    from datetime import timedelta
-
     email_repo = EmailAuthRepository(db)
     provider_id = hmac_email(request.email)
 
@@ -1109,7 +1104,6 @@ async def register(
         token_hash=token_hash,
         expires_at=utc_now() + timedelta(hours=24),
     )
-    await db.commit()
 
     EmailService().send_verification_email(request.email, raw_token)
 
@@ -1121,10 +1115,8 @@ async def verify_email(
     token: str,
     db: AsyncSession = Depends(get_db),
 ) -> VerifyEmailResponse:
-    import hashlib
-
     email_repo = EmailAuthRepository(db)
-    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    token_hash = _hash_token(token)
     token_rec = await email_repo.consume_verification_token(token_hash)
     if token_rec is None:
         raise HTTPException(status_code=400, detail={"error": "invalid_or_expired_token"})
@@ -1137,7 +1129,9 @@ async def verify_email(
     )
     method = result.scalar_one_or_none()
     if method:
-        await email_repo.mark_email_verified(method.id)
+        method.email_verified = True
+        method.verified_at = utc_now()
+    await db.commit()
 
     return VerifyEmailResponse(message="Email verified. You can now sign in.")
 
@@ -1170,6 +1164,8 @@ async def login_email(
         access_token=access_token,
         refresh_token=token_record.refresh_token,
         expires_at=token_record.expires_at.isoformat(),
+        user_id=user.id,
+        email=user.email,
     )
 
 
@@ -1178,8 +1174,6 @@ async def password_reset_request(
     request: PasswordResetRequestSchema,
     db: AsyncSession = Depends(get_db),
 ) -> PasswordResetRequestResponse:
-    from datetime import timedelta
-
     email_repo = EmailAuthRepository(db)
     provider_id = hmac_email(request.email)
     method = await email_repo.get_auth_method_by_provider(AuthProvider.EMAIL_PASSWORD, provider_id)
@@ -1191,7 +1185,6 @@ async def password_reset_request(
             token_hash=token_hash,
             expires_at=utc_now() + timedelta(hours=1),
         )
-        await db.commit()
         try:
             EmailService().send_password_reset_email(request.email, raw_token)
         except Exception:
@@ -1205,10 +1198,8 @@ async def password_reset_confirm(
     request: PasswordResetConfirmSchema,
     db: AsyncSession = Depends(get_db),
 ) -> PasswordResetConfirmResponse:
-    import hashlib
-
     email_repo = EmailAuthRepository(db)
-    token_hash = hashlib.sha256(request.token.encode()).hexdigest()
+    token_hash = _hash_token(request.token)
     token_rec = await email_repo.consume_reset_token(token_hash)
     if token_rec is None:
         raise HTTPException(status_code=400, detail={"error": "invalid_or_expired_token"})
@@ -1223,7 +1214,8 @@ async def password_reset_confirm(
     if method is None:
         raise HTTPException(status_code=400, detail={"error": "invalid_or_expired_token"})
 
-    await email_repo.update_password(method.id, hash_password(request.new_password))
+    method.password_hash = hash_password(request.new_password)
+    await db.commit()
     return PasswordResetConfirmResponse(message="Password updated. You can now sign in.")
 
 

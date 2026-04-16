@@ -8,7 +8,6 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  pendingLinkConflict: { providers: string[] } | null;
 
   // Actions
   initialize: () => Promise<void>;
@@ -28,7 +27,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
   isLoading: true,
-  pendingLinkConflict: null,
 
   // Getters
   getUserEmail: () => get().user?.email || '',
@@ -78,13 +76,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   loginWithEmail: async (email: string, password: string) => {
     const data = await loginWithEmailPassword(email, password);
     get().saveTokens(data.access_token, data.refresh_token);
-    const status: AuthStatus = await checkAuthStatus();
-    if (status.is_authenticated && status.user_id && status.email) {
-      set({
-        user: { id: status.user_id, email: status.email },
-        isAuthenticated: true,
-      });
-    }
+    set({
+      user: { id: data.user_id, email: data.email },
+      isAuthenticated: true,
+    });
   },
 
   performLogin: (authData: AuthStatus) => {

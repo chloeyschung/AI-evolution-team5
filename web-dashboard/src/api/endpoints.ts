@@ -44,7 +44,13 @@ export async function logout() {
 export async function loginWithEmailPassword(email: string, password: string) {
   const client = getApiClient();
   const response = await client.post('/api/v1/auth/login', { email, password });
-  return response.data as { access_token: string; refresh_token: string; expires_at: string };
+  return response.data as { access_token: string; refresh_token: string; expires_at: string; user_id: number; email: string };
+}
+
+export async function verifyEmail(token: string) {
+  const client = getApiClient();
+  const response = await client.get('/api/v1/auth/verify-email', { params: { token } });
+  return response.data as { message: string };
 }
 
 export async function registerWithEmail(email: string, password: string) {

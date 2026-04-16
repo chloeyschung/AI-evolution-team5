@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import styles from './Login.module.css';
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+import { verifyEmail } from '../api/endpoints';
 
 export default function VerifyEmail() {
   const [searchParams] = useSearchParams();
@@ -15,11 +14,8 @@ export default function VerifyEmail() {
       return;
     }
 
-    fetch(`${API_BASE}/api/v1/auth/verify-email?token=${encodeURIComponent(token)}`)
-      .then((res) => {
-        if (res.ok) setStatus('success');
-        else setStatus('error');
-      })
+    verifyEmail(token)
+      .then(() => setStatus('success'))
       .catch(() => setStatus('error'));
   }, [token]);
 
