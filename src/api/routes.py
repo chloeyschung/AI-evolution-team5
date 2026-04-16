@@ -888,6 +888,19 @@ async def google_login(
         )
         is_new_user = True
 
+    # Upsert user_auth_methods row for Google provider (AUTH-005)
+    from src.data.email_auth_repository import EmailAuthRepository
+    from src.constants import AuthProvider
+    _email_auth_repo = EmailAuthRepository(db)
+    _existing_method = await _email_auth_repo.get_auth_method_by_provider(AuthProvider.GOOGLE, google_sub)
+    if not _existing_method:
+        await _email_auth_repo.create_auth_method(
+            user_id=existing_user.id,
+            provider=AuthProvider.GOOGLE,
+            provider_id=google_sub,
+            email_verified=True,
+        )
+
     # Create authentication tokens (returns tuple of record and plaintext JWT)
     token_record, access_token = await auth_repo.create_tokens(existing_user.id)
 
@@ -1003,6 +1016,19 @@ async def google_login_with_code(
             avatar_url=google_user_info.get("picture"),
         )
         is_new_user = True
+
+    # Upsert user_auth_methods row for Google provider (AUTH-005)
+    from src.data.email_auth_repository import EmailAuthRepository
+    from src.constants import AuthProvider
+    _email_auth_repo = EmailAuthRepository(db)
+    _existing_method = await _email_auth_repo.get_auth_method_by_provider(AuthProvider.GOOGLE, google_sub)
+    if not _existing_method:
+        await _email_auth_repo.create_auth_method(
+            user_id=existing_user.id,
+            provider=AuthProvider.GOOGLE,
+            provider_id=google_sub,
+            email_verified=True,
+        )
 
     # Create authentication tokens (returns tuple of record and plaintext JWT)
     token_record, access_token = await auth_repo.create_tokens(existing_user.id)
