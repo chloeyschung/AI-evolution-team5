@@ -31,6 +31,7 @@
 | F-024 | 지능형 기능 | 개인화 트렌드 피드 | 사용자의 관심사와 스와이프 이력을 기반으로 추천하는 아카이브 콘텐츠 | 관심사 매칭 (35%), 태그 유사도 (30%), 최신성 (20%), 참여도 (15%), 하드 리미트 1000 개 | Phase 3 | iOS+Web | P2 | - | 정의완료 | ⚠️ Backend API ready (src/ai/trend_analyzer.py) |
 | F-025 | 지능형 기능 | 게이미피케이션 성취 시스템 | 스와이프 활동을 기반으로 한 업적 시스템 (16 개 업적) | 연속 기록, 총 스와이프 수, 플랫폼 다양성, 큐레이션 4 가지 카테고리 | Phase 3 | iOS+Web | P2 | - | 정의완료 | ⚠️ Backend API ready (src/ai/achievement_checker.py) |
 | F-026 | 지능형 기능 | 스마트 리마인더 | 사용자 패턴을 학습하여 최적의 타이밍에 콘텐츠 소비 유도 | 백로그, 기록 유지, 시간 기반, 재참여 4 가지 리마인더 타입; 조용한 시간, 빈도 제한 | Phase 3 | iOS+Web | P2 | - | 정의완료 | ⚠️ Backend API ready (src/ai/reminder_engine.py) |
+| F-027 | 인증 | 이메일/비밀번호 회원가입·로그인 | 이메일+비밀번호로 회원가입/로그인, Google OAuth와 공존 | 이메일 인증 필수. Argon2id 비밀번호 해시. Fernet 이메일 암호화 저장. 동일 이메일 타 제공자 충돌 시 연결 확인. 비밀번호 재설정 이메일 지원. 테스트 로그인 제거. | Phase 1 | iOS+Web | P0 | - | 정의완료 | Authlib 기반 멀티 프로바이더 확장 예정 (Kakao, Naver, GitHub) |
 | SEC-001 | 보안 | 보안 강화 | 인증, 데이터 보호, 액세스 제어를 위한 포괄적인 보안 조치 | JWT 해싱, OAuth 암호화, 속도 제한, SSRF 보호, 다중 사용자 격리 | Infrastructure | Backend | P0 | - | ✅ 구현완료 | ✅ Fully implemented (src/utils/token_hashing.py, src/utils/token_encryption.py, etc.) |
 | QOL-001 | 코드 품질 | 코드 품질 개선 | 중앙 집중화 된 상수, 표준화된 타입 힌트, 개선된 유지보수성 | 열거형 통합, 타입 힌트 표준화, 상수 중앙 집중화, 에러 코드 표준화 | Infrastructure | Backend | P1 | - | ✅ 구현완료 | ✅ Fully implemented (src/constants.py, refactored files) |
 
@@ -73,6 +74,7 @@
 - F-001: 소셜 로그인 — Google
 - F-002: 로그아웃
 - F-003: 회원 탈퇴
+- F-027: 이메일/비밀번호 회원가입·로그인
 
 ### 공유 확장 (Share Extension)
 - F-004: 공유 시트 — iOS Share Extension

@@ -20,6 +20,7 @@ Feature dependency mapping for optimal implementation order.
 | **AUTH-002** Social Login (Google) | AUTH-001 | - | One-tap login, auto-create account | F-001 |
 | **AUTH-003** Logout | AUTH-002 | - | Session end, local data retained | F-002 |
 | **AUTH-004** Account Delete | AUTH-001 | - | 2-step confirmation, 30-day block | F-003 |
+| **AUTH-005** Email/Password Auth + Identity Layer | AUTH-001, AUTH-002 | - | Argon2id hash, Fernet email encryption, Authlib multi-provider, account linking | F-027 |
 
 ### Ingestion Layer
 
@@ -82,12 +83,13 @@ Feature dependency mapping for optimal implementation order.
 11. **AUTH-002** Social Login (Google)
 12. **AUTH-003** Logout
 13. **AUTH-004** Account Delete
+14. **AUTH-005** Email/Password Auth + Identity Layer
 14. **DAT-002** User Profile ✅ (Models exist, API complete)
 
 ## Critical Path
 
 ```
-AUTH-001 → AUTH-002 → AUTH-003 → AUTH-004
+AUTH-001 → AUTH-002 → AUTH-003 → AUTH-004 → AUTH-005
     ↓
 ING-001 → ING-002 → AI-001 → UX-001 → UX-002
     ↓        ↓        ↓
@@ -106,6 +108,7 @@ ING-001 → ING-002 → AI-001 → UX-001 → UX-002
 | AUTH-002 | ✅ [`AUTH-002.md`](specs/AUTH-002.md) | ✅ [`AUTH-002-record.md`](records/AUTH-002-record.md) | ✅ Implemented | `src/auth/google_oauth.py`, `src/api/routes.py` | F-001 | ✅ Google OAuth, 30-day block |
 | AUTH-003 | ✅ [`AUTH-003.md`](specs/AUTH-003.md) | ✅ [`AUTH-003-record.md`](records/AUTH-003-record.md) | ✅ Implemented | `src/api/routes.py` | F-002 | ✅ Token revocation |
 | AUTH-004 | ✅ [`AUTH-004.md`](specs/AUTH-004.md) | ✅ [`AUTH-004-record.md`](records/AUTH-004-record.md) | ✅ Implemented | `src/api/routes.py` | F-003 | ✅ 2-step delete, cascade |
+| AUTH-005 | ✅ [`AUTH-005.md`](specs/AUTH-005.md) | ⏳ pending | 🔲 Planned | `src/auth/email_auth.py`, `src/data/email_auth_repository.py`, `src/services/email_service.py` | F-027 | 🔲 Argon2id, Fernet, Authlib, identity table |
 | AI-001 | ✅ [`AI-001.md`](specs/AI-001.md) | ✅ [`AI-001-record.md`](records/AI-001-record.md) | ✅ Implemented | `src/ai/summarizer.py` | F-005 | ✅ 300-char limit enforced |
 | AI-002 | ✅ [`AI-002.md`](specs/AI-002.md) | ✅ [`AI-002-record.md`](records/AI-002-record.md) | ✅ Implemented | `src/ai/metadata_extractor.py` | F-007 | ✅ OG image thumbnail extraction added |
 | AI-003 | ✅ [`AI-003.md`](specs/AI-003.md) | ✅ [`AI-003-record.md`](records/AI-003-record.md) | ✅ Implemented | `src/ai/categorizer.py` | F-006 | ✅ LLM-based auto-tagging (max 3 tags) |
