@@ -82,6 +82,19 @@ class Settings:
     # Content Settings
     MAX_SUMMARY_LENGTH: int = 300  # Maximum characters for AI summary
 
+    # CORS Settings
+    # Comma-separated list of allowed origins; chrome-extension wildcard is handled
+    # via ALLOWED_ORIGIN_REGEX because CORSMiddleware does not support glob wildcards
+    # in allow_origins when allow_credentials=True.
+    _allowed_origins_raw: str = os.getenv(
+        "ALLOWED_ORIGINS", "http://localhost:5173"
+    )
+    ALLOWED_ORIGINS: list[str] = [o.strip() for o in _allowed_origins_raw.split(",") if o.strip()]
+    # Regex covering all chrome-extension:// origins; set to "" to disable
+    ALLOWED_ORIGIN_REGEX: str = os.getenv(
+        "ALLOWED_ORIGIN_REGEX", r"chrome-extension://[a-z]{32}"
+    )
+
 
 # Convenience access
 settings = get_settings()

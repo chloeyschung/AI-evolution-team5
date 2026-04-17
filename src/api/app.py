@@ -5,6 +5,7 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -12,6 +13,7 @@ from ..ai.summarizer import Summarizer
 from ..data.database import init_db
 from ..ingestion.extractor import ContentExtractor
 from ..ingestion.share_handler import ShareHandler
+from ..config import settings
 from ..middleware.rate_limiter import limiter, rate_limit_exceeded_handler
 from ..middleware.security_headers import security_headers_middleware
 from ..utils.http_client import HttpClientPool
@@ -61,6 +63,20 @@ app = FastAPI(
 
 # Initialize rate limiter
 app.state.limiter = limiter
+
+# CORS middleware — must be added before other middleware so it runs outermost.
+# chrome-extension://* cannot be expressed as a glob in allow_origins when
+# allow_credentials=True; we use allow_origin_regex instead (matches any
+# 32-char extension ID, which is the canonical Chrome extension ID format).
+_cors_kwargs: dict = dict(
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+if settings.ALLOWED_ORIGIN_REGEX:
+    _cors_kwargs["allow_origin_regex"] = settings.ALLOWED_ORIGIN_REGEX
+app.add_middleware(CORSMiddleware, **_cors_kwargs)
 
 # Add security headers middleware (SEC-001 compliance)
 app.add_middleware(BaseHTTPMiddleware, dispatch=security_headers_middleware)
