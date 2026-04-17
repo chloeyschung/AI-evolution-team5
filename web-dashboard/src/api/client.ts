@@ -6,12 +6,37 @@ let apiClient: ReturnType<typeof axios.create> | null = null;
 let refreshPromise: Promise<void> | null = null;
 let currentAbortController: AbortController | null = null;
 
+function shouldSkip401Refresh(error: AxiosError): boolean {
+  const url = error.config?.url ?? '';
+  const authNoRefreshPaths = [
+    '/api/v1/auth/login',
+    '/api/v1/auth/register',
+    '/api/v1/auth/verify-email',
+    '/api/v1/auth/verify-email/resend',
+    '/api/v1/auth/password-reset/request',
+    '/api/v1/auth/password-reset/confirm',
+  ];
+
+  return authNoRefreshPaths.some((path) => url.includes(path));
+}
+
 export function setAbortController(controller: AbortController | null): void {
   currentAbortController = controller;
 }
 
 function getApiBaseUrl(): string {
-  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+  const explicitBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
+  if (explicitBaseUrl) {
+    return explicitBaseUrl;
+  }
+
+  // In local dev, keep requests same-origin and let Vite proxy /api -> backend.
+  if (import.meta.env.DEV) {
+    return '';
+  }
+
+  // In prod, default to same origin unless explicitly overridden.
+  return window.location.origin;
 }
 
 export function getApiClient(): ReturnType<typeof axios.create> {
@@ -45,7 +70,7 @@ export function getApiClient(): ReturnType<typeof axios.create> {
     apiClient.interceptors.response.use(
       (response: AxiosResponse) => response,
       async (error: AxiosError) => {
-        if (error.response?.status !== 401) {
+        if (error.response?.status !== 401 || shouldSkip401Refresh(error)) {
           return Promise.reject(error);
         }
 

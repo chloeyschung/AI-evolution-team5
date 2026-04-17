@@ -86,6 +86,40 @@ test.describe('Authentication Flow', () => {
     await expect(page.getByText(/verification email has been sent/i)).toBeVisible();
   });
 
+  test('login 401 does not trigger forced refresh flow', async ({ page }) => {
+    let refreshCalled = false;
+
+    await page.route('**/api/v1/auth/login', async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          detail: { error: 'invalid_credentials' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/auth/refresh', async (route) => {
+      refreshCalled = true;
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          detail: { error: 'invalid_refresh_token' },
+        }),
+      });
+    });
+
+    await page.goto('/login');
+    await page.fill('input[name="email"]', 'no-user@example.com');
+    await page.fill('input[name="password"]', 'WrongPass1!');
+    await page.click('button:has-text("Sign in with email")');
+
+    await expect(page).toHaveURL(/\/login/);
+    await expect(page.getByText(/request failed|sign in failed|invalid credentials/i)).toBeVisible();
+    expect(refreshCalled).toBeFalsy();
+  });
+
   test('should navigate to dashboard route', async ({ page }) => {
     // Navigate to dashboard route
     await page.goto('/dashboard');
