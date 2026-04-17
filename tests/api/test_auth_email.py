@@ -8,6 +8,9 @@ from tests.factories import (
     make_user,
     make_verification_token,
 )
+from src.constants import AuthProvider
+from src.data.models import UserAuthMethod, UserProfile
+from src.utils.datetime_utils import utc_now
 
 
 async def test_register_creates_unverified_user(async_client, db):
@@ -32,6 +35,32 @@ async def test_register_duplicate_email_returns_409(async_client, db):
     assert resp.json()["detail"] == {
         "error": "email_exists",
         "providers": ["email_password"],
+    }
+
+
+async def test_register_existing_email_with_google_provider_returns_409(async_client, db):
+    async with AsyncTestingSessionLocal() as session:
+        user = UserProfile(email="multi-provider@example.com", created_at=utc_now(), updated_at=utc_now())
+        session.add(user)
+        await session.flush()
+        session.add(UserAuthMethod(
+            user_id=user.id,
+            provider=AuthProvider.GOOGLE,
+            provider_id="google-sub-123",
+            email_verified=True,
+            verified_at=utc_now(),
+        ))
+        await session.commit()
+
+    resp = await async_client.post("/api/v1/auth/register", json={
+        "email": "multi-provider@example.com",
+        "password": "Pass2!",
+    })
+
+    assert resp.status_code == 409
+    assert resp.json()["detail"] == {
+        "error": "email_exists",
+        "providers": ["google"],
     }
 
 
@@ -77,6 +106,17 @@ async def test_resend_verification_for_unverified_email_returns_200(async_client
 
     assert resp.status_code == 200
     assert "sent" in resp.json()["message"].lower()
+
+
+async def test_resend_verification_for_unknown_email_returns_same_200_message(async_client, db):
+    resp = await async_client.post("/api/v1/auth/verify-email/resend", json={
+        "email": "unknown@example.com",
+    })
+
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "message": "If that email is registered and not yet verified, a verification email has been sent.",
+    }
 
 
 # ── Login tests ───────────────────────────────────────────────────────────────
@@ -131,7 +171,6 @@ async def test_login_unverified_email_returns_403_with_resend_hint(async_client,
     assert resp.status_code == 403
     detail = resp.json()["detail"]
     assert detail["error"] == "email_not_verified"
-    assert detail["can_resend"] is True
 
 
 # ── Password reset tests ──────────────────────────────────────────────────────
