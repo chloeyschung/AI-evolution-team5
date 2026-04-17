@@ -24,7 +24,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'VITE_ENABLE_TEST_LOGIN=true npm run dev',
+    command: 'npm run dev',
     url: 'http://localhost:3001',
     reuseExistingServer: true,
     timeout: 120000,

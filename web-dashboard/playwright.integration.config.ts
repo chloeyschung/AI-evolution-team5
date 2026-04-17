@@ -29,7 +29,7 @@ export default defineConfig({
       timeout: 120000,
     },
     {
-      command: 'VITE_ENABLE_TEST_LOGIN=true VITE_API_BASE_URL=http://127.0.0.1:8000 npm run dev',
+      command: 'VITE_API_BASE_URL=http://127.0.0.1:8000 npm run dev',
       url: 'http://localhost:3001',
       reuseExistingServer: true,
       timeout: 120000,
