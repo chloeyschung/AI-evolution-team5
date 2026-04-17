@@ -161,7 +161,7 @@ class TestUserStatisticsRepository:
     async def test_get_statistics_empty_history(self, db_session):
         """Test statistics with empty swipe history."""
         repo = UserProfileRepository(db_session)
-        stats = await repo.get_statistics()
+        stats = await repo.get_statistics(user_id=999)
 
         assert stats["total_swipes"] == 0
         assert stats["total_kept"] == 0
@@ -203,7 +203,7 @@ class TestUserStatisticsRepository:
         await db_session.commit()
 
         # Get statistics
-        stats = await repo.get_statistics()
+        stats = await repo.get_statistics(user_id=user.id)
 
         assert stats["total_swipes"] == 3
         assert stats["total_kept"] == 2
@@ -250,7 +250,7 @@ class TestUserStatisticsRepository:
             ))
         await db_session.commit()
 
-        stats = await repo.get_statistics()
+        stats = await repo.get_statistics(user_id=user.id)
 
         assert stats["total_swipes"] == 10
         assert stats["total_kept"] == 6

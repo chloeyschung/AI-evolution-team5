@@ -708,8 +708,11 @@ class UserProfileRepository(BaseRepository[UserProfile]):
 
         return preferences
 
-    async def get_statistics(self) -> dict:
+    async def get_statistics(self, user_id: int) -> dict:
         """Calculate and return user statistics from swipe history (optimized: single query).
+
+        Args:
+            user_id: The ID of the user whose statistics to calculate.
 
         Returns:
             Dictionary with total_swipes, total_kept, total_discarded,
@@ -723,7 +726,7 @@ class UserProfileRepository(BaseRepository[UserProfile]):
                 func.sum(case((SwipeHistory.action == SwipeAction.DISCARD, 1), else_=0)).label("discarded"),
                 func.min(SwipeHistory.swiped_at).label("first"),
                 func.max(SwipeHistory.swiped_at).label("last"),
-            )
+            ).where(SwipeHistory.user_id == user_id)
         )
         row = stats_result.fetchone()
 
@@ -756,6 +759,7 @@ class UserProfileRepository(BaseRepository[UserProfile]):
                 select(func.date(SwipeHistory.swiped_at))
                 .distinct()
                 .where(
+                    SwipeHistory.user_id == user_id,
                     func.date(SwipeHistory.swiped_at) <= end_date,
                     func.date(SwipeHistory.swiped_at) >= first_swipe_utc.date(),
                 )
