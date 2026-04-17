@@ -111,6 +111,9 @@ test.describe('Authentication Flow', () => {
     });
 
     await page.goto('/login');
+    await page.evaluate(() => {
+      localStorage.setItem('briefly_refresh_token', 'dummy-refresh-token');
+    });
     await page.fill('input[name="email"]', 'no-user@example.com');
     await page.fill('input[name="password"]', 'WrongPass1!');
     await page.click('button:has-text("Sign in with email")');
