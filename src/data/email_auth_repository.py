@@ -107,6 +107,21 @@ class EmailAuthRepository:
         token.used_at = utc_now()
         return token
 
+    async def invalidate_verification_tokens_for_user(self, user_id: int) -> int:
+        """Mark all active verification tokens for a user as used. Does NOT commit."""
+        now = utc_now()
+        result = await self._db.execute(
+            select(EmailVerificationToken).where(
+                EmailVerificationToken.user_id == user_id,
+                EmailVerificationToken.used_at.is_(None),
+                EmailVerificationToken.expires_at > now,
+            )
+        )
+        tokens = list(result.scalars().all())
+        for token in tokens:
+            token.used_at = now
+        return len(tokens)
+
     # ── PasswordResetToken ────────────────────────────────────────────────
 
     async def create_reset_token(

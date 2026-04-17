@@ -59,6 +59,17 @@ async def test_create_and_consume_verification_token(user, repo):
     assert await repo.consume_verification_token("abc123hash") is None
 
 
+async def test_invalidate_all_verification_tokens_for_user(user, repo):
+    await repo.create_verification_token(user.id, "hash1", utc_now() + timedelta(hours=24))
+    await repo.create_verification_token(user.id, "hash2", utc_now() + timedelta(hours=24))
+
+    invalidated = await repo.invalidate_verification_tokens_for_user(user.id)
+
+    assert invalidated == 2
+    assert await repo.consume_verification_token("hash1") is None
+    assert await repo.consume_verification_token("hash2") is None
+
+
 async def test_expired_verification_token_returns_none(user, repo):
     await repo.create_verification_token(user.id, "expiredhash", utc_now() - timedelta(hours=1))
     assert await repo.consume_verification_token("expiredhash") is None
