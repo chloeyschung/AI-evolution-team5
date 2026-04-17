@@ -87,6 +87,21 @@ async def test_login_unverified_email_returns_403(async_client, db):
     assert resp.status_code == 403
 
 
+async def test_login_unverified_email_returns_403_with_resend_hint(async_client, db):
+    async with AsyncTestingSessionLocal() as session:
+        await make_unverified_user(session, email="unverified-hint@example.com", password="Pass1!")
+
+    resp = await async_client.post("/api/v1/auth/login", json={
+        "email": "unverified-hint@example.com",
+        "password": "Pass1!"
+    })
+
+    assert resp.status_code == 403
+    detail = resp.json()["detail"]
+    assert detail["error"] == "email_not_verified"
+    assert detail["can_resend"] is True
+
+
 # ── Password reset tests ──────────────────────────────────────────────────────
 
 async def test_password_reset_request_returns_200(async_client, db):
