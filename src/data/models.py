@@ -94,7 +94,7 @@ class UserPreferences(Base):
     __tablename__ = "user_preferences"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False, unique=True)
+    user_id = Column(Integer, ForeignKey("user_profile.id", ondelete="CASCADE"), nullable=False, unique=True)
     theme = Column(SQLEnum(Theme), nullable=False, default=Theme.SYSTEM)
     notifications_enabled = Column(Boolean, nullable=False, default=True)
     daily_goal = Column(Integer, nullable=False, default=20)
@@ -108,7 +108,7 @@ class InterestTag(Base):
     __tablename__ = "interest_tags"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False)
+    user_id = Column(Integer, nullable=False, index=True)
     tag = Column(String(100), nullable=False)
 
     # Unique constraint for user_id + tag combination
@@ -122,7 +122,7 @@ class AuthenticationToken(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("user_profile.id"), unique=True, nullable=False, index=True)
-    access_token = Column(String(1000), nullable=False)
+    access_token = Column(String(1000), nullable=False, index=True)
     refresh_token = Column(String(1000), nullable=False)
     expires_at = Column(DateTime, nullable=False, index=True)
     created_at = Column(DateTime, default=utc_now, nullable=False)
