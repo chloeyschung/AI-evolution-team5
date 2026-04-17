@@ -211,7 +211,11 @@ async def test_login_unverified_email_returns_403_with_resend_hint(async_client,
 
     assert resp.status_code == 403
     detail = resp.json()["detail"]
-    assert detail["error"] == "email_not_verified"
+    assert detail == {
+        "error": "email_not_verified",
+        "can_resend": True,
+        "message": "Email not verified. Please verify your email or request a new verification email.",
+    }
 
 
 # ── Password reset tests ──────────────────────────────────────────────────────

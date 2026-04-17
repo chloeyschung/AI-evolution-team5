@@ -550,7 +550,14 @@ async def login_email(
         raise HTTPException(status_code=401, detail={"error": "invalid_credentials"})
 
     if not method.email_verified:
-        raise HTTPException(status_code=403, detail={"error": "email_not_verified"})
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "email_not_verified",
+                "can_resend": True,
+                "message": "Email not verified. Please verify your email or request a new verification email.",
+            },
+        )
 
     user = await db.get(UserProfile, method.user_id)
     if user is None:
