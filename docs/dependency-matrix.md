@@ -45,8 +45,8 @@ Feature dependency mapping for optimal implementation order.
 | **UX-002** Swipe Actions | UX-001, DAT-001 | - | Persists Keep/Discard. ✅ `status` field (INBOX/ARCHIVED) implemented. | F-009, F-011 |
 | **UX-003** Detail View | UX-001, AI-002 | - | Shows source content with swipe history. ✅ Implemented (`GET /content/{id}`). | F-012 |
 | **UX-004** Filter by Platform | UX-001 | - | Filter by source platform. Dynamic list from user's save history. ✅ Implemented | F-013 |
-| **UX-005** Search by Title/Tag | UX-001 | - | Real-time search across titles and tags. Scope: INBOX + Archive. ⏸️ Spec pending | F-016 |
-| **UX-006** Delete Content | UX-001 | - | Permanent deletion with 1-step confirmation. Irreversible. ⏸️ Spec pending | F-019 |
+| **UX-005** Search by Title/Tag | UX-001 | - | Real-time search across titles and tags. Scope: INBOX + Archive. ✅ Implemented | F-016 |
+| **UX-006** Delete Content | UX-001 | - | Permanent deletion with 1-step confirmation. Irreversible. ✅ Implemented | F-019 |
 
 ### Data Layer
 
