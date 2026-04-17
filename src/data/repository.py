@@ -505,20 +505,25 @@ class SwipeRepository(BaseRepository[SwipeHistory]):
 
         # Auto-update status for DISCARD action
         if action == SwipeAction.DISCARD:
-            await self._update_content_status(content_id, ContentStatus.ARCHIVED)
+            await self._update_content_status(content_id, user_id, ContentStatus.ARCHIVED)
 
         await self.session.commit()
         await self.session.refresh(history)
         return history
 
-    async def _update_content_status(self, content_id: int, new_status: ContentStatus) -> None:
+    async def _update_content_status(self, content_id: int, user_id: int, new_status: ContentStatus) -> None:
         """Helper to update content status (internal use).
 
         Args:
             content_id: The content ID to update.
+            user_id: The owner's user ID — guards against cross-user updates.
             new_status: The new status to set.
         """
-        stmt = update(Content).where(Content.id == content_id).values(status=new_status, updated_at=utc_now())
+        stmt = (
+            update(Content)
+            .where(Content.id == content_id, Content.user_id == user_id)
+            .values(status=new_status, updated_at=utc_now())
+        )
         await self.session.execute(stmt)
 
     async def get_history(self, content_id: int) -> list[SwipeHistory]:
