@@ -11,6 +11,7 @@ This document tracks all identified features for the **Briefly** project, catego
 - [x] **[AUTH-002] Social Login — Google** (F-001): One-tap Google sign-in. Auto-create account on first login. Rejection of re-registration for deleted accounts within 30 days. ✅ Implemented
 - [x] **[AUTH-003] Logout** (F-002): End current session. Local data retained, syncs on re-login. ✅ Implemented
 - [x] **[AUTH-004] Account Delete** (F-003): Permanent deletion of account and all data. 2-step confirmation. 30-day re-registration block. Full server + local data deletion. ✅ Implemented
+- [ ] **[AUTH-005] Email/Password Authentication & Multi-Provider Identity** (F-027): Email/password registration and sign-in coexisting with Google OAuth. Multi-provider identity layer for extensibility. ⚠️ Design complete; implementation in progress
 
 ### Ingestion
 - [x] **[ING-001] Mobile Share Sheet Integration** (F-004): Implement the ability for users to trigger "Save to Briefly" via the native OS share menu on iOS/Android. ✅ Implemented
@@ -55,6 +56,7 @@ This document tracks all identified features for the **Briefly** project, catego
 
 ### Security (SEC)
 - [x] **[SEC-001] Security Hardening**: Comprehensive security measures for authentication, data protection, and access control. ✅ Implemented
+- [x] **[SEC-002] YouTube OAuth State CSRF Protection** (N/A): Server-side state token storage with TTL-based expiry for YouTube OAuth connect/callback flow. ✅ Implemented
   - **JWT Token Security**: SHA-256 hashing before storage, minimum 32-char secret key validation, signature verification
   - **OAuth Token Encryption**: Fernet-based symmetric encryption for OAuth tokens at rest
   - **Rate Limiting**: Token bucket algorithm with per-endpoint limits (10/minute for share, 30/minute for ingest)
