@@ -130,6 +130,7 @@ ING-001 → ING-002 → AI-001 → UX-001 → UX-002
 | ADV-002 | ✅ [`ADV-002.md`](specs/ADV-002.md) | ✅ [`ADV-002-record.md`](records/ADV-002-record.md) | ✅ Implemented | `src/ai/achievement_checker.py`, `src/api/routes.py` | - | ✅ 16 achievements across streak, volume, diversity, curation categories |
 | ADV-003 | ✅ [`ADV-003.md`](specs/ADV-003.md) | ✅ [`ADV-003-record.md`](records/ADV-003-record.md) | ✅ Implemented | `src/ai/reminder_engine.py`, `src/api/routes.py` | - | ✅ 4 reminder types: backlog, streak, time-based, reengagement; Quiet hours, frequency limits |
 | SEC-001 | ✅ [`SEC-001.md`](specs/SEC-001.md) | ✅ [`SEC-001-record.md`](records/SEC-001-record.md) | ✅ Implemented | `src/utils/token_hashing.py`, `src/utils/token_encryption.py`, `src/middleware/rate_limiter.py` | - | ✅ JWT hashing, OAuth encryption, rate limiting, SSRF protection, multi-user isolation |
+| SEC-002 | ✅ [`SEC-002.md`](specs/SEC-002.md) | ✅ [`SEC-002-record.md`](records/SEC-002-record.md) | ✅ Implemented | `src/data/models.py`, `src/integrations/repositories/integration.py`, `src/api/routes.py` | - | ✅ OAuthState table, random CSRF tokens, 15-min TTL, single-use consumption |
 | QOL-001 | ✅ [`QOL-001.md`](specs/QOL-001.md) | ✅ [`QOL-001-record.md`](records/QOL-001-record.md) | ✅ Implemented | `src/constants.py`, multiple refactored files | - | ✅ Enum consolidation, type hint standardization, constants centralization |
 
 ## Next: Frontend Development (Phase 2/3)
