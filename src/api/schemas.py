@@ -291,6 +291,8 @@ class AuthStatusResponse(BaseModel):
     is_authenticated: bool
     user_id: int | None = None
     email: str | None = None
+    display_name: str | None = None
+    avatar_url: str | None = None
     token_expires_at: str | None = None
 
 

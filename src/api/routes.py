@@ -789,6 +789,8 @@ async def get_auth_status(
         is_authenticated=True,
         user_id=token_record.user_id,
         email=user.email if user else None,
+        display_name=user.display_name if user else None,
+        avatar_url=user.avatar_url if user else None,
         token_expires_at=token_record.expires_at.isoformat(),
     )
 
