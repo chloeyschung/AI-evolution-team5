@@ -2,10 +2,14 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import styles from './Login.module.css';
 import { useAuthStore } from '../stores/useAuthStore';
+import { resendVerificationEmail } from '../api/endpoints';
 
 export default function SignIn() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState('');
   const loginWithEmail = useAuthStore((state) => state.loginWithEmail);
 
   const handleGoogleLogin = async () => {
@@ -39,6 +43,8 @@ export default function SignIn() {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    setNotice(null);
+    setNeedsVerification(false);
 
     const form = e.currentTarget;
     const email = (form.elements.namedItem('email') as HTMLInputElement).value;
@@ -46,20 +52,45 @@ export default function SignIn() {
 
     try {
       await loginWithEmail(email, password);
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: { error?: string; message?: string; can_resend?: boolean } } } })
+        ?.response?.data?.detail;
+
+      if (detail?.error === 'email_not_verified') {
+        setNeedsVerification(Boolean(detail.can_resend));
+        setPendingEmail(email);
+        setError(detail.message ?? 'Email not verified. Please verify your email.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Sign in failed');
+      }
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!pendingEmail) return;
+    setIsLoading(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const data = await resendVerificationEmail(pendingEmail);
+      setNotice(data.message);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign in failed');
+      setError(err instanceof Error ? err.message : 'Failed to resend verification email');
+    } finally {
       setIsLoading(false);
     }
   };
 
   return (
     <section className={styles.page} data-testid="login-page">
-      <div className={styles.card}>
-        <p className={styles.kicker}>Welcome to Briefly</p>
-        <h1>Turn "later" into "learned".</h1>
-        <p className={styles.description}>Log in once, then clear your saved queue in short, focused bursts.</p>
+      <div className={styles.card} data-testid="auth-signal-lane">
+        <p className={styles.kicker}>Welcome back</p>
+        <h1>Briefs become memory.</h1>
+        <p className={styles.description}>One login. Steady reading momentum.</p>
 
         {error ? <p className={styles.error}>{error}</p> : null}
+        {notice ? <p className={styles.description}>{notice}</p> : null}
 
         <button
           onClick={handleGoogleLogin}
@@ -70,9 +101,9 @@ export default function SignIn() {
           {isLoading ? 'Signing in…' : 'Continue with Google'}
         </button>
 
-        <hr style={{ margin: '1.5rem 0', opacity: 0.2 }} />
+        <hr className={styles.divider} />
 
-        <form onSubmit={handleEmailLogin}>
+        <form onSubmit={handleEmailLogin} className={styles.form}>
           <input
             name="email"
             type="email"
@@ -96,10 +127,20 @@ export default function SignIn() {
           >
             {isLoading ? 'Signing in…' : 'Sign in with email'}
           </button>
+          {needsVerification ? (
+            <button
+              type="button"
+              disabled={isLoading}
+              className={styles.secondaryBtn}
+              onClick={handleResendVerification}
+            >
+              {isLoading ? 'Sending…' : 'Resend verification email'}
+            </button>
+          ) : null}
         </form>
 
-        <p style={{ marginTop: '1rem', fontSize: '0.875rem', textAlign: 'center' }}>
-          No account? <Link to="/signup">Sign up</Link>
+        <p className={styles.metaLinks}>
+          New here? <Link to="/signup">Create account</Link>
           {' · '}
           <Link to="/forgot-password">Forgot password?</Link>
         </p>

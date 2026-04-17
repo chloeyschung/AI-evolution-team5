@@ -74,6 +74,12 @@ export async function confirmPasswordReset(token: string, newPassword: string) {
   return response.data as { message: string };
 }
 
+export async function resendVerificationEmail(email: string) {
+  const client = getApiClient();
+  const response = await client.post('/api/v1/auth/verify-email/resend', { email });
+  return response.data as { message: string };
+}
+
 // Content
 export async function getContent(
   filters: ContentFilters,

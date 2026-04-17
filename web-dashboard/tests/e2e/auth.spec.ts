@@ -13,6 +13,43 @@ import { test, expect } from '@playwright/test';
  */
 
 test.describe('Authentication Flow', () => {
+  test('unverified login error shows resend verification CTA', async ({ page }) => {
+    await page.route('**/api/v1/auth/login', async (route) => {
+      await route.fulfill({
+        status: 403,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          detail: {
+            error: 'email_not_verified',
+            can_resend: true,
+            message: 'Email not verified. Please verify your email or request a new verification email.',
+          },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/auth/verify-email/resend', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message: 'If the account exists and is not verified, a verification email has been sent.',
+        }),
+      });
+    });
+
+    await page.goto('/login');
+    await page.fill('input[name="email"]', 'unverified@example.com');
+    await page.fill('input[name="password"]', 'Pass1!');
+    await page.click('button:has-text("Sign in with email")');
+
+    await expect(page.getByText(/email not verified/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: /resend verification email/i })).toBeVisible();
+
+    await page.click('button:has-text("Resend verification email")');
+    await expect(page.getByText(/verification email has been sent/i)).toBeVisible();
+  });
+
   test('should navigate to dashboard route', async ({ page }) => {
     // Navigate to dashboard route
     await page.goto('/dashboard');
