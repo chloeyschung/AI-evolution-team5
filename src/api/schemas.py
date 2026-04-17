@@ -426,6 +426,7 @@ class AccountDeleteResponse(BaseModel):
 
     message: str
     block_expires_at: str
+    confirmation_token: str | None = None
 
 
 # INT-001: YouTube Integration schemas
