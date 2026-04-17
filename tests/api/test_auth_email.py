@@ -11,7 +11,7 @@ from tests.factories import (
 
 
 async def test_register_creates_unverified_user(async_client, db):
-    with patch("src.api.routes.EmailService") as MockEmail:
+    with patch("src.api.routers.auth.EmailService") as MockEmail:
         MockEmail.return_value.send_verification_email = lambda *a, **kw: None
         resp = await async_client.post("/api/v1/auth/register", json={
             "email": "new@example.com",
@@ -22,15 +22,35 @@ async def test_register_creates_unverified_user(async_client, db):
 
 
 async def test_register_duplicate_email_returns_409(async_client, db):
-    with patch("src.api.routes.EmailService") as MockEmail:
-        MockEmail.return_value.send_verification_email = lambda *a, **kw: None
-        await async_client.post("/api/v1/auth/register", json={
-            "email": "dup@example.com", "password": "pass1"
-        })
-        resp = await async_client.post("/api/v1/auth/register", json={
-            "email": "dup@example.com", "password": "pass2"
-        })
+    async with AsyncTestingSessionLocal() as session:
+        await make_user(session, email="dup@example.com", password="Pass1!")
+
+    resp = await async_client.post("/api/v1/auth/register", json={
+        "email": "dup@example.com", "password": "pass2"
+    })
     assert resp.status_code == 409
+    assert resp.json()["detail"] == {
+        "error": "email_exists",
+        "providers": ["email_password"],
+    }
+
+
+async def test_register_existing_unverified_rotates_token_and_returns_201(async_client, db):
+    async with AsyncTestingSessionLocal() as session:
+        user, _ = await make_unverified_user(session, email="stuck@example.com", password="Pass1!")
+        old_raw = await make_verification_token(session, user.id)
+
+    with patch("src.api.routers.auth.EmailService") as MockEmail:
+        MockEmail.return_value.send_verification_email = lambda *a, **kw: None
+        resp = await async_client.post("/api/v1/auth/register", json={
+            "email": "stuck@example.com",
+            "password": "AnotherPass2!"
+        })
+
+    assert resp.status_code == 201
+
+    verify_old = await async_client.get(f"/api/v1/auth/verify-email?token={old_raw}")
+    assert verify_old.status_code == 400
 
 
 async def test_verify_email_valid_token(async_client, db):
@@ -45,6 +65,18 @@ async def test_verify_email_valid_token(async_client, db):
 async def test_verify_email_invalid_token_returns_400(async_client, db):
     resp = await async_client.get("/api/v1/auth/verify-email?token=badtoken")
     assert resp.status_code == 400
+
+
+async def test_resend_verification_for_unverified_email_returns_200(async_client, db):
+    async with AsyncTestingSessionLocal() as session:
+        await make_unverified_user(session, email="resend@example.com", password="Pass1!")
+
+    with patch("src.api.routers.auth.EmailService") as MockEmail:
+        MockEmail.return_value.send_verification_email = lambda *a, **kw: None
+        resp = await async_client.post("/api/v1/auth/verify-email/resend", json={"email": "resend@example.com"})
+
+    assert resp.status_code == 200
+    assert "sent" in resp.json()["message"].lower()
 
 
 # ── Login tests ───────────────────────────────────────────────────────────────
