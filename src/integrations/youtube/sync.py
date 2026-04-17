@@ -139,7 +139,7 @@ class YouTubeSyncService:
         url = f"https://www.youtube.com/watch?v={video.video_id}"
 
         # Check if already exists
-        existing = await self.content_repo.get_by_url(url)
+        existing = await self.content_repo.get_by_url(url, user_id)
         if existing:
             return "skipped"
 
@@ -170,7 +170,7 @@ class YouTubeSyncService:
         )
 
         # Create content record
-        await self.content_repo.save(metadata, status=ContentStatus.INBOX)
+        await self.content_repo.save(metadata, user_id=user_id, status=ContentStatus.INBOX)
 
         return "ingested"
 

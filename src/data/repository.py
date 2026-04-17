@@ -88,16 +88,19 @@ class ContentRepository(BaseRepository[Content]):
             await self.session.commit()
             return content
 
-    async def get_by_url(self, url: str) -> Content | None:
-        """Get content by URL.
+    async def get_by_url(self, url: str, user_id: int) -> Content | None:
+        """Get content by URL, scoped to the given user.
 
         Args:
             url: The content URL.
+            user_id: The user ID to scope the lookup.
 
         Returns:
             Content object if found, None otherwise.
         """
-        result = await self.session.execute(select(Content).where(Content.url == url))
+        result = await self.session.execute(
+            select(Content).where(Content.url == url, Content.user_id == user_id)
+        )
         return result.scalar_one_or_none()
 
     async def get_by_id(self, content_id: int) -> Content | None:

@@ -99,7 +99,7 @@ class LinkedInSyncService:
                     url = client.generate_post_url(item.target_urn)
 
                     # Check if already exists
-                    existing = await self._content_repo.get_by_url(url)
+                    existing = await self._content_repo.get_by_url(url, user_id)
                     if existing:
                         result.skipped += 1
                         continue
@@ -116,7 +116,7 @@ class LinkedInSyncService:
                         continue
 
                     # Process the post
-                    content_id = await self._process_post(post)
+                    content_id = await self._process_post(post, user_id)
                     if content_id is not None:
                         result.ingested += 1
                     else:
@@ -158,6 +158,7 @@ class LinkedInSyncService:
     async def _process_post(
         self,
         post: LinkedInPost,
+        user_id: int,
     ) -> int | None:
         """Process a LinkedIn post and save to database.
 
@@ -165,6 +166,7 @@ class LinkedInSyncService:
 
         Args:
             post: LinkedIn post data.
+            user_id: User ID to associate content with.
 
         Returns:
             Content ID if successful, None otherwise.
@@ -181,7 +183,7 @@ class LinkedInSyncService:
         )
 
         # Save content
-        content = await self._content_repo.save(metadata)
+        content = await self._content_repo.save(metadata, user_id=user_id)
 
         # Generate summary and tags in parallel if AI services available
         if self._summarizer and post.text_content:
@@ -230,7 +232,7 @@ class LinkedInSyncService:
         """
 
         # Check if already exists
-        existing = await self._content_repo.get_by_url(url)
+        existing = await self._content_repo.get_by_url(url, user_id)
         if existing:
             return {"content_id": existing.id, "status": "already_exists"}
 
@@ -240,7 +242,7 @@ class LinkedInSyncService:
             return {"status": "error", "error": "Failed to fetch post data"}
 
         # Process the post
-        content_id = await self._process_post(post)
+        content_id = await self._process_post(post, user_id)
         if content_id is None:
             return {"status": "error", "error": "Failed to process post"}
 

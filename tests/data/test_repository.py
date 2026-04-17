@@ -102,16 +102,16 @@ class TestContentRepository:
         await repo.save(sample_metadata, user_id=test_user_id)
 
         # Get by URL
-        result = await repo.get_by_url("https://youtube.com/watch?v=test123")
+        result = await repo.get_by_url("https://youtube.com/watch?v=test123", test_user_id)
 
         assert result is not None
         assert result.url == "https://youtube.com/watch?v=test123"
 
     @pytest.mark.asyncio
-    async def test_get_by_url_not_found(self, db_session):
+    async def test_get_by_url_not_found(self, db_session, test_user_id):
         """Test getting non-existent content by URL."""
         repo = ContentRepository(db_session)
-        result = await repo.get_by_url("https://nonexistent.com")
+        result = await repo.get_by_url("https://nonexistent.com", test_user_id)
 
         assert result is None
 
