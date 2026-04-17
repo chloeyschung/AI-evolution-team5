@@ -1,6 +1,8 @@
 """API integration tests for email/password auth endpoints (AUTH-005)."""
 from unittest.mock import patch
 
+from sqlalchemy import select
+
 from tests.conftest import AsyncTestingSessionLocal
 from tests.factories import (
     make_reset_token,
@@ -9,7 +11,7 @@ from tests.factories import (
     make_verification_token,
 )
 from src.constants import AuthProvider
-from src.data.models import UserAuthMethod, UserProfile
+from src.data.models import PasswordResetToken, UserAuthMethod, UserProfile
 from src.utils.datetime_utils import utc_now
 
 
@@ -137,6 +139,19 @@ async def test_login_success(async_client, db):
     assert data["email"] == "login@example.com"
 
 
+async def test_login_normalizes_mixed_case_whitespace_email(async_client, db):
+    async with AsyncTestingSessionLocal() as session:
+        await make_user(session, email="login-normalized@example.com", password="GoodPass1!")
+
+    resp = await async_client.post("/api/v1/auth/login", json={
+        "email": "  Login-Normalized@Example.com  ",
+        "password": "GoodPass1!"
+    })
+
+    assert resp.status_code == 200
+    assert resp.json()["email"] == "login-normalized@example.com"
+
+
 async def test_login_wrong_password_returns_401(async_client, db):
     async with AsyncTestingSessionLocal() as session:
         await make_user(session, email="badpass@example.com", password="RealPass1!")
@@ -180,6 +195,60 @@ async def test_password_reset_request_returns_200(async_client, db):
         "email": "anyone@example.com"
     })
     assert resp.status_code == 200
+
+
+async def test_password_reset_request_normalizes_mixed_case_whitespace_email(async_client, db):
+    async with AsyncTestingSessionLocal() as session:
+        user, _ = await make_user(session, email="reset-normalized@example.com", password="OldPass1!")
+
+    resp = await async_client.post("/api/v1/auth/password-reset/request", json={
+        "email": "  Reset-Normalized@Example.com  "
+    })
+
+    assert resp.status_code == 200
+
+    async with AsyncTestingSessionLocal() as session:
+        result = await session.execute(
+            select(PasswordResetToken).where(PasswordResetToken.user_id == user.id)
+        )
+        tokens = list(result.scalars().all())
+
+    assert len(tokens) == 1
+
+
+async def test_register_existing_unverified_updates_password_before_verification(async_client, db):
+    async with AsyncTestingSessionLocal() as session:
+        await make_unverified_user(session, email="update-password@example.com", password="OldPass1!")
+
+    sent_tokens: list[str] = []
+
+    def capture_verification_email(email: str, token: str) -> None:
+        sent_tokens.append(token)
+
+    with patch("src.api.routers.auth.EmailService") as MockEmail:
+        MockEmail.return_value.send_verification_email = capture_verification_email
+        resp = await async_client.post("/api/v1/auth/register", json={
+            "email": "update-password@example.com",
+            "password": "NewPass2!"
+        })
+
+    assert resp.status_code == 201
+    assert len(sent_tokens) == 1
+
+    verify_resp = await async_client.get(f"/api/v1/auth/verify-email?token={sent_tokens[0]}")
+    assert verify_resp.status_code == 200
+
+    old_login = await async_client.post("/api/v1/auth/login", json={
+        "email": "update-password@example.com",
+        "password": "OldPass1!"
+    })
+    assert old_login.status_code == 401
+
+    new_login = await async_client.post("/api/v1/auth/login", json={
+        "email": "update-password@example.com",
+        "password": "NewPass2!"
+    })
+    assert new_login.status_code == 200
 
 
 async def test_password_reset_confirm_valid(async_client, db):

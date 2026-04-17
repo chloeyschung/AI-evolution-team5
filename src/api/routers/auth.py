@@ -437,6 +437,7 @@ async def register(
                 detail={"error": "email_exists", "providers": [AuthProvider.EMAIL_PASSWORD.value]},
             )
 
+        existing.password_hash = hash_password(request.password)
         raw_token = await _rotate_verification_token(email_repo, existing.user_id)
         _send_verification_email_safely(normalized_email, raw_token)
         return RegisterResponse(message="Verification email sent. Please check your inbox.")
@@ -525,14 +526,15 @@ async def login_email(
     ip = http_request.client.host if http_request.client else None
     audit = AuditRepository(db)
     email_repo = EmailAuthRepository(db)
-    provider_id = hmac_email(request.email)
+    normalized_email = _normalize_email(request.email)
+    provider_id = hmac_email(normalized_email)
 
     method = await email_repo.get_auth_method_by_provider(AuthProvider.EMAIL_PASSWORD, provider_id)
     if method is None:
         await audit.log_event(
             AuditEventType.LOGIN_FAILURE,
             ip_address=ip,
-            metadata={"reason": "user_not_found", "email": request.email},
+            metadata={"reason": "user_not_found", "email": normalized_email},
         )
         await db.commit()
         raise HTTPException(status_code=401, detail={"error": "invalid_credentials"})
@@ -587,7 +589,8 @@ async def password_reset_request(
     db: AsyncSession = Depends(get_db),
 ) -> PasswordResetRequestResponse:
     email_repo = EmailAuthRepository(db)
-    provider_id = hmac_email(request.email)
+    normalized_email = _normalize_email(request.email)
+    provider_id = hmac_email(normalized_email)
     method = await email_repo.get_auth_method_by_provider(AuthProvider.EMAIL_PASSWORD, provider_id)
 
     if method:
@@ -598,7 +601,7 @@ async def password_reset_request(
             expires_at=utc_now() + timedelta(hours=1),
         )
         try:
-            EmailService().send_password_reset_email(request.email, raw_token)
+            EmailService().send_password_reset_email(normalized_email, raw_token)
         except Exception:
             pass  # Never reveal whether email exists
 
