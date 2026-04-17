@@ -162,26 +162,6 @@ class ShareResponse(BaseModel):
     created_at: str
 
 
-class ResendVerificationRequest(BaseModel):
-    """Schema for requesting email verification resend."""
-
-    email: str
-
-
-class ResendVerificationResponse(BaseModel):
-    """Schema for resend verification response."""
-
-    message: str
-
-
-class EmailNotVerifiedErrorDetail(BaseModel):
-    """Schema for unverified email login error details."""
-
-    error: str
-    can_resend: bool
-    message: str
-
-
 # UX-003: Content Detail View schemas
 
 
@@ -337,6 +317,26 @@ class AuthError(BaseModel):
     """Schema for authentication error response."""
 
     error: str
+
+
+class ResendVerificationRequest(BaseModel):
+    """Schema for requesting email verification resend."""
+
+    email: str
+
+
+class ResendVerificationResponse(BaseModel):
+    """Schema for resend verification response."""
+
+    message: str
+
+
+class EmailNotVerifiedErrorDetail(BaseModel):
+    """Schema for unverified email login error details."""
+
+    error: str
+    can_resend: bool
+    message: str
 
 
 # AUTH-002: Google OAuth schemas
