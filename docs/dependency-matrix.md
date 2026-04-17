@@ -108,7 +108,7 @@ ING-001 → ING-002 → AI-001 → UX-001 → UX-002
 | AUTH-002 | ✅ [`AUTH-002.md`](specs/AUTH-002.md) | ✅ [`AUTH-002-record.md`](records/AUTH-002-record.md) | ✅ Implemented | `src/auth/google_oauth.py`, `src/api/routes.py` | F-001 | ✅ Google OAuth, 30-day block |
 | AUTH-003 | ✅ [`AUTH-003.md`](specs/AUTH-003.md) | ✅ [`AUTH-003-record.md`](records/AUTH-003-record.md) | ✅ Implemented | `src/api/routes.py` | F-002 | ✅ Token revocation |
 | AUTH-004 | ✅ [`AUTH-004.md`](specs/AUTH-004.md) | ✅ [`AUTH-004-record.md`](records/AUTH-004-record.md) | ✅ Implemented | `src/api/routes.py` | F-003 | ✅ 2-step delete, cascade |
-| AUTH-005 | ✅ [`AUTH-005.md`](specs/AUTH-005.md) | ⏳ pending | 🔲 Planned | `src/auth/email_auth.py`, `src/data/email_auth_repository.py`, `src/services/email_service.py` | F-027 | 🔲 Argon2id, Fernet, Authlib, identity table |
+| AUTH-005 | ✅ [`AUTH-005.md`](specs/AUTH-005.md) | ✅ [`AUTH-005-record.md`](records/AUTH-005-record.md) | ✅ Implemented | `src/auth/email_auth.py`, `src/data/email_auth_repository.py`, `src/services/email_service.py` | F-027 | ✅ Argon2id, Fernet, Authlib, identity table
 | AI-001 | ✅ [`AI-001.md`](specs/AI-001.md) | ✅ [`AI-001-record.md`](records/AI-001-record.md) | ✅ Implemented | `src/ai/summarizer.py` | F-005 | ✅ 300-char limit enforced |
 | AI-002 | ✅ [`AI-002.md`](specs/AI-002.md) | ✅ [`AI-002-record.md`](records/AI-002-record.md) | ✅ Implemented | `src/ai/metadata_extractor.py` | F-007 | ✅ OG image thumbnail extraction added |
 | AI-003 | ✅ [`AI-003.md`](specs/AI-003.md) | ✅ [`AI-003-record.md`](records/AI-003-record.md) | ✅ Implemented | `src/ai/categorizer.py` | F-006 | ✅ LLM-based auto-tagging (max 3 tags) |
