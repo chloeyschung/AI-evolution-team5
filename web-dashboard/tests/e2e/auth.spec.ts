@@ -123,6 +123,41 @@ test.describe('Authentication Flow', () => {
     expect(refreshCalled).toBeFalsy();
   });
 
+  test('oauth callback 401 does not trigger forced refresh flow', async ({ page }) => {
+    let refreshCalled = false;
+
+    await page.route('**/api/v1/auth/google/code', async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          detail: { error: 'invalid_google_token' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/auth/refresh', async (route) => {
+      refreshCalled = true;
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          detail: { error: 'invalid_refresh_token' },
+        }),
+      });
+    });
+
+    await page.goto('/login');
+    await page.evaluate(() => {
+      localStorage.setItem('briefly_refresh_token', 'dummy-refresh-token');
+    });
+
+    await page.goto('/oauth-callback?code=invalid_code_12345');
+    await page.waitForURL(/\/login\?error=/, { timeout: 6000 });
+
+    expect(refreshCalled).toBeFalsy();
+  });
+
   test('should navigate to dashboard route', async ({ page }) => {
     // Navigate to dashboard route
     await page.goto('/dashboard');
