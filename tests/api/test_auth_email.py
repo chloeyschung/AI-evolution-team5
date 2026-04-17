@@ -66,6 +66,32 @@ async def test_register_existing_email_with_google_provider_returns_409(async_cl
     }
 
 
+async def test_register_existing_google_email_mixed_case_returns_409(async_client, db):
+    async with AsyncTestingSessionLocal() as session:
+        user = UserProfile(email="MixedCase.Google@Example.com", created_at=utc_now(), updated_at=utc_now())
+        session.add(user)
+        await session.flush()
+        session.add(UserAuthMethod(
+            user_id=user.id,
+            provider=AuthProvider.GOOGLE,
+            provider_id="google-sub-mixed-123",
+            email_verified=True,
+            verified_at=utc_now(),
+        ))
+        await session.commit()
+
+    resp = await async_client.post("/api/v1/auth/register", json={
+        "email": "mixedcase.google@example.com",
+        "password": "Pass2!",
+    })
+
+    assert resp.status_code == 409
+    assert resp.json()["detail"] == {
+        "error": "email_exists",
+        "providers": ["google"],
+    }
+
+
 async def test_register_existing_unverified_rotates_token_and_returns_201(async_client, db):
     async with AsyncTestingSessionLocal() as session:
         user, _ = await make_unverified_user(session, email="stuck@example.com", password="Pass1!")

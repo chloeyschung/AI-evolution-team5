@@ -871,9 +871,12 @@ class UserProfileRepository(BaseRepository[UserProfile]):
             email: User email address.
 
         Returns:
-            UserProfile if found, None otherwise.
+            UserProfile if found, None otherwise. Lookup is normalized and case-insensitive.
         """
-        result = await self.session.execute(select(UserProfile).where(UserProfile.email == email))
+        normalized_email = email.strip().lower()
+        result = await self.session.execute(
+            select(UserProfile).where(func.lower(func.trim(UserProfile.email)) == normalized_email)
+        )
         return result.scalar_one_or_none()
 
     async def get_user_by_google_sub(self, google_sub: str) -> UserProfile | None:
