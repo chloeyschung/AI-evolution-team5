@@ -824,6 +824,7 @@ async def refresh_auth_token(
 
     return TokenRefreshResponse(
         access_token=access_token,  # Plaintext JWT for client
+        refresh_token=token_record.refresh_token,  # Rotated refresh token
         expires_at=token_record.expires_at.isoformat(),
     )
 

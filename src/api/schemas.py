@@ -304,6 +304,7 @@ class TokenRefreshResponse(BaseModel):
     """Schema for token refresh response."""
 
     access_token: str
+    refresh_token: str
     expires_at: str
 
 
