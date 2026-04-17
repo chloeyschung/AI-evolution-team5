@@ -319,4 +319,5 @@ Tests require zero SMTP config and zero manual DB inspection.
 - [AUTH-002.md](AUTH-002.md) — Google OAuth being refactored (not replaced)
 - [ARCH-002](../decisions/ARCH-002-hybrid-jwt-session-with-hashed-encrypted-tokens.md) — JWT + Fernet architecture this extends
 - [ARCH-006](../decisions/ARCH-006-security-in-depth-perimeter-for-external-io.md) — Security-in-depth patterns
+- [ARCH-014](../decisions/ARCH-014-multi-provider-identity-table-and-email-auth.md) — Identity table architecture implemented by this spec
 - OWASP Password Storage Cheat Sheet — Argon2id parameters
