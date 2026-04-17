@@ -24,7 +24,7 @@ class EmailService:
 
     def send_verification_email(self, to: str, raw_token: str) -> None:
         """Send account verification email with single-use link."""
-        link = f"{settings.APP_BASE_URL}/auth/verify-email?token={raw_token}"
+        link = f"{settings.APP_BASE_URL}/verify-email?token={raw_token}"
         self._send(
             to=to,
             subject="Verify your Briefly account",
@@ -38,7 +38,7 @@ class EmailService:
 
     def send_password_reset_email(self, to: str, raw_token: str) -> None:
         """Send password reset email with single-use link."""
-        link = f"{settings.APP_BASE_URL}/auth/reset-password?token={raw_token}"
+        link = f"{settings.APP_BASE_URL}/reset-password?token={raw_token}"
         self._send(
             to=to,
             subject="Reset your Briefly password",
