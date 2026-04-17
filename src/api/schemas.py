@@ -41,6 +41,7 @@ class ContentResponse(BaseModel):
     url: str
     title: str | None = None
     author: str | None = None
+    summary: str | None = None
     thumbnail_url: str | None = None
     status: ContentStatus = ContentStatus.INBOX
     created_at: str
@@ -63,6 +64,7 @@ class ContentResponse(BaseModel):
             url=content.url,
             title=content.title,
             author=content.author,
+            summary=content.summary,
             thumbnail_url=content.thumbnail_url,
             status=content.status,
             created_at=content.created_at.isoformat(),
@@ -86,6 +88,7 @@ class ContentResponse(BaseModel):
             url=metadata.url,
             title=metadata.title,
             author=metadata.author,
+            summary=metadata.summary if hasattr(metadata, "summary") else None,
             thumbnail_url=metadata.thumbnail_url,
             status=ContentStatus.INBOX,
             created_at=utc_now().isoformat(),
