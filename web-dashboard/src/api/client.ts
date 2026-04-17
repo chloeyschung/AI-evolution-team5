@@ -1,5 +1,6 @@
 import axios, { type AxiosRequestConfig, type AxiosResponse, type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from '../types';
+import { navigate } from '../utils/navigation';
 
 let apiClient: ReturnType<typeof axios.create> | null = null;
 let refreshPromise: Promise<void> | null = null;
@@ -63,7 +64,7 @@ export function getApiClient(): ReturnType<typeof axios.create> {
             localStorage.removeItem(ACCESS_TOKEN_KEY);
             localStorage.removeItem(REFRESH_TOKEN_KEY);
             if (window.location.pathname !== '/login') {
-              window.location.href = '/login';
+              navigate('/login', { replace: true });
             }
             return Promise.reject(error);
           }
