@@ -25,7 +25,7 @@ class Content(Base):
     __tablename__ = "content"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("user_profile.id"), nullable=False, default=1, index=True)
+    user_id = Column(Integer, ForeignKey("user_profile.id"), nullable=False, index=True)
     platform = Column(String(100), nullable=False, index=True)
     content_type = Column(String(50), nullable=False)
     url = Column(Text, nullable=False, index=True)
@@ -56,7 +56,7 @@ class SwipeHistory(Base):
     __tablename__ = "swipe_history"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("user_profile.id"), nullable=False, default=1, index=True)
+    user_id = Column(Integer, ForeignKey("user_profile.id"), nullable=False, index=True)
     content_id = Column(Integer, ForeignKey("content.id"), nullable=False, index=True)
     action = Column(SQLEnum(SwipeAction), nullable=False)
     swiped_at = Column(DateTime, default=utc_now, index=True)
@@ -94,7 +94,7 @@ class UserPreferences(Base):
     __tablename__ = "user_preferences"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False, default=1, unique=True)
+    user_id = Column(Integer, nullable=False, unique=True)
     theme = Column(SQLEnum(Theme), nullable=False, default=Theme.SYSTEM)
     notifications_enabled = Column(Boolean, nullable=False, default=True)
     daily_goal = Column(Integer, nullable=False, default=20)
@@ -108,7 +108,7 @@ class InterestTag(Base):
     __tablename__ = "interest_tags"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False, default=1)
+    user_id = Column(Integer, nullable=False)
     tag = Column(String(100), nullable=False)
 
     # Unique constraint for user_id + tag combination

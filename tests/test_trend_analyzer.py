@@ -45,6 +45,7 @@ async def test_get_trend_feed_minimal(db_session):
             title=f"Video {i}",
             status=ContentStatus.ARCHIVED,  # Kept = archived
             updated_at=kept_at,  # Set timezone-aware datetime
+            user_id=1,
         )
         db_session.add(content)
         await db_session.flush()  # Get content.id assigned
@@ -54,6 +55,7 @@ async def test_get_trend_feed_minimal(db_session):
             content_id=content.id,
             action=SwipeAction.KEEP,
             swiped_at=kept_at,
+            user_id=1,
         )
         db_session.add(swipe)
 
@@ -194,6 +196,7 @@ async def test_get_preferred_tags(db_session):
             url=f"https://youtube.com/watch?v={i}",
             title=f"Video {i}",
             status=ContentStatus.ARCHIVED,
+            user_id=1,
         )
         db_session.add(content)
         await db_session.flush()  # Get content.id assigned
@@ -204,6 +207,7 @@ async def test_get_preferred_tags(db_session):
             content_id=content.id,
             action=SwipeAction.KEEP,
             swiped_at=datetime.now(timezone.utc) - timedelta(days=i),
+            user_id=1,
         )
         db_session.add(swipe)
 
@@ -276,6 +280,7 @@ async def test_score_threshold_filtering(db_session):
             title=f"Video {i}",
             status=ContentStatus.ARCHIVED,
             updated_at=kept_at,
+            user_id=1,
         )
         db_session.add(content)
         await db_session.flush()  # Get content.id assigned
@@ -285,6 +290,7 @@ async def test_score_threshold_filtering(db_session):
             content_id=content.id,
             action=SwipeAction.KEEP,
             swiped_at=kept_at,
+            user_id=1,
         )
         db_session.add(swipe)
 
@@ -318,6 +324,7 @@ async def test_pagination(db_session):
             title=f"Video {i}",
             status=ContentStatus.ARCHIVED,
             updated_at=kept_at,
+            user_id=1,
         )
         db_session.add(content)
         await db_session.flush()  # Get content.id assigned
@@ -327,6 +334,7 @@ async def test_pagination(db_session):
             content_id=content.id,
             action=SwipeAction.KEEP,
             swiped_at=kept_at,
+            user_id=1,
         )
         db_session.add(swipe)
 

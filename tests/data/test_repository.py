@@ -61,10 +61,10 @@ class TestContentRepository:
     """Tests for ContentRepository."""
 
     @pytest.mark.asyncio
-    async def test_save_new_content(self, db_session, sample_metadata):
+    async def test_save_new_content(self, db_session, test_user_id, sample_metadata):
         """Test saving new content."""
         repo = ContentRepository(db_session)
-        result = await repo.save(sample_metadata)
+        result = await repo.save(sample_metadata, user_id=test_user_id)
 
         assert result.id is not None
         assert result.platform == "YouTube"
@@ -72,12 +72,12 @@ class TestContentRepository:
         assert result.url == "https://youtube.com/watch?v=test123"
 
     @pytest.mark.asyncio
-    async def test_save_updates_existing(self, db_session, sample_metadata):
+    async def test_save_updates_existing(self, db_session, test_user_id, sample_metadata):
         """Test saving updates existing content by URL."""
         repo = ContentRepository(db_session)
 
         # Save initial content
-        await repo.save(sample_metadata)
+        await repo.save(sample_metadata, user_id=test_user_id)
 
         # Update metadata
         updated_metadata = ContentMetadata(
@@ -88,18 +88,18 @@ class TestContentRepository:
             author="Updated Author",
             timestamp=datetime.now(timezone.utc),
         )
-        result = await repo.save(updated_metadata)
+        result = await repo.save(updated_metadata, user_id=test_user_id)
 
         assert result.title == "Updated Title"
         assert result.author == "Updated Author"
 
     @pytest.mark.asyncio
-    async def test_get_by_url(self, db_session, sample_metadata):
+    async def test_get_by_url(self, db_session, test_user_id, sample_metadata):
         """Test getting content by URL."""
         repo = ContentRepository(db_session)
 
         # Save content
-        await repo.save(sample_metadata)
+        await repo.save(sample_metadata, user_id=test_user_id)
 
         # Get by URL
         result = await repo.get_by_url("https://youtube.com/watch?v=test123")
@@ -128,7 +128,7 @@ class TestContentRepository:
                 url=f"https://example.com/{i}",
                 title=f"Title {i}",
             )
-            await repo.save(metadata)
+            await repo.save(metadata, user_id=test_user_id)
 
         results = await repo.get_all(test_user_id, limit=10)
 
@@ -147,7 +147,7 @@ class TestContentRepository:
                 url=f"https://example.com/{i}",
                 title=f"Title {i}",
             )
-            await repo.save(metadata)
+            await repo.save(metadata, user_id=test_user_id)
 
         results = await repo.get_all(test_user_id, limit=5, offset=0)
 
@@ -165,19 +165,21 @@ class TestContentRepository:
                 platform="Test",
                 content_type=ContentType.ARTICLE,
                 url="https://example.com/1",
-            )
+            ),
+            user_id=test_user_id,
         )
         content2 = await content_repo.save(
             ContentMetadata(
                 platform="Test",
                 content_type=ContentType.ARTICLE,
                 url="https://example.com/2",
-            )
+            ),
+            user_id=test_user_id,
         )
 
         # Record swipe actions
-        await swipe_repo.record_swipe(content1.id, SwipeAction.KEEP)
-        await swipe_repo.record_swipe(content2.id, SwipeAction.DISCARD)
+        await swipe_repo.record_swipe(content1.id, SwipeAction.KEEP, test_user_id)
+        await swipe_repo.record_swipe(content2.id, SwipeAction.DISCARD, test_user_id)
 
         kept = await content_repo.get_kept(test_user_id)
 
@@ -196,25 +198,28 @@ class TestContentRepository:
                 platform="Test",
                 content_type=ContentType.ARTICLE,
                 url="https://example.com/1",
-            )
+            ),
+            user_id=test_user_id,
         )
         content2 = await content_repo.save(
             ContentMetadata(
                 platform="Test",
                 content_type=ContentType.ARTICLE,
                 url="https://example.com/2",
-            )
+            ),
+            user_id=test_user_id,
         )
         content3 = await content_repo.save(
             ContentMetadata(
                 platform="Test",
                 content_type=ContentType.ARTICLE,
                 url="https://example.com/3",
-            )
+            ),
+            user_id=test_user_id,
         )
 
         # Swipe only content1
-        await swipe_repo.record_swipe(content1.id, SwipeAction.KEEP)
+        await swipe_repo.record_swipe(content1.id, SwipeAction.KEEP, test_user_id)
 
         pending = await content_repo.get_pending(test_user_id)
 
@@ -236,27 +241,30 @@ class TestContentRepository:
                 platform="Test",
                 content_type=ContentType.ARTICLE,
                 url="https://example.com/1",
-            )
+            ),
+            user_id=test_user_id,
         )
         content2 = await content_repo.save(
             ContentMetadata(
                 platform="Test",
                 content_type=ContentType.ARTICLE,
                 url="https://example.com/2",
-            )
+            ),
+            user_id=test_user_id,
         )
         content3 = await content_repo.save(
             ContentMetadata(
                 platform="Test",
                 content_type=ContentType.ARTICLE,
                 url="https://example.com/3",
-            )
+            ),
+            user_id=test_user_id,
         )
 
         # Swipe all with different actions
-        await swipe_repo.record_swipe(content1.id, SwipeAction.KEEP)
-        await swipe_repo.record_swipe(content2.id, SwipeAction.DISCARD)
-        await swipe_repo.record_swipe(content3.id, SwipeAction.KEEP)
+        await swipe_repo.record_swipe(content1.id, SwipeAction.KEEP, test_user_id)
+        await swipe_repo.record_swipe(content2.id, SwipeAction.DISCARD, test_user_id)
+        await swipe_repo.record_swipe(content3.id, SwipeAction.KEEP, test_user_id)
 
         pending = await content_repo.get_pending(test_user_id)
 
@@ -274,7 +282,8 @@ class TestContentRepository:
                     platform="Test",
                     content_type=ContentType.ARTICLE,
                     url=f"https://example.com/{i}",
-                )
+                ),
+                user_id=test_user_id,
             )
 
         pending = await content_repo.get_pending(test_user_id, limit=5)
@@ -292,7 +301,8 @@ class TestContentRepository:
                 platform="Test",
                 content_type=ContentType.ARTICLE,
                 url="https://example.com/1",
-            )
+            ),
+            user_id=test_user_id,
         )
 
         # Small delay to ensure different timestamps
@@ -303,7 +313,8 @@ class TestContentRepository:
                 platform="Test",
                 content_type=ContentType.ARTICLE,
                 url="https://example.com/2",
-            )
+            ),
+            user_id=test_user_id,
         )
 
         pending = await content_repo.get_pending(test_user_id)
@@ -317,27 +328,41 @@ class TestSwipeRepository:
     """Tests for SwipeRepository."""
 
     @pytest.mark.asyncio
-    async def test_record_swipe(self, db_session):
+    async def test_record_swipe(self, db_session, test_user_id):
         """Test recording swipe action."""
+        content_repo = ContentRepository(db_session)
+        content = await content_repo.save(
+            ContentMetadata(platform="Test", content_type=ContentType.ARTICLE, url="https://example.com/swipe1"),
+            user_id=test_user_id,
+        )
         repo = SwipeRepository(db_session)
 
-        history = await repo.record_swipe(content_id=1, action=SwipeAction.KEEP)
+        history = await repo.record_swipe(content_id=content.id, action=SwipeAction.KEEP, user_id=test_user_id)
 
         assert history.id is not None
-        assert history.content_id == 1
+        assert history.content_id == content.id
         assert history.action == SwipeAction.KEEP
 
     @pytest.mark.asyncio
-    async def test_get_history(self, db_session):
+    async def test_get_history(self, db_session, test_user_id):
         """Test getting swipe history."""
+        content_repo = ContentRepository(db_session)
+        content1 = await content_repo.save(
+            ContentMetadata(platform="Test", content_type=ContentType.ARTICLE, url="https://example.com/h1"),
+            user_id=test_user_id,
+        )
+        content2 = await content_repo.save(
+            ContentMetadata(platform="Test", content_type=ContentType.ARTICLE, url="https://example.com/h2"),
+            user_id=test_user_id,
+        )
         repo = SwipeRepository(db_session)
 
         # Record multiple swipes
-        await repo.record_swipe(1, SwipeAction.KEEP)
-        await repo.record_swipe(1, SwipeAction.DISCARD)
-        await repo.record_swipe(2, SwipeAction.KEEP)
+        await repo.record_swipe(content1.id, SwipeAction.KEEP, test_user_id)
+        await repo.record_swipe(content1.id, SwipeAction.DISCARD, test_user_id)
+        await repo.record_swipe(content2.id, SwipeAction.KEEP, test_user_id)
 
-        history = await repo.get_history(1)
+        history = await repo.get_history(content1.id)
 
         assert len(history) == 2
 

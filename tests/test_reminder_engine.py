@@ -204,6 +204,7 @@ async def test_get_suggestion_backlog_reminder(db_session):
             url=f"https://youtube.com/watch?v={i}",
             title=f"Video {i}",
             status=ContentStatus.INBOX,
+            user_id=1,
         )
         db_session.add(content)
 
@@ -249,6 +250,7 @@ async def test_get_suggestion_streak_reminder(db_session):
             url=f"https://youtube.com/watch?v={i}",
             title=f"Video {i}",
             status=ContentStatus.INBOX,
+            user_id=1,
         )
         db_session.add(content)
 
@@ -406,6 +408,7 @@ async def test_update_patterns_with_history(db_session):
             url=f"https://youtube.com/watch?v={i}",
             title=f"Video {i}",
             status=ContentStatus.ARCHIVED,
+            user_id=1,
         )
         db_session.add(content)
 
@@ -421,6 +424,7 @@ async def test_update_patterns_with_history(db_session):
             content_id=content.id,
             action=SwipeAction.KEEP,
             swiped_at=swipe_time,
+            user_id=1,
         )
         db_session.add(swipe)
 
@@ -450,6 +454,7 @@ async def test_count_by_hour(db_session):
             url=f"https://youtube.com/watch?v={idx}",
             title=f"Video {idx}",
             status=ContentStatus.ARCHIVED,
+            user_id=1,
         )
         db_session.add(content)
 
@@ -464,6 +469,7 @@ async def test_count_by_hour(db_session):
             content_id=content.id,
             action=SwipeAction.KEEP,
             swiped_at=swipe_time,
+            user_id=1,
         )
         db_session.add(swipe)
         swipes.append(swipe)
@@ -495,6 +501,7 @@ async def test_count_by_day(db_session):
             url=f"https://youtube.com/watch?v={idx}",
             title=f"Video {idx}",
             status=ContentStatus.ARCHIVED,
+            user_id=1,
         )
         db_session.add(content)
 
@@ -509,6 +516,7 @@ async def test_count_by_day(db_session):
             content_id=content.id,
             action=SwipeAction.KEEP,
             swiped_at=swipe_time,
+            user_id=1,
         )
         db_session.add(swipe)
         swipes.append(swipe)
@@ -550,6 +558,7 @@ async def test_full_reminder_flow(db_session):
             url=f"https://youtube.com/watch?v={i}",
             title=f"Video {i}",
             status=ContentStatus.INBOX,
+            user_id=1,
         )
         db_session.add(content)
 

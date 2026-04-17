@@ -38,15 +38,15 @@ class ContentRepository(BaseRepository[Content]):
     async def save(
         self,
         metadata: ContentMetadata,
+        user_id: int,
         status: ContentStatus = ContentStatus.INBOX,
-        user_id: int = 1,  # TODO #3 (2026-04-14): Added user_id parameter for multi-user support
     ) -> Content:
         """Save or update content from metadata.
 
         Args:
             metadata: ContentMetadata to save.
+            user_id: User ID to associate with content.
             status: Content status (default: INBOX for new content).
-            user_id: User ID to associate with content (default: 1 for backward compatibility).
 
         Returns:
             The saved or updated Content object.
@@ -478,14 +478,14 @@ class SwipeRepository(BaseRepository[SwipeHistory]):
         super().__init__(session)
 
     async def record_swipe(
-        self, content_id: int, action: SwipeAction, user_id: int = 1
+        self, content_id: int, action: SwipeAction, user_id: int
     ) -> SwipeHistory:
         """Record a swipe action.
 
         Args:
             content_id: The content ID.
             action: The swipe action (KEEP or DISCARD).
-            user_id: User ID (default: 1 for backward compatibility).
+            user_id: User ID of the swipe actor.
                 - KEEP: Content remains INBOX
                 - DISCARD: Content status changes to ARCHIVED
 
@@ -540,7 +540,7 @@ class SwipeRepository(BaseRepository[SwipeHistory]):
         return list(result.scalars().all())
 
     async def record_swipes_batch(
-        self, actions: list[tuple[int, SwipeAction]], user_id: int = 1
+        self, actions: list[tuple[int, SwipeAction]], user_id: int
     ) -> list[SwipeHistory]:
         """Record multiple swipe actions atomically.
 
@@ -548,7 +548,7 @@ class SwipeRepository(BaseRepository[SwipeHistory]):
 
         Args:
             actions: List of (content_id, action) tuples.
-            user_id: User ID (default: 1 for backward compatibility).
+            user_id: User ID of the swipe actor.
 
         Returns:
             List of created SwipeHistory objects.

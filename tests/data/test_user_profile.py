@@ -175,11 +175,18 @@ class TestUserStatisticsRepository:
         """Test statistics calculation with swipe history."""
         repo = UserProfileRepository(db_session)
 
+        # Create a user first (required for FK)
+        from src.utils.datetime_utils import utc_now
+        user = UserProfile(email="stat_test@example.com", created_at=utc_now(), updated_at=utc_now())
+        db_session.add(user)
+        await db_session.flush()
+
         # Create test content
         content = Content(
             platform="Test",
             content_type="article",
-            url="https://example.com/test"
+            url="https://example.com/test",
+            user_id=user.id,
         )
         db_session.add(content)
         await db_session.commit()
@@ -188,9 +195,9 @@ class TestUserStatisticsRepository:
         # Create swipe history
         now = datetime.now(timezone.utc)
         swipes = [
-            SwipeHistory(content_id=content.id, action=SwipeAction.KEEP, swiped_at=now - timedelta(hours=1)),
-            SwipeHistory(content_id=content.id, action=SwipeAction.KEEP, swiped_at=now - timedelta(hours=2)),
-            SwipeHistory(content_id=content.id, action=SwipeAction.DISCARD, swiped_at=now - timedelta(hours=3)),
+            SwipeHistory(content_id=content.id, action=SwipeAction.KEEP, swiped_at=now - timedelta(hours=1), user_id=user.id),
+            SwipeHistory(content_id=content.id, action=SwipeAction.KEEP, swiped_at=now - timedelta(hours=2), user_id=user.id),
+            SwipeHistory(content_id=content.id, action=SwipeAction.DISCARD, swiped_at=now - timedelta(hours=3), user_id=user.id),
         ]
         db_session.add_all(swipes)
         await db_session.commit()
@@ -208,11 +215,18 @@ class TestUserStatisticsRepository:
         """Test retention rate calculation."""
         repo = UserProfileRepository(db_session)
 
+        # Create a user first (required for FK)
+        from src.utils.datetime_utils import utc_now
+        user = UserProfile(email="retention_test@example.com", created_at=utc_now(), updated_at=utc_now())
+        db_session.add(user)
+        await db_session.flush()
+
         # Create test content
         content = Content(
             platform="Test",
             content_type="article",
-            url="https://example.com/test"
+            url="https://example.com/test",
+            user_id=user.id,
         )
         db_session.add(content)
         await db_session.commit()
@@ -224,13 +238,15 @@ class TestUserStatisticsRepository:
             db_session.add(SwipeHistory(
                 content_id=content.id,
                 action=SwipeAction.KEEP,
-                swiped_at=now - timedelta(hours=i)
+                swiped_at=now - timedelta(hours=i),
+                user_id=user.id,
             ))
         for i in range(4):
             db_session.add(SwipeHistory(
                 content_id=content.id,
                 action=SwipeAction.DISCARD,
-                swiped_at=now - timedelta(hours=10+i)
+                swiped_at=now - timedelta(hours=10+i),
+                user_id=user.id,
             ))
         await db_session.commit()
 

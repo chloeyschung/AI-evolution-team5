@@ -67,6 +67,13 @@ async def test_calculate_user_stats_with_data(db_session):
     await seed_achievements(db_session)
     checker = AchievementChecker(db_session)
 
+    # Create a user first (required for FK)
+    from src.data.models import UserProfile
+    from src.utils.datetime_utils import utc_now
+    user = UserProfile(email="achiev_test@example.com", created_at=utc_now(), updated_at=utc_now())
+    db_session.add(user)
+    await db_session.flush()
+
     # Create content with swipe history
     for i in range(5):
         content = Content(
@@ -75,6 +82,7 @@ async def test_calculate_user_stats_with_data(db_session):
             url=f"https://example.com/{i}",
             title=f"Content {i}",
             status=ContentStatus.ARCHIVED,
+            user_id=user.id,
         )
         db_session.add(content)
         await db_session.flush()
@@ -83,12 +91,13 @@ async def test_calculate_user_stats_with_data(db_session):
             content_id=content.id,
             action=SwipeAction.KEEP,
             swiped_at=datetime.now(timezone.utc) - timedelta(days=i),
+            user_id=user.id,
         )
         db_session.add(swipe)
 
     await db_session.commit()
 
-    stats = await checker._calculate_user_stats(user_id=1)
+    stats = await checker._calculate_user_stats(user_id=user.id)
 
     assert stats["total_swipes"] == 5
     assert stats["platform_count"] == 2  # YouTube and LinkedIn
@@ -279,6 +288,13 @@ async def test_check_and_award_all_types(db_session):
     await seed_achievements(db_session)
     checker = AchievementChecker(db_session)
 
+    # Create a user first (required for FK)
+    from src.data.models import UserProfile
+    from src.utils.datetime_utils import utc_now
+    user = UserProfile(email="award_all@example.com", created_at=utc_now(), updated_at=utc_now())
+    db_session.add(user)
+    await db_session.flush()
+
     # Create data that should unlock multiple achievements
     for i in range(15):
         platform = "YouTube" if i < 8 else "LinkedIn" if i < 12 else "Twitter"
@@ -288,6 +304,7 @@ async def test_check_and_award_all_types(db_session):
             url=f"https://example.com/{i}",
             title=f"Content {i}",
             status=ContentStatus.ARCHIVED,
+            user_id=user.id,
         )
         db_session.add(content)
         await db_session.flush()
@@ -296,6 +313,7 @@ async def test_check_and_award_all_types(db_session):
             content_id=content.id,
             action=SwipeAction.KEEP,
             swiped_at=datetime.now(timezone.utc) - timedelta(days=i % 10),
+            user_id=user.id,
         )
         db_session.add(swipe)
 
@@ -303,10 +321,10 @@ async def test_check_and_award_all_types(db_session):
 
     # Update streak
     for day in range(1, 8):
-        await checker._streak_repo.update_streak(user_id=1, activity_date=date(2024, 1, day))
+        await checker._streak_repo.update_streak(user_id=user.id, activity_date=date(2024, 1, day))
 
     # Check and award
-    new_achievements = await checker.check_and_award(user_id=1)
+    new_achievements = await checker.check_and_award(user_id=user.id)
 
     # Should have unlocked several achievements
     assert len(new_achievements) > 0

@@ -48,19 +48,19 @@ class SwipeService:
         self,
         content_id: int,
         action: SwipeAction,
-        user_id: int = 1,
+        user_id: int,
     ) -> SwipeResult:
         """Record a single swipe action.
 
         Args:
             content_id: Content ID being swiped.
             action: Swipe action (keep or discard).
-            user_id: User ID (default: 1 for backward compatibility).
+            user_id: User ID of the swipe actor.
 
         Returns:
             Swipe result with ID and action.
         """
-        history = await self._swipe_repo.record_swipe(content_id, action)
+        history = await self._swipe_repo.record_swipe(content_id, action, user_id)
 
         # Publish event for side effects (achievement checking, analytics, etc.)
         await self._event_bus.publish(
@@ -80,18 +80,18 @@ class SwipeService:
     async def record_swipes_batch(
         self,
         actions: list[tuple[int, SwipeAction]],
-        user_id: int = 1,
+        user_id: int,
     ) -> BatchSwipeResult:
         """Record multiple swipe actions atomically.
 
         Args:
             actions: List of (content_id, action) tuples.
-            user_id: User ID (default: 1 for backward compatibility).
+            user_id: User ID of the swipe actor.
 
         Returns:
             Batch swipe result with count and individual results.
         """
-        histories = await self._swipe_repo.record_swipes_batch(actions)
+        histories = await self._swipe_repo.record_swipes_batch(actions, user_id)
 
         # Publish events for each swipe (for side effects)
         for history in histories:
