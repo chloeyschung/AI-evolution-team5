@@ -50,6 +50,24 @@ test.describe('Authentication Flow', () => {
     await expect(page.getByText(/verification email has been sent/i)).toBeVisible();
   });
 
+  test('verify-email failure page allows resend by email', async ({ page }) => {
+    await page.route('**/api/v1/auth/verify-email?token=*', async (route) => {
+      await route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          detail: 'Invalid or expired verification token',
+        }),
+      });
+    });
+
+    await page.goto('/verify-email?token=expired-or-invalid-token');
+
+    await expect(page.getByText(/verification failed/i)).toBeVisible();
+    await expect(page.locator('input[name="email"]')).toBeVisible();
+    await expect(page.getByRole('button', { name: /resend verification email/i })).toBeVisible();
+  });
+
   test('should navigate to dashboard route', async ({ page }) => {
     // Navigate to dashboard route
     await page.goto('/dashboard');
