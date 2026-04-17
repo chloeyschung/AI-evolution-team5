@@ -75,7 +75,7 @@ async function handleLogin(): Promise<void> {
 
     // Step 2: Get user info from Google
     const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { Authorization: `Bearer ${googleTokens.id_token}` },
+      headers: { Authorization: `Bearer ${googleTokens.access_token}` },
     });
 
     if (!userInfoResponse.ok) {
