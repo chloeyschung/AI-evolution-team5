@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
 import { router } from './router';
+import { useAuthStore } from './stores/useAuthStore';
 import './styles/main.css';
 
 // Apply theme on mount
@@ -26,6 +27,10 @@ function applyTheme() {
 }
 
 applyTheme();
+
+// Bootstrap auth state once before React renders. This resolves isLoading
+// (initially true) so ProtectedRoute never blocks indefinitely after refresh.
+useAuthStore.getState().initialize();
 
 ReactDOM.createRoot(document.getElementById('app')!).render(
   <React.StrictMode>
