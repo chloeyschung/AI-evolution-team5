@@ -292,8 +292,8 @@ class TrendAnalyzer:
         if not content_tags:
             return self.DEFAULT_NEUTRAL_SCORE
 
-        # Get all swipe history (single-user system, no user_id filter needed)
-        swipe_history = await self._swipe_repo.get_all_history()
+        # Get swipe history scoped to the current user
+        swipe_history = await self._swipe_repo.get_all_history(user_id=user_id)
 
         if not swipe_history:
             return self.DEFAULT_NEUTRAL_SCORE

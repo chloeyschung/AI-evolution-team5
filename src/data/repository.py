@@ -538,13 +538,28 @@ class SwipeRepository(BaseRepository[SwipeHistory]):
         result = await self.session.execute(select(SwipeHistory).where(SwipeHistory.content_id == content_id))
         return list(result.scalars().all())
 
-    async def get_all_history(self) -> list[SwipeHistory]:
-        """Get all swipe history (for achievement tracking).
+    async def get_all_history(
+        self,
+        user_id: int,
+        content_id: int | None = None,
+        limit: int | None = None,
+    ) -> list[SwipeHistory]:
+        """Get swipe history scoped to a user (for achievement/trend tracking).
+
+        Args:
+            user_id: The user whose history to retrieve.
+            content_id: Optional content ID to filter by.
+            limit: Optional maximum number of results.
 
         Returns:
-            List of all SwipeHistory objects.
+            List of SwipeHistory objects belonging to the user.
         """
-        result = await self.session.execute(select(SwipeHistory))
+        stmt = select(SwipeHistory).where(SwipeHistory.user_id == user_id)
+        if content_id is not None:
+            stmt = stmt.where(SwipeHistory.content_id == content_id)
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
     async def record_swipes_batch(

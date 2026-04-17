@@ -115,19 +115,21 @@ class SwipeService:
 
     async def get_swipe_history(
         self,
+        user_id: int,
         content_id: int | None = None,
         limit: int | None = None,
     ) -> list[SwipeResult]:
-        """Get swipe history.
+        """Get swipe history scoped to a user.
 
         Args:
+            user_id: The user whose history to retrieve.
             content_id: Optional content ID to filter by.
             limit: Optional limit on results.
 
         Returns:
             List of swipe results.
         """
-        histories = await self._swipe_repo.get_all_history(content_id=content_id, limit=limit)
+        histories = await self._swipe_repo.get_all_history(user_id=user_id, content_id=content_id, limit=limit)
         return [
             SwipeResult(
                 id=h.id,

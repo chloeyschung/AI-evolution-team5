@@ -58,8 +58,8 @@ class AchievementChecker:
         # Get streak
         streak = await self._streak_repo.get_or_create_streak(user_id)
 
-        # Get swipe history (all history for now - single user system)
-        swipe_history = await self._swipe_repo.get_all_history()
+        # Get swipe history scoped to this user
+        swipe_history = await self._swipe_repo.get_all_history(user_id=user_id)
         total_swipes = len(swipe_history)
 
         # Get unique platforms from swipe history
