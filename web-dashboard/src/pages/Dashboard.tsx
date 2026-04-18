@@ -23,32 +23,34 @@ export default function Dashboard() {
 
   return (
     <section className={styles.page} data-testid="dashboard-page">
-      <header className={styles.hero}>
-        <p className={styles.kicker}>Today&apos;s Catch-Up</p>
-        <h1>Convert your saved pile into quick wins.</h1>
+      <header className={styles.heroPlane} data-testid="dashboard-hero-plane">
+        <p className={styles.kicker}>TODAY&apos;S READING FLOW</p>
+        <h1>Process pending items with less context switching.</h1>
         <p className={styles.description}>
-          Briefly helps you consume first, collect second. Start with one card and keep your momentum guilt-free.
+          Handle your queue in short, focused passes. Start with one item and keep momentum without reopening context.
         </p>
       </header>
 
-      {contentStore.isLoading ? <p className={styles.message}>Loading your stack…</p> : null}
+      <section className={styles.workLane} data-testid="dashboard-work-lane">
+        {contentStore.isLoading ? <p className={styles.message}>Loading your stack…</p> : null}
 
-      {!contentStore.items.length && !contentStore.isLoading ? (
-        <p className={styles.message}>
-          Nothing queued yet. Save one article from the extension and it will show up here.
-        </p>
-      ) : null}
+        {!contentStore.items.length && !contentStore.isLoading ? (
+          <p className={styles.message}>
+            Nothing queued yet. Save one article from the extension and it will show up here.
+          </p>
+        ) : null}
 
-      <div className={styles.grid}>
-        {contentStore.items.map((item) => (
-          <ContentCard
-            key={item.id}
-            content={item}
-            onDelete={handleDelete}
-            onSwipe={handleSwipe}
-          />
-        ))}
-      </div>
+        <div className={styles.grid}>
+          {contentStore.items.map((item) => (
+            <ContentCard
+              key={item.id}
+              content={item}
+              onDelete={handleDelete}
+              onSwipe={handleSwipe}
+            />
+          ))}
+        </div>
+      </section>
     </section>
   );
 }

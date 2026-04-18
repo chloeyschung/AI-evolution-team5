@@ -2,6 +2,7 @@
   min-height: 100vh;
   display: grid;
   grid-template-rows: auto 1fr;
+  background: var(--color-canvas);
 }
 
 .skipLink {
@@ -9,10 +10,11 @@
   left: 12px;
   top: -100px;
   z-index: 100;
-  background: var(--gold);
-  color: var(--text-inverse);
+  background: var(--color-primary);
+  color: var(--color-surface);
   padding: 10px 14px;
-  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--color-primary-strong) 70%, #ffffff 30%);
+  border-radius: var(--radius-md);
   font-weight: 600;
 }
 

@@ -3,15 +3,23 @@
   gap: 14px;
 }
 
-.hero h1 {
-  margin-top: 6px;
+.hero {
+  display: grid;
+  gap: 4px;
+  padding: 18px 20px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-panel);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-primary) 6%, #ffffff 94%),
+      color-mix(in srgb, var(--color-surface-muted) 74%, #ffffff 26%)
+    );
+  box-shadow: var(--shadow-sm);
 }
 
-.kicker {
-  font-family: var(--font-mono);
-  color: var(--gold);
-  font-size: 0.78rem;
-  text-transform: uppercase;
+.hero h1 {
+  margin-top: 0;
 }
 
 .filterRow {
@@ -27,6 +35,15 @@
 .filterRow label,
 .message {
   color: var(--text-secondary);
+}
+
+.subtitle {
+  margin-top: 6px;
+  color: var(--color-primary-strong);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .select {

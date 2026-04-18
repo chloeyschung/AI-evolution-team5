@@ -8,11 +8,16 @@
   box-shadow: var(--shadow-sm);
   display: grid;
   gap: 12px;
+  transition:
+    border-color var(--motion-affordance-duration) var(--motion-affordance-ease),
+    box-shadow var(--motion-affordance-duration) var(--motion-affordance-ease),
+    transform var(--motion-affordance-duration) var(--motion-affordance-ease);
 }
 
 .card:hover {
   border-color: var(--border-gold);
   box-shadow: var(--shadow-sm), var(--shadow-gold);
+  transform: translateY(-1px);
 }
 
 .metaRow,
@@ -113,6 +118,15 @@
   border: 1px solid var(--border);
   color: var(--text-primary);
   background: var(--bg-elevated);
+  transition:
+    box-shadow var(--motion-affordance-duration) var(--motion-affordance-ease),
+    transform var(--motion-affordance-duration) var(--motion-affordance-ease),
+    border-color var(--motion-affordance-duration) var(--motion-affordance-ease);
+}
+
+.actionBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .keepBtn {

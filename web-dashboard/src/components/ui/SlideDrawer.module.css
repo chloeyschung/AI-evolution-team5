@@ -1,0 +1,61 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-overlay);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 40;
+  animation: fade-in var(--motion-arrival-duration) var(--motion-arrival-ease);
+  transition: opacity var(--motion-progression-duration) var(--motion-progression-ease);
+}
+
+.drawer {
+  width: min(560px, 100%);
+  height: 100%;
+  background: var(--bg-elevated);
+  border-left: 1px solid var(--border-default);
+  box-shadow: var(--shadow-lg);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  animation: slide-in var(--motion-progression-duration) var(--motion-progression-ease);
+  transition:
+    transform var(--motion-progression-duration) var(--motion-progression-ease),
+    opacity var(--motion-progression-duration) var(--motion-progression-ease);
+}
+
+.head {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: var(--space-3);
+}
+
+.head p {
+  margin-top: var(--space-1);
+  font-size: var(--fs-small);
+}
+
+.content {
+  overflow: auto;
+  padding: var(--space-4);
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  overscroll-behavior: contain;
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

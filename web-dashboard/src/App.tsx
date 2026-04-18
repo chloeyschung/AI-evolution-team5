@@ -1,11 +1,18 @@
 import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import ErrorBoundary from './components/ErrorBoundary';
-import Header from './components/layout/Header';
+import AppShell from './components/layout/AppShell';
 import styles from './App.module.css';
 import { setNavigator } from './utils/navigation';
 
-const AUTH_PAGES = ['/login', '/oauth-callback'];
+const AUTH_PAGES = [
+  '/login',
+  '/signup',
+  '/forgot-password',
+  '/reset-password',
+  '/verify-email',
+  '/oauth-callback',
+];
 
 function App() {
   const location = useLocation();
@@ -23,16 +30,7 @@ function App() {
   return (
     <ErrorBoundary onError={handleError}>
       <a href="#main-content" className={styles.skipLink}>Skip to content</a>
-      {isAuthPage ? (
-        <Outlet />
-      ) : (
-        <div className={styles.shell}>
-          <Header />
-          <main id="main-content" className={styles.content}>
-            <Outlet />
-          </main>
-        </div>
-      )}
+      {isAuthPage ? <Outlet /> : <AppShell />}
     </ErrorBoundary>
   );
 }

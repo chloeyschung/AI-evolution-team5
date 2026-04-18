@@ -1,0 +1,6 @@
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0MjQyIiwiZXhwIjoxNzc2MzI0MzQzLCJpYXQiOjE3NzYzMjA3NDMsInR5cGUiOiJhY2Nlc3MifQ.wV0ZON23PoaFN9oNL9-gRF4oVs2brcsuwQX0Ru0QD8Q",
+  "refresh_token": "circle3-refresh-token-fixed",
+  "user_id": 4242,
+  "email": "circle3@briefly.local"
+}

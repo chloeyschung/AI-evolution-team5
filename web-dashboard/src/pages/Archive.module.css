@@ -3,15 +3,32 @@
   gap: 14px;
 }
 
-.kicker {
-  font-family: var(--font-mono);
-  color: var(--gold);
-  font-size: 0.78rem;
-  text-transform: uppercase;
+.hero {
+  display: grid;
+  gap: 4px;
+  padding: 18px 20px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-panel);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-primary) 5%, #ffffff 95%),
+      color-mix(in srgb, var(--color-surface-muted) 78%, #ffffff 22%)
+    );
+  box-shadow: var(--shadow-sm);
 }
 
 .hero h1 {
+  margin-top: 0;
+}
+
+.subtitle {
   margin-top: 6px;
+  color: var(--color-primary-strong);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .message {

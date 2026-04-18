@@ -1,0 +1,70 @@
+.titleButton {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  color: var(--text-primary);
+  padding: 0;
+}
+
+.titleButton:focus-visible,
+.actions :global(.btn):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-primary) 78%, white);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+.titleButton strong {
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.titleButton span {
+  font-size: var(--fs-small);
+  color: var(--text-muted);
+}
+
+.summary {
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.4;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.actions :global(.btn) {
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+}
+
+.tableHost :global(tbody tr.content-table-row) {
+  background-color: color-mix(in srgb, var(--bg-surface) 96%, var(--bg-canvas) 4%);
+}
+
+.tableHost :global(tbody tr.content-table-row) {
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.tableHost :global(tbody tr.content-table-row td:first-child) {
+  box-shadow: inset 3px 0 0 transparent;
+}
+
+.tableHost :global(tbody tr.content-table-row:hover) {
+  background-color: color-mix(in srgb, var(--color-primary) 10%, var(--bg-surface));
+  background-image: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+.tableHost :global(tbody tr.content-table-row:hover td:first-child) {
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}

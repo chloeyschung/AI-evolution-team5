@@ -28,10 +28,10 @@ export default function ForgotPassword() {
   if (submitted) {
     return (
       <section className={styles.page}>
-        <div className={styles.card}>
-          <h1>Email sent</h1>
-          <p>If that email is registered, a reset link has been sent. Check your inbox.</p>
-          <Link to="/login" className={styles.primaryBtn} style={{ textAlign: 'center', display: 'block', textDecoration: 'none', lineHeight: '44px' }}>
+        <div className={styles.card} data-testid="auth-signal-lane">
+          <h1>Reset link sent</h1>
+          <p>If that email is registered, you'll get a reset link shortly.</p>
+          <Link to="/login" className={`${styles.primaryBtn} ${styles.primaryLink}`}>
             Back to sign in
           </Link>
         </div>
@@ -41,10 +41,10 @@ export default function ForgotPassword() {
 
   return (
     <section className={styles.page} data-testid="forgot-password-page">
-      <div className={styles.card}>
-        <p className={styles.kicker}>Reset password</p>
-        <h1>Forgot your password?</h1>
-        <p className={styles.description}>Enter your email and we'll send a reset link if your account exists.</p>
+      <div className={styles.card} data-testid="auth-signal-lane">
+        <p className={styles.kicker}>Reset access</p>
+        <h1>Reset and return.</h1>
+        <p className={styles.description}>Use the email on your account and we'll send a reset link.</p>
 
         {error ? <p className={styles.error}>{error}</p> : null}
 
@@ -62,7 +62,7 @@ export default function ForgotPassword() {
           </button>
         </form>
 
-        <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', textAlign: 'center' }}>
+        <p className={styles.metaLinks}>
           <Link to="/login">Back to sign in</Link>
         </p>
       </div>

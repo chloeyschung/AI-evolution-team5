@@ -1,0 +1,123 @@
+.rail {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  border-right: 1px solid color-mix(in srgb, var(--border-default) 86%, var(--accent-primary) 14%);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bg-surface) 96%, var(--accent-primary) 4%),
+      color-mix(in srgb, var(--bg-surface) 98%, var(--bg-canvas) 2%)
+    );
+  padding: var(--space-5) var(--space-4);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: var(--space-8);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(140deg, var(--accent-primary), color-mix(in srgb, var(--accent-secondary) 72%, white));
+  color: var(--text-inverse);
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+}
+
+.brandText {
+  display: grid;
+  gap: 2px;
+}
+
+.brandText strong {
+  font-family: var(--font-display);
+  font-size: 1.06rem;
+  letter-spacing: -0.01em;
+}
+
+.brandText span {
+  font-size: var(--fs-small);
+  color: color-mix(in srgb, var(--text-muted) 85%, var(--gold));
+}
+
+.nav {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+}
+
+.link {
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: 0 var(--space-3);
+}
+
+.link:hover {
+  border-color: color-mix(in srgb, var(--border-default) 82%, var(--gold-line));
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.short {
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+}
+
+.active {
+  border-color: color-mix(in srgb, var(--accent-primary) 40%, var(--border-default));
+  background:
+    linear-gradient(
+      120deg,
+      color-mix(in srgb, var(--accent-primary) 10%, var(--bg-surface)),
+      color-mix(in srgb, var(--gold) 7%, var(--bg-surface))
+    );
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+@media (max-width: 980px) {
+  .rail {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--border-default) 86%, var(--accent-primary) 14%);
+    padding: var(--space-4);
+    gap: var(--space-4);
+  }
+
+  .brandText span {
+    display: none;
+  }
+
+  .nav {
+    display: flex;
+    overflow: auto;
+    padding-bottom: var(--space-1);
+  }
+
+  .link {
+    white-space: nowrap;
+  }
+}

@@ -5,15 +5,33 @@ import styles from './Settings.module.css';
 
 export default function Settings() {
   const [settings, setSettings] = useState<AppSettings>({ ...DEFAULT_SETTINGS });
+  const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(DEFAULT_SETTINGS));
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const isDirty = JSON.stringify(settings) !== savedSnapshot;
 
   useEffect(() => {
     const saved = localStorage.getItem('briefly_settings');
     if (saved) {
-      setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(saved) });
+      const parsed = { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
+      setSettings(parsed);
+      setSavedSnapshot(JSON.stringify(parsed));
     }
   }, []);
+
+  useEffect(() => {
+    if (!isDirty) {
+      return undefined;
+    }
+
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [isDirty]);
 
   const saveSettings = async () => {
     setIsSaving(true);
@@ -21,6 +39,7 @@ export default function Settings() {
     try {
       localStorage.setItem('briefly_settings', JSON.stringify(settings));
       document.documentElement.setAttribute('data-theme', settings.theme);
+      setSavedSnapshot(JSON.stringify(settings));
       setSaveMessage('Saved. Your workspace is updated.');
       setTimeout(() => setSaveMessage(null), 2500);
     } finally {
@@ -83,7 +102,7 @@ export default function Settings() {
           onChange={(e) => setSettings({ ...settings, apiBaseUrl: e.target.value.trim() })}
         />
 
-        <button onClick={saveSettings} disabled={isSaving}>
+        <button onClick={saveSettings} disabled={isSaving || !isDirty}>
           {isSaving ? 'Saving…' : 'Save settings'}
         </button>
       </div>

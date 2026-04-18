@@ -1,10 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useContentStore } from '../stores/useContentStore';
-import ContentCard from '../components/content/ContentCard';
+import ContentDrawer from '../components/content/ContentDrawer';
+import ContentTable from '../components/content/ContentTable';
 import styles from './Archive.module.css';
 
 export default function Archive() {
   const contentStore = useContentStore();
+  const [selectedContentId, setSelectedContentId] = useState<number | null>(null);
 
   useEffect(() => {
     contentStore.updateFilters({ status: 'archived' });
@@ -18,21 +20,23 @@ export default function Archive() {
   return (
     <section className={styles.page} data-testid="archive-page">
       <header className={styles.hero}>
-        <p className={styles.kicker}>Saved Wisdom</p>
-        <h1>Your kept insights live here.</h1>
+        <h1>Archive</h1>
+        <p className={styles.subtitle}>Completed and deferred items</p>
       </header>
 
       {contentStore.isLoading ? <p className={styles.message}>Loading your library…</p> : null}
 
-      {!contentStore.items.length && !contentStore.isLoading ? (
-        <p className={styles.message}>No kept cards yet. Hit Keep on any inbox card to build this library.</p>
-      ) : null}
+      <ContentTable
+        items={contentStore.items}
+        onOpen={setSelectedContentId}
+        onDelete={handleDelete}
+        emptyMessage="No completed or deferred items in archive."
+      />
 
-      <div className={styles.grid}>
-        {contentStore.items.map((item) => (
-          <ContentCard key={item.id} content={item} onDelete={handleDelete} />
-        ))}
-      </div>
+      <ContentDrawer
+        contentId={selectedContentId}
+        onClose={() => setSelectedContentId(null)}
+      />
     </section>
   );
 }

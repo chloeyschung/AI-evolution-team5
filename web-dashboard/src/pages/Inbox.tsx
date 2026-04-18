@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useContentStore } from '../stores/useContentStore';
-import ContentCard from '../components/content/ContentCard';
+import ContentDrawer from '../components/content/ContentDrawer';
+import ContentTable from '../components/content/ContentTable';
 import styles from './Inbox.module.css';
 
 export default function Inbox() {
   const contentStore = useContentStore();
   const [selectedPlatform, setSelectedPlatform] = useState('');
+  const [selectedContentId, setSelectedContentId] = useState<number | null>(null);
 
   useEffect(() => {
     contentStore.updateFilters({ status: 'inbox' });
@@ -29,8 +31,8 @@ export default function Inbox() {
   return (
     <section className={styles.page} data-testid="inbox-page">
       <header className={styles.hero}>
-        <p className={styles.kicker}>Swipe Queue</p>
-        <h1>One card at a time, no backlog guilt.</h1>
+        <h1>Inbox</h1>
+        <p className={styles.subtitle}>Items requiring action</p>
       </header>
 
       <div className={styles.filterRow}>
@@ -52,20 +54,18 @@ export default function Inbox() {
 
       {contentStore.isLoading ? <p className={styles.message}>Refreshing queue…</p> : null}
 
-      {!contentStore.items.length && !contentStore.isLoading ? (
-        <p className={styles.message}>Inbox clear. You&apos;re fully caught up.</p>
-      ) : null}
+      <ContentTable
+        items={contentStore.items}
+        onOpen={setSelectedContentId}
+        onDelete={handleDelete}
+        onSwipe={handleSwipe}
+        emptyMessage="No inbox items requiring action."
+      />
 
-      <div className={styles.grid}>
-        {contentStore.items.map((item) => (
-          <ContentCard
-            key={item.id}
-            content={item}
-            onDelete={handleDelete}
-            onSwipe={handleSwipe}
-          />
-        ))}
-      </div>
+      <ContentDrawer
+        contentId={selectedContentId}
+        onClose={() => setSelectedContentId(null)}
+      />
     </section>
   );
 }
