@@ -149,6 +149,7 @@ class TestContentEndpoints:
         # has_more=True → next_offset must be non-null integer
         assert data["has_more"] is True
         assert data["next_offset"] == 2
+        assert "next_cursor" in data
 
     async def test_list_content_next_offset_none_when_no_more(self, authenticated_client):
         """Test next_offset is None when has_more=False (no more pages)."""
@@ -169,6 +170,42 @@ class TestContentEndpoints:
         assert "next_offset" in data
         assert data["has_more"] is False
         assert data["next_offset"] is None
+        assert "next_cursor" in data
+
+    async def test_list_content_cursor_mode_returns_next_cursor(self, authenticated_client):
+        """Cursor mode should support forward pagination and return next_cursor."""
+        for i in range(3):
+            await authenticated_client.post(
+                "/api/v1/content",
+                json={
+                    "platform": "Web",
+                    "content_type": "article",
+                    "url": f"https://example.com/list-cursor-test-{i}",
+                },
+            )
+
+        page1 = await authenticated_client.get("/api/v1/content?limit=2")
+        assert page1.status_code == 200
+        page1_data = page1.json()
+        assert page1_data["next_cursor"] is not None
+
+        page2 = await authenticated_client.get(
+            f"/api/v1/content?limit=2&cursor={page1_data['next_cursor']}"
+        )
+        assert page2.status_code == 200
+        page2_data = page2.json()
+        assert page2_data["next_offset"] is None
+
+        page1_ids = {item["id"] for item in page1_data["items"]}
+        page2_ids = {item["id"] for item in page2_data["items"]}
+        assert page1_ids.isdisjoint(page2_ids)
+
+    async def test_list_content_malformed_cursor_returns_400(self, authenticated_client):
+        """Malformed cursor should return structured HTTP 400 for /content."""
+        response = await authenticated_client.get("/api/v1/content?cursor=not-a-cursor")
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"] == "invalid_cursor"
 
     async def test_list_content_total_matches_actual_count(self, authenticated_client):
         """Test total matches the actual number of items across pages."""

@@ -1,11 +1,16 @@
 """Swipe domain router — /swipe/* and /content/pending, /content/kept, /content/discarded."""
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...data.database import get_db
 from ...data.repository import ContentRepository
 from ...services import SwipeService
+from ...utils.cursor_pagination import (
+    CursorTokenError,
+    make_timestamp_cursor,
+    parse_timestamp_cursor,
+)
 from ..dependencies import get_current_user
 from ..schemas import (
     ContentResponse,
@@ -17,6 +22,20 @@ from ..schemas import (
 )
 
 router = APIRouter()
+
+
+def _invalid_cursor_http_exception() -> HTTPException:
+    return HTTPException(
+        status_code=400,
+        detail={"error": "invalid_cursor", "message": "Malformed cursor token."},
+    )
+
+
+def _cursor_filter_context(platform: str | None, tags: list[str] | None) -> dict[str, str | list[str]]:
+    return {
+        "platform": platform or "",
+        "tags": sorted(tags or []),
+    }
 
 
 @router.post("/swipe", status_code=201, response_model=SwipeResponse | SwipeBatchResponse)
@@ -49,6 +68,7 @@ async def list_pending_content(
     user_id: int = Depends(get_current_user),
     limit: int = Query(20, gt=0, le=100),
     offset: int = Query(0, ge=0),
+    cursor: str | None = Query(None),
     platform: str | None = Query(None),  # UX-004: Filter by platform
     tags: list[str] | None = Query(None),  # F-014: Filter by AI-generated tags
     db: AsyncSession = Depends(get_db),
@@ -59,15 +79,49 @@ async def list_pending_content(
     Optionally filter by platform and AI-generated tags.
     """
     repo = ContentRepository(db)
-    contents = await repo.get_pending(user_id, limit=limit, offset=offset, platform=platform, tags=tags)
+    is_cursor_mode = cursor is not None
+    cursor_context = _cursor_filter_context(platform, tags)
+    if is_cursor_mode:
+        try:
+            cursor_created_at, cursor_id = parse_timestamp_cursor(
+                cursor,
+                expected_scope="content:pending",
+                expected_context=cursor_context,
+            )
+        except CursorTokenError as exc:
+            raise _invalid_cursor_http_exception() from exc
+        contents = await repo.get_pending(
+            user_id,
+            limit=limit,
+            platform=platform,
+            tags=tags,
+            cursor_created_at=cursor_created_at,
+            cursor_id=cursor_id,
+        )
+    else:
+        contents = await repo.get_pending(user_id, limit=limit, offset=offset, platform=platform, tags=tags)
+
     total = await repo.count_pending(user_id)
-    has_more = (offset + limit) < total
+    has_more = len(contents) == limit if is_cursor_mode else (offset + limit) < total
+    next_cursor = None
+    next_offset = offset + limit if has_more else None
+    if has_more and contents:
+        last_item = contents[-1]
+        next_cursor = make_timestamp_cursor(
+            scope="content:pending",
+            sort_ts=last_item.created_at,
+            tie_breaker_id=last_item.id,
+            context=cursor_context,
+        )
+    if is_cursor_mode:
+        next_offset = None
 
     return PaginatedContentResponse(
         items=[ContentResponse.from_content(c) for c in contents],
         has_more=has_more,
         total=total,
-        next_offset=offset + limit if has_more else None,
+        next_offset=next_offset,
+        next_cursor=next_cursor,
     )
 
 
@@ -76,6 +130,7 @@ async def list_kept_content(
     user_id: int = Depends(get_current_user),
     limit: int = Query(20, gt=0, le=100),
     offset: int = Query(0, ge=0),
+    cursor: str | None = Query(None),
     platform: str | None = Query(None),  # UX-004: Filter by platform
     tags: list[str] | None = Query(None),  # F-014: Filter by AI-generated tags
     db: AsyncSession = Depends(get_db),
@@ -86,15 +141,51 @@ async def list_kept_content(
     Optionally filter by platform and AI-generated tags.
     """
     repo = ContentRepository(db)
-    contents = await repo.get_kept(user_id, limit=limit, offset=offset, platform=platform, tags=tags)
+    is_cursor_mode = cursor is not None
+    cursor_context = _cursor_filter_context(platform, tags)
+    if is_cursor_mode:
+        try:
+            cursor_swiped_at, cursor_content_id = parse_timestamp_cursor(
+                cursor,
+                expected_scope="content:kept",
+                expected_context=cursor_context,
+            )
+        except CursorTokenError as exc:
+            raise _invalid_cursor_http_exception() from exc
+        contents = await repo.get_kept(
+            user_id,
+            limit=limit,
+            platform=platform,
+            tags=tags,
+            cursor_swiped_at=cursor_swiped_at,
+            cursor_content_id=cursor_content_id,
+        )
+    else:
+        contents = await repo.get_kept(user_id, limit=limit, offset=offset, platform=platform, tags=tags)
+
     total = await repo.count_kept(user_id)
-    has_more = (offset + limit) < total
+    has_more = len(contents) == limit if is_cursor_mode else (offset + limit) < total
+    next_cursor = None
+    next_offset = offset + limit if has_more else None
+    if has_more and contents:
+        last_item = contents[-1]
+        latest_swipe_ts = getattr(last_item, "_cursor_swiped_at", None)
+        if latest_swipe_ts is not None:
+            next_cursor = make_timestamp_cursor(
+                scope="content:kept",
+                sort_ts=latest_swipe_ts,
+                tie_breaker_id=last_item.id,
+                context=cursor_context,
+            )
+    if is_cursor_mode:
+        next_offset = None
 
     return PaginatedContentResponse(
         items=[ContentResponse.from_content(c) for c in contents],
         has_more=has_more,
         total=total,
-        next_offset=offset + limit if has_more else None,
+        next_offset=next_offset,
+        next_cursor=next_cursor,
     )
 
 
@@ -103,6 +194,7 @@ async def list_discarded_content(
     user_id: int = Depends(get_current_user),
     limit: int = Query(20, gt=0, le=100),
     offset: int = Query(0, ge=0),
+    cursor: str | None = Query(None),
     platform: str | None = Query(None),  # UX-004: Filter by platform
     tags: list[str] | None = Query(None),  # F-014: Filter by AI-generated tags
     db: AsyncSession = Depends(get_db),
@@ -113,13 +205,49 @@ async def list_discarded_content(
     Optionally filter by platform and AI-generated tags.
     """
     repo = ContentRepository(db)
-    contents = await repo.get_discarded(user_id, limit=limit, offset=offset, platform=platform, tags=tags)
+    is_cursor_mode = cursor is not None
+    cursor_context = _cursor_filter_context(platform, tags)
+    if is_cursor_mode:
+        try:
+            cursor_swiped_at, cursor_content_id = parse_timestamp_cursor(
+                cursor,
+                expected_scope="content:discarded",
+                expected_context=cursor_context,
+            )
+        except CursorTokenError as exc:
+            raise _invalid_cursor_http_exception() from exc
+        contents = await repo.get_discarded(
+            user_id,
+            limit=limit,
+            platform=platform,
+            tags=tags,
+            cursor_swiped_at=cursor_swiped_at,
+            cursor_content_id=cursor_content_id,
+        )
+    else:
+        contents = await repo.get_discarded(user_id, limit=limit, offset=offset, platform=platform, tags=tags)
+
     total = await repo.count_discarded(user_id)
-    has_more = (offset + limit) < total
+    has_more = len(contents) == limit if is_cursor_mode else (offset + limit) < total
+    next_cursor = None
+    next_offset = offset + limit if has_more else None
+    if has_more and contents:
+        last_item = contents[-1]
+        latest_swipe_ts = getattr(last_item, "_cursor_swiped_at", None)
+        if latest_swipe_ts is not None:
+            next_cursor = make_timestamp_cursor(
+                scope="content:discarded",
+                sort_ts=latest_swipe_ts,
+                tie_breaker_id=last_item.id,
+                context=cursor_context,
+            )
+    if is_cursor_mode:
+        next_offset = None
 
     return PaginatedContentResponse(
         items=[ContentResponse.from_content(c) for c in contents],
         has_more=has_more,
         total=total,
-        next_offset=offset + limit if has_more else None,
+        next_offset=next_offset,
+        next_cursor=next_cursor,
     )

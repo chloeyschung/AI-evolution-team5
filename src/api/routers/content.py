@@ -18,6 +18,11 @@ from ...data.repository import (
 from ...ingestion.share_handler import ShareHandler
 from ...middleware.rate_limiter import limiter
 from ...services import ContentService
+from ...utils.cursor_pagination import (
+    CursorTokenError,
+    make_timestamp_cursor,
+    parse_timestamp_cursor,
+)
 from ..dependencies import get_current_user
 from ..schemas import (
     ContentCreate,
@@ -38,6 +43,13 @@ from ..schemas import (
 )
 
 router = APIRouter()
+
+
+def _invalid_cursor_http_exception() -> HTTPException:
+    return HTTPException(
+        status_code=400,
+        detail={"error": "invalid_cursor", "message": "Malformed cursor token."},
+    )
 
 
 @router.post("/content", status_code=201, response_model=ContentResponse)
@@ -67,6 +79,7 @@ async def create_content(
 async def list_content(
     limit: int = Query(50, gt=0, le=100),
     offset: int = Query(0, ge=0),
+    cursor: str | None = Query(None),
     user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> PaginatedContentResponse:
@@ -77,15 +90,45 @@ async def list_content(
     next_offset is offset + len(items) when has_more is True, else None.
     """
     repo = ContentRepository(db)
-    contents = await repo.get_all_ordered(user_id=user_id, limit=limit, offset=offset)
+    is_cursor_mode = cursor is not None
+    if is_cursor_mode:
+        try:
+            cursor_created_at, cursor_id = parse_timestamp_cursor(
+                cursor,
+                expected_scope="content:list",
+            )
+        except CursorTokenError as exc:
+            raise _invalid_cursor_http_exception() from exc
+
+        contents = await repo.get_all_ordered(
+            user_id=user_id,
+            limit=limit,
+            cursor_created_at=cursor_created_at,
+            cursor_id=cursor_id,
+        )
+    else:
+        contents = await repo.get_all_ordered(user_id=user_id, limit=limit, offset=offset)
+
     total = await repo.count_all(user_id=user_id)
-    has_more = len(contents) == limit
+    has_more = len(contents) == limit if is_cursor_mode else len(contents) == limit
+    next_cursor = None
+    next_offset = offset + len(contents) if has_more else None
+    if has_more and contents:
+        last_item = contents[-1]
+        next_cursor = make_timestamp_cursor(
+            scope="content:list",
+            sort_ts=last_item.created_at,
+            tie_breaker_id=last_item.id,
+        )
+    if is_cursor_mode:
+        next_offset = None
 
     return PaginatedContentResponse(
         items=[ContentResponse.from_content(c) for c in contents],
         has_more=has_more,
         total=total,
-        next_offset=offset + len(contents) if has_more else None,
+        next_offset=next_offset,
+        next_cursor=next_cursor,
     )
 
 
@@ -393,6 +436,7 @@ async def search_content(
     q: str = Query(..., min_length=1, description="Search query"),
     limit: int = Query(20, gt=0, le=100),
     offset: int = Query(0, ge=0),
+    cursor: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
 ) -> PaginatedContentResponse:
     """Search content by title, author, or tags.
@@ -410,15 +454,49 @@ async def search_content(
         Paginated response with matching content, sorted by recency.
     """
     repo = ContentRepository(db)
-    results = await repo.search_content(user_id, q, limit=limit, offset=offset)
+    is_cursor_mode = cursor is not None
+    cursor_context = {"q": q}
+    if is_cursor_mode:
+        try:
+            cursor_created_at, cursor_id = parse_timestamp_cursor(
+                cursor,
+                expected_scope="content:search",
+                expected_context=cursor_context,
+            )
+        except CursorTokenError as exc:
+            raise _invalid_cursor_http_exception() from exc
+
+        results = await repo.search_content(
+            user_id,
+            q,
+            limit=limit,
+            cursor_created_at=cursor_created_at,
+            cursor_id=cursor_id,
+        )
+    else:
+        results = await repo.search_content(user_id, q, limit=limit, offset=offset)
+
     total = await repo.count_search(user_id, q)
-    has_more = (offset + limit) < total
+    has_more = len(results) == limit if is_cursor_mode else (offset + limit) < total
+    next_cursor = None
+    next_offset = offset + limit if has_more else None
+    if has_more and results:
+        last_item = results[-1]
+        next_cursor = make_timestamp_cursor(
+            scope="content:search",
+            sort_ts=last_item.created_at,
+            tie_breaker_id=last_item.id,
+            context=cursor_context,
+        )
+    if is_cursor_mode:
+        next_offset = None
 
     return PaginatedContentResponse(
         items=[ContentResponse.from_content(c) for c in results],
         has_more=has_more,
         total=total,
-        next_offset=offset + limit if has_more else None,
+        next_offset=next_offset,
+        next_cursor=next_cursor,
     )
 
 

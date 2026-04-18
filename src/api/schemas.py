@@ -140,6 +140,7 @@ class PaginatedContentResponse(BaseModel):
     has_more: bool
     total: int
     next_offset: int | None
+    next_cursor: str | None = None
 
 
 class StatsResponse(BaseModel):

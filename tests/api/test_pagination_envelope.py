@@ -2,13 +2,13 @@
 
 TDD: these tests are written BEFORE the implementation.
 They assert that these endpoints return PaginatedContentResponse shape:
-  { items: list, has_more: bool, total: int, next_offset: int | None }
+  { items: list, has_more: bool, total: int, next_offset: int | None, next_cursor: str | None }
 """
 
 import pytest
 
 
-PAGINATION_KEYS = {"items", "has_more", "total", "next_offset"}
+PAGINATION_KEYS = {"items", "has_more", "total", "next_offset", "next_cursor"}
 
 
 class TestPendingPaginatedEnvelope:
@@ -84,6 +84,34 @@ class TestPendingPaginatedEnvelope:
         if data["has_more"]:
             assert data["next_offset"] is not None
             assert data["next_offset"] == 2
+
+    async def test_pending_cursor_mode_returns_next_cursor(self, authenticated_client):
+        """Cursor mode should include next_cursor and suppress next_offset."""
+        for i in range(3):
+            await authenticated_client.post(
+                "/api/v1/content",
+                json={
+                    "platform": "Web",
+                    "content_type": "article",
+                    "url": f"https://example.com/pending-cursor-{i}",
+                    "title": f"Pending Cursor Test {i}",
+                },
+            )
+
+        page1 = await authenticated_client.get("/api/v1/content/pending?limit=2")
+        assert page1.status_code == 200
+        page1_data = page1.json()
+
+        page2 = await authenticated_client.get(
+            f"/api/v1/content/pending?limit=2&cursor={page1_data['next_cursor']}"
+        )
+        assert page2.status_code == 200
+        page2_data = page2.json()
+        assert page2_data["next_offset"] is None
+
+        page1_ids = {item["id"] for item in page1_data["items"]}
+        page2_ids = {item["id"] for item in page2_data["items"]}
+        assert page1_ids.isdisjoint(page2_ids)
 
 
 class TestKeptPaginatedEnvelope:
@@ -256,3 +284,39 @@ class TestSearchPaginatedEnvelope:
         if data["has_more"]:
             assert data["next_offset"] is not None
             assert data["next_offset"] == 2
+
+    async def test_search_cursor_mode_returns_next_cursor(self, authenticated_client):
+        """Cursor mode should paginate forward with next_cursor."""
+        for i in range(3):
+            await authenticated_client.post(
+                "/api/v1/content",
+                json={
+                    "platform": "Web",
+                    "content_type": "article",
+                    "url": f"https://example.com/search-cursor-{i}",
+                    "title": f"SearchCursorOnlyTest article {i}",
+                },
+            )
+
+        page1 = await authenticated_client.get("/api/v1/search?q=SearchCursorOnlyTest&limit=2")
+        assert page1.status_code == 200
+        page1_data = page1.json()
+        assert page1_data["next_cursor"] is not None
+
+        page2 = await authenticated_client.get(
+            f"/api/v1/search?q=SearchCursorOnlyTest&limit=2&cursor={page1_data['next_cursor']}"
+        )
+        assert page2.status_code == 200
+        page2_data = page2.json()
+        assert page2_data["next_offset"] is None
+
+        page1_ids = {item["id"] for item in page1_data["items"]}
+        page2_ids = {item["id"] for item in page2_data["items"]}
+        assert page1_ids.isdisjoint(page2_ids)
+
+    async def test_search_malformed_cursor_returns_400(self, authenticated_client):
+        """Malformed cursor should return structured HTTP 400."""
+        response = await authenticated_client.get("/api/v1/search?q=test&cursor=invalid@@@")
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"] == "invalid_cursor"

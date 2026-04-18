@@ -218,6 +218,8 @@ class ContentRepository(BaseRepository[Content]):
         offset: int = 0,
         platform: str | None = None,
         tags: list[str] | None = None,
+        cursor_created_at: datetime | None = None,
+        cursor_id: int | None = None,
     ) -> list[Content]:
         """Get content that hasn't been swiped yet.
 
@@ -237,9 +239,15 @@ class ContentRepository(BaseRepository[Content]):
             .where(Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
             .outerjoin(SwipeHistory, Content.id == SwipeHistory.content_id)
             .where(SwipeHistory.id.is_(None))
-            .order_by(Content.created_at.desc())
-            .offset(offset)
+            .order_by(Content.created_at.desc(), Content.id.desc())
         )
+        if cursor_created_at is not None and cursor_id is not None:
+            base_query = base_query.where(
+                (Content.created_at < cursor_created_at)
+                | ((Content.created_at == cursor_created_at) & (Content.id < cursor_id))
+            )
+        else:
+            base_query = base_query.offset(offset)
         # Only apply limit if not None (SQLAlchemy .limit(None) still limits!)
         if limit is not None:
             base_query = base_query.limit(limit)
@@ -256,6 +264,8 @@ class ContentRepository(BaseRepository[Content]):
         offset: int = 0,
         platform: str | None = None,
         tags: list[str] | None = None,
+        cursor_swiped_at: datetime | None = None,
+        cursor_content_id: int | None = None,
     ) -> list[Content]:
         """Get content that was swiped Keep.
 
@@ -271,13 +281,19 @@ class ContentRepository(BaseRepository[Content]):
         """
         # TODO #4 (2026-04-14): Build query without limit first, apply conditionally
         base_query = (
-            select(Content)
+            select(Content, SwipeHistory.swiped_at.label("cursor_swiped_at"))
             .where(Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
             .join(SwipeHistory, Content.id == SwipeHistory.content_id)
             .where(SwipeHistory.action == SwipeAction.KEEP)
-            .order_by(SwipeHistory.swiped_at.desc())
-            .offset(offset)
+            .order_by(SwipeHistory.swiped_at.desc(), Content.id.desc())
         )
+        if cursor_swiped_at is not None and cursor_content_id is not None:
+            base_query = base_query.where(
+                (SwipeHistory.swiped_at < cursor_swiped_at)
+                | ((SwipeHistory.swiped_at == cursor_swiped_at) & (Content.id < cursor_content_id))
+            )
+        else:
+            base_query = base_query.offset(offset)
         # Only apply limit if not None (SQLAlchemy .limit(None) still limits!)
         if limit is not None:
             base_query = base_query.limit(limit)
@@ -285,7 +301,16 @@ class ContentRepository(BaseRepository[Content]):
         query = self._build_content_query_with_filters(base_query, platform, tags)
 
         result = await self.session.execute(query)
-        return list(result.scalars().unique().all())
+        rows = result.all()
+        seen_ids: set[int] = set()
+        contents: list[Content] = []
+        for content, cursor_swiped_at in rows:
+            if content.id in seen_ids:
+                continue
+            setattr(content, "_cursor_swiped_at", cursor_swiped_at)
+            seen_ids.add(content.id)
+            contents.append(content)
+        return contents
 
     async def get_discarded(
         self,
@@ -294,6 +319,8 @@ class ContentRepository(BaseRepository[Content]):
         offset: int = 0,
         platform: str | None = None,
         tags: list[str] | None = None,
+        cursor_swiped_at: datetime | None = None,
+        cursor_content_id: int | None = None,
     ) -> list[Content]:
         """Get content that was swiped Discard.
 
@@ -309,13 +336,19 @@ class ContentRepository(BaseRepository[Content]):
         """
         # TODO #4 (2026-04-14): Build query without limit first, apply conditionally
         base_query = (
-            select(Content)
+            select(Content, SwipeHistory.swiped_at.label("cursor_swiped_at"))
             .where(Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
             .join(SwipeHistory, Content.id == SwipeHistory.content_id)
             .where(SwipeHistory.action == SwipeAction.DISCARD)
-            .order_by(SwipeHistory.swiped_at.desc())
-            .offset(offset)
+            .order_by(SwipeHistory.swiped_at.desc(), Content.id.desc())
         )
+        if cursor_swiped_at is not None and cursor_content_id is not None:
+            base_query = base_query.where(
+                (SwipeHistory.swiped_at < cursor_swiped_at)
+                | ((SwipeHistory.swiped_at == cursor_swiped_at) & (Content.id < cursor_content_id))
+            )
+        else:
+            base_query = base_query.offset(offset)
         # Only apply limit if not None (SQLAlchemy .limit(None) still limits!)
         if limit is not None:
             base_query = base_query.limit(limit)
@@ -323,7 +356,16 @@ class ContentRepository(BaseRepository[Content]):
         query = self._build_content_query_with_filters(base_query, platform, tags)
 
         result = await self.session.execute(query)
-        return list(result.scalars().unique().all())
+        rows = result.all()
+        seen_ids: set[int] = set()
+        contents: list[Content] = []
+        for content, cursor_swiped_at in rows:
+            if content.id in seen_ids:
+                continue
+            setattr(content, "_cursor_swiped_at", cursor_swiped_at)
+            seen_ids.add(content.id)
+            contents.append(content)
+        return contents
 
     async def get_platform_counts(self, user_id: int | None = None) -> list[tuple[str, int]]:
         """Get list of platforms with content counts.
@@ -348,6 +390,8 @@ class ContentRepository(BaseRepository[Content]):
         query: str,
         limit: int = 50,
         offset: int = 0,
+        cursor_created_at: datetime | None = None,
+        cursor_id: int | None = None,
     ) -> list[Content]:
         """Search content by title, author, or AI-generated tags (F-016).
 
@@ -377,10 +421,16 @@ class ContentRepository(BaseRepository[Content]):
                     | (ContentTag.tag.ilike(query_pattern))  # F-016: Tag search
                 )
             )
-            .order_by(Content.created_at.desc())
-            .offset(offset)
-            .limit(limit)
+            .order_by(Content.created_at.desc(), Content.id.desc())
         )
+        if cursor_created_at is not None and cursor_id is not None:
+            query_stmt = query_stmt.where(
+                (Content.created_at < cursor_created_at)
+                | ((Content.created_at == cursor_created_at) & (Content.id < cursor_id))
+            )
+        else:
+            query_stmt = query_stmt.offset(offset)
+        query_stmt = query_stmt.limit(limit)
 
         # Execute search
         result = await self.session.execute(query_stmt)
@@ -531,6 +581,8 @@ class ContentRepository(BaseRepository[Content]):
         user_id: int | None = None,
         limit: int = 50,
         offset: int = 0,
+        cursor_created_at: datetime | None = None,
+        cursor_id: int | None = None,
     ) -> list[Content]:
         """Get all content ordered by creation date (newest first).
 
@@ -542,7 +594,19 @@ class ContentRepository(BaseRepository[Content]):
         Returns:
             List of Content objects ordered by created_at descending.
         """
-        query = select(Content).where(Content.is_deleted == False).order_by(Content.created_at.desc()).offset(offset).limit(limit)  # noqa: E712
+        query = (
+            select(Content)
+            .where(Content.is_deleted == False)  # noqa: E712
+            .order_by(Content.created_at.desc(), Content.id.desc())
+        )
+        if cursor_created_at is not None and cursor_id is not None:
+            query = query.where(
+                (Content.created_at < cursor_created_at)
+                | ((Content.created_at == cursor_created_at) & (Content.id < cursor_id))
+            )
+        else:
+            query = query.offset(offset)
+        query = query.limit(limit)
         if user_id is not None:
             query = query.where(Content.user_id == user_id)
         result = await self.session.execute(query)
