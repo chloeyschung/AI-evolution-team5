@@ -49,7 +49,7 @@ export async function loginWithEmailPassword(email: string, password: string) {
 
 export async function verifyEmail(token: string) {
   const client = getApiClient();
-  const response = await client.get('/api/v1/auth/verify-email', { params: { token } });
+  const response = await client.post('/api/v1/auth/verify-email', { token });
   return response.data as { message: string };
 }
 
