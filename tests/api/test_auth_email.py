@@ -34,10 +34,9 @@ async def test_register_duplicate_email_returns_409(async_client, db):
         "email": "dup@example.com", "password": "pass2"
     })
     assert resp.status_code == 409
-    assert resp.json()["detail"] == {
-        "error": "email_exists",
-        "providers": ["email_password"],
-    }
+    body = resp.json()
+    assert body["error"] == "email_exists"
+    assert body["details"]["providers"] == ["email_password"]
 
 
 async def test_register_existing_email_with_google_provider_returns_409(async_client, db):
@@ -60,10 +59,9 @@ async def test_register_existing_email_with_google_provider_returns_409(async_cl
     })
 
     assert resp.status_code == 409
-    assert resp.json()["detail"] == {
-        "error": "email_exists",
-        "providers": ["google"],
-    }
+    body = resp.json()
+    assert body["error"] == "email_exists"
+    assert body["details"]["providers"] == ["google"]
 
 
 async def test_register_existing_google_email_mixed_case_returns_409(async_client, db):
@@ -86,10 +84,9 @@ async def test_register_existing_google_email_mixed_case_returns_409(async_clien
     })
 
     assert resp.status_code == 409
-    assert resp.json()["detail"] == {
-        "error": "email_exists",
-        "providers": ["google"],
-    }
+    body = resp.json()
+    assert body["error"] == "email_exists"
+    assert body["details"]["providers"] == ["google"]
 
 
 async def test_register_existing_unverified_rotates_token_and_returns_201(async_client, db):
@@ -106,21 +103,22 @@ async def test_register_existing_unverified_rotates_token_and_returns_201(async_
 
     assert resp.status_code == 201
 
-    verify_old = await async_client.get(f"/api/v1/auth/verify-email?token={old_raw}")
+    verify_old = await async_client.post("/api/v1/auth/verify-email", json={"token": old_raw})
     assert verify_old.status_code == 400
 
 
-async def test_verify_email_valid_token(async_client, db):
+async def test_verify_email_post_valid_token(async_client, db):
     async with AsyncTestingSessionLocal() as session:
         user, method = await make_unverified_user(session, email="verify@example.com")
         raw = await make_verification_token(session, user.id)
 
-    resp = await async_client.get(f"/api/v1/auth/verify-email?token={raw}")
+    resp = await async_client.post("/api/v1/auth/verify-email", json={"token": raw})
     assert resp.status_code == 200
+    assert "verified" in resp.json()["message"].lower()
 
 
-async def test_verify_email_invalid_token_returns_400(async_client, db):
-    resp = await async_client.get("/api/v1/auth/verify-email?token=badtoken")
+async def test_verify_email_post_invalid_token_returns_400(async_client, db):
+    resp = await async_client.post("/api/v1/auth/verify-email", json={"token": "badtoken"})
     assert resp.status_code == 400
 
 
@@ -210,12 +208,10 @@ async def test_login_unverified_email_returns_403_with_resend_hint(async_client,
     })
 
     assert resp.status_code == 403
-    detail = resp.json()["detail"]
-    assert detail == {
-        "error": "email_not_verified",
-        "can_resend": True,
-        "message": "Email not verified. Please verify your email or request a new verification email.",
-    }
+    body = resp.json()
+    assert body["error"] == "email_not_verified"
+    assert body["message"] == "Email not verified. Please verify your email or request a new verification email."
+    assert body["details"]["can_resend"] is True
 
 
 # ── Password reset tests ──────────────────────────────────────────────────────
@@ -265,7 +261,7 @@ async def test_register_existing_unverified_updates_password_before_verification
     assert resp.status_code == 201
     assert len(sent_tokens) == 1
 
-    verify_resp = await async_client.get(f"/api/v1/auth/verify-email?token={sent_tokens[0]}")
+    verify_resp = await async_client.post("/api/v1/auth/verify-email", json={"token": sent_tokens[0]})
     assert verify_resp.status_code == 200
 
     old_login = await async_client.post("/api/v1/auth/login", json={
@@ -279,6 +275,49 @@ async def test_register_existing_unverified_updates_password_before_verification
         "password": "NewPass2!"
     })
     assert new_login.status_code == 200
+
+
+async def test_register_new_user_sends_verification_email_to_correct_address(async_client, db):
+    """Verify that register sends a verification email with a usable token to the submitted address."""
+    sent: list[tuple[str, str]] = []  # [(to_address, raw_token)]
+
+    def capture(email: str, token: str) -> None:
+        sent.append((email, token))
+
+    with patch("src.api.routers.auth.EmailService") as MockEmail:
+        MockEmail.return_value.send_verification_email = capture
+        resp = await async_client.post("/api/v1/auth/register", json={
+            "email": "brand-new@example.com",
+            "password": "SecurePass1!"
+        })
+
+    assert resp.status_code == 201
+    assert len(sent) == 1, f"Expected 1 email sent, got {len(sent)}"
+    to_addr, raw_token = sent[0]
+    assert to_addr == "brand-new@example.com"
+
+    # Token must be usable — proves the DB token matches what was emailed
+    verify_resp = await async_client.post("/api/v1/auth/verify-email", json={"token": raw_token})
+    assert verify_resp.status_code == 200
+
+
+async def test_register_smtp_failure_is_logged_not_silently_dropped(async_client, db):
+    """If SMTP raises, the error must be logged (not silently swallowed) while still returning 201."""
+    import logging
+
+    with patch("src.api.routers.auth.EmailService") as MockEmail:
+        MockEmail.return_value.send_verification_email.side_effect = OSError("Connection refused")
+
+        with patch("src.api.routers.auth.logger") as mock_logger:
+            resp = await async_client.post("/api/v1/auth/register", json={
+                "email": "smtp-fail@example.com",
+                "password": "SecurePass1!"
+            })
+
+    assert resp.status_code == 201  # Route must still succeed
+    mock_logger.error.assert_called_once()
+    call_args = mock_logger.error.call_args
+    assert "smtp-fail@example.com" in str(call_args)
 
 
 async def test_password_reset_confirm_valid(async_client, db):

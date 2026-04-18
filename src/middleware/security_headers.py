@@ -6,7 +6,12 @@ Implements SEC-001 security requirements:
 - X-XSS-Protection: 1; mode=block (enable XSS filter)
 """
 
+import logging
+
 from fastapi import Request, Response
+from fastapi.responses import JSONResponse
+
+logger = logging.getLogger(__name__)
 
 
 async def security_headers_middleware(request: Request, call_next):
@@ -16,6 +21,11 @@ async def security_headers_middleware(request: Request, call_next):
     It wraps every response and adds protective headers to prevent common
     web vulnerabilities.
 
+    Starlette's BaseHTTPMiddleware re-raises exceptions that leak from
+    call_next, bypassing FastAPI's exception handlers.  We catch unhandled
+    exceptions here so they always return a structured JSON 500 rather than
+    letting the exception propagate to the ASGI server.
+
     Args:
         request: The incoming HTTP request
         call_next: The next handler in the middleware chain
@@ -23,7 +33,14 @@ async def security_headers_middleware(request: Request, call_next):
     Returns:
         The response with security headers added
     """
-    response = await call_next(request)
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        logger.error("Unhandled exception in request %s %s: %s", request.method, request.url.path, exc, exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "internal_server_error", "message": "An unexpected error occurred.", "code": 500},
+        )
 
     # Prevent MIME type sniffing (browsers won't guess content type)
     response.headers["X-Content-Type-Options"] = "nosniff"

@@ -118,10 +118,10 @@ class TestKeptContentEndpoints:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 5
+        assert len(data["items"]) == 5
 
         # Verify only kept content is returned
-        returned_ids = [c["id"] for c in data]
+        returned_ids = [c["id"] for c in data["items"]]
         for content_id in kept_ids:
             assert content_id in returned_ids
         for content_id in discarded_ids:
@@ -144,7 +144,7 @@ class TestKeptContentEndpoints:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 0
+        assert len(data["items"]) == 0
 
     async def test_get_kept_pagination(self, authenticated_client):
         """Test pagination for kept content."""
@@ -167,12 +167,12 @@ class TestKeptContentEndpoints:
         # Get with limit=5
         response = await authenticated_client.get("/api/v1/content/kept?limit=5")
         data = response.json()
-        assert len(data) == 5
+        assert len(data["items"]) == 5
 
         # Get with offset=5
         response = await authenticated_client.get("/api/v1/content/kept?limit=5&offset=5")
         data = response.json()
-        assert len(data) == 5
+        assert len(data["items"]) == 5
 
 
 class TestDiscardedContentEndpoints:
@@ -223,10 +223,10 @@ class TestDiscardedContentEndpoints:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 5
+        assert len(data["items"]) == 5
 
         # Verify only discarded content is returned
-        returned_ids = [c["id"] for c in data]
+        returned_ids = [c["id"] for c in data["items"]]
         for content_id in discarded_ids:
             assert content_id in returned_ids
         for content_id in kept_ids:
@@ -249,7 +249,7 @@ class TestDiscardedContentEndpoints:
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 0
+        assert len(data["items"]) == 0
 
 
 class TestStatsEndpoint:
@@ -330,12 +330,12 @@ class TestSwipeMutualExclusivity:
 
         # Get kept and verify content is there
         kept_response = await authenticated_client.get("/api/v1/content/kept")
-        kept_ids = [c["id"] for c in kept_response.json()]
+        kept_ids = [c["id"] for c in kept_response.json()["items"]]
         assert content_id in kept_ids
 
         # Get discarded and verify content is NOT there
         discarded_response = await authenticated_client.get("/api/v1/content/discarded")
-        discarded_ids = [c["id"] for c in discarded_response.json()]
+        discarded_ids = [c["id"] for c in discarded_response.json()["items"]]
         assert content_id not in discarded_ids
 
     async def test_pending_excludes_kept_and_discarded(self, authenticated_client):
@@ -367,5 +367,5 @@ class TestSwipeMutualExclusivity:
         response = await authenticated_client.get("/api/v1/content/pending")
         data = response.json()
 
-        assert len(data) == 1
-        assert data[0]["id"] == content_ids[2]
+        assert len(data["items"]) == 1
+        assert data["items"][0]["id"] == content_ids[2]

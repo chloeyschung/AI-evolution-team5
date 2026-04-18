@@ -124,6 +124,7 @@ class AuthenticationRepository(BaseRepository[AuthenticationToken]):
             select(AuthenticationToken)
             .where(AuthenticationToken.refresh_token == refresh_token)
             .where(AuthenticationToken.revoked_at.is_(None))
+            .with_for_update()  # prevents concurrent rotation race condition
         )
         return result.scalar_one_or_none()
 

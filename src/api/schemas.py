@@ -1,8 +1,9 @@
 """Pydantic schemas for API request/response validation."""
 
+from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 from src.constants import (
     ContentStatus,
@@ -12,6 +13,7 @@ from src.constants import (
     Theme,
 )
 from src.data.models import utc_now
+from src.utils.datetime_utils import serialize_datetime
 
 
 class ContentCreate(BaseModel):
@@ -129,6 +131,15 @@ class SwipeBatchResponse(BaseModel):
 
     recorded: int
     results: list[SwipeResponse]
+
+
+class PaginatedContentResponse(BaseModel):
+    """Paginated content list response (DAT-001 FR-6)."""
+
+    items: list[ContentResponse]
+    has_more: bool
+    total: int
+    next_offset: int | None
 
 
 class StatsResponse(BaseModel):
@@ -269,6 +280,22 @@ class DeleteContentResponse(BaseModel):
     message: str
 
 
+# DAT-003: Soft delete response schemas
+
+
+class DeletedContentResponse(BaseModel):
+    """Schema for soft-deleted content response (DAT-003)."""
+
+    id: int
+    is_deleted: bool
+    deleted_at: datetime
+    recoverable_until: datetime
+
+    @field_serializer("deleted_at", "recoverable_until")
+    def serialize_dt_fields(self, dt: datetime | None) -> str | None:
+        return serialize_datetime(dt)
+
+
 class PlatformCount(BaseModel):
     """Schema for platform with content count."""
 
@@ -311,6 +338,19 @@ class TokenRefreshResponse(BaseModel):
     access_token: str
     refresh_token: str
     expires_at: str
+
+
+class APIError(BaseModel):
+    """Unified error response schema for iOS Codable compatibility.
+
+    All HTTPException responses use this shape so that iOS clients
+    can always decode errors with a single Codable struct.
+    """
+
+    error: str
+    message: str
+    code: int
+    details: dict | None = None
 
 
 class AuthError(BaseModel):
@@ -394,6 +434,10 @@ class RegisterRequest(BaseModel):
 
 class RegisterResponse(BaseModel):
     message: str
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str
 
 
 class VerifyEmailResponse(BaseModel):

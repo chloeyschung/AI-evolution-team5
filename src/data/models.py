@@ -1,11 +1,13 @@
 """SQLAlchemy ORM models for Briefly storage engine."""
 
 from datetime import datetime
+from enum import Enum
+from typing import Optional
 
 import sqlalchemy
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Index, Integer, JSON, String, Text
 from sqlalchemy import Enum as SQLEnum
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, declarative_base, mapped_column, relationship
 
 from src.constants import (
     AuthProvider,
@@ -17,6 +19,38 @@ from src.constants import (
 from src.utils.datetime_utils import utc_now
 
 Base = declarative_base()
+
+
+# SEC-003: Audit event type enum
+
+class AuditEventType(str, Enum):
+    LOGIN_SUCCESS            = "login_success"
+    LOGIN_FAILURE            = "login_failure"
+    LOGOUT                   = "logout"
+    REFRESH_TOKEN            = "refresh_token"
+    ACCOUNT_DELETE_INITIATED = "account_delete_initiated"
+    ACCOUNT_DELETE_CONFIRMED = "account_delete_confirmed"
+    OAUTH_CONNECT            = "oauth_connect"
+    OAUTH_DISCONNECT         = "oauth_disconnect"
+    PASSWORD_RESET_REQUESTED = "password_reset_requested"
+    PASSWORD_RESET_COMPLETED = "password_reset_completed"
+
+
+class AuditLog(Base):
+    """Append-only security event log (SEC-003)."""
+
+    __tablename__ = "audit_logs"
+
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    user_id    = Column(Integer, nullable=True, index=True)
+    event_type = Column(String(50), nullable=False, index=True)
+    ip_address = Column(String(45), nullable=True)
+    meta       = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False, index=True)
+
+    __table_args__ = (
+        sqlalchemy.Index("ix_audit_logs_user_created", "user_id", "created_at"),
+    )
 
 
 class Content(Base):
@@ -37,6 +71,9 @@ class Content(Base):
     status = Column(SQLEnum(ContentStatus), nullable=False, default=ContentStatus.INBOX, index=True)
     created_at = Column(DateTime, default=utc_now, index=True)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, index=True)
+    # DAT-003: Soft delete support
+    is_deleted = Column(Boolean, default=False, nullable=False, index=True)
+    deleted_at = Column(DateTime, nullable=True)
 
     # Relationship to swipe history
     swipe_history = relationship("SwipeHistory", back_populates="content")
@@ -65,6 +102,10 @@ class SwipeHistory(Base):
     content = relationship("Content", back_populates="swipe_history")
     user = relationship("UserProfile", back_populates="swipe_history")
 
+    __table_args__ = (
+        sqlalchemy.UniqueConstraint("user_id", "content_id", name="uq_swipe_user_content"),
+    )
+
 
 class UserProfile(Base):
     """User profile information."""
@@ -82,6 +123,9 @@ class UserProfile(Base):
     last_login_at = Column(DateTime, nullable=True, index=True)  # AUTH-002
     created_at = Column(DateTime, default=utc_now, index=True)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, index=True)
+    # DAT-003: Soft delete support
+    is_deleted = Column(Boolean, default=False, nullable=False, index=True)
+    deleted_at = Column(DateTime, nullable=True)
 
     # Relationships
     content = relationship("Content", back_populates="user", cascade="all, delete-orphan")
@@ -110,6 +154,9 @@ class InterestTag(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, nullable=False, index=True)
     tag = Column(String(100), nullable=False)
+    # DAT-003: Soft delete support
+    is_deleted = Column(Boolean, default=False, nullable=False)
+    deleted_at = Column(DateTime, nullable=True)
 
     # Unique constraint for user_id + tag combination
     __table_args__ = (sqlalchemy.UniqueConstraint("user_id", "tag", name="unique_user_tag"),)

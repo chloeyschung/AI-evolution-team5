@@ -35,7 +35,7 @@ Feature dependency mapping for optimal implementation order.
 |---------|------------|------------|-------|---------------|
 | **AI-001** Core Summarizer | ING-002 | - | Needs extracted text. 300-char limit enforced. | F-005 |
 | **AI-002** Metadata Extraction | ING-001 | - | Works with URL directly. OG image thumbnail extraction implemented. | F-007 |
-| **AI-003** AI Categorization | ING-002 | - | LLM-based auto-tagging (max 3 tags). ⏸️ Spec pending. | F-006 |
+| **AI-003** AI Categorization | ING-002 | - | LLM-based auto-tagging (max 3 tags). | F-006 |
 
 ### UX Layer
 
@@ -122,15 +122,17 @@ ING-001 → ING-002 → AI-001 → UX-001 → UX-002
 | UX-004 | ✅ [`UX-004.md`](specs/UX-004.md) | ✅ [`UX-004-record.md`](records/UX-004-record.md) | ✅ Implemented | `src/api/routes.py`, `src/data/repository.py` | F-013 | ✅ Filter by platform |
 | UX-005 | ✅ [`UX-005.md`](specs/UX-005.md) | ✅ [`UX-005-record.md`](records/UX-005-record.md) | ✅ Implemented | `src/api/routes.py`, `src/data/repository.py` | F-016 | ✅ Searches title, author, and AI-generated tags
 | UX-006 | ✅ [`UX-006.md`](specs/UX-006.md) | ✅ [`UX-006-record.md`](records/UX-006-record.md) | ✅ Implemented | `src/api/routes.py` | F-019 | ✅ Delete content |
-| EXT-001 | ✅ [`EXT-001.md`](specs/EXT-001.md) | ✅ [`EXT-001-record.md`](records/EXT-001-record.md) | ⚠️ Backend Only | `src/api/routes.py` (backend API) | F-020 | ⚠️ Backend API ready; browser-extension/ not in repo (Phase 2) |
-| EXT-002 | ✅ [`EXT-002.md`](specs/EXT-002.md) | ✅ [`EXT-002-record.md`](records/EXT-002-record.md) | ⚠️ Backend Only | `src/api/routes.py` (backend API) | F-021 | ⚠️ Backend API ready; web-dashboard/ not in repo (Phase 2) |
-| INT-001 | ✅ [`INT-001.md`](specs/INT-001.md) | ✅ [`INT-001-record.md`](records/INT-001-record.md) | ✅ Implemented | `src/integrations/youtube/`, `src/integrations/repositories/` | F-022 | ✅ OAuth, sync configs, manual trigger |
-| INT-002 | ✅ [`INT-002.md`](specs/INT-002.md) | ✅ [`INT-002-record.md`](records/INT-002-record.md) | ✅ Implemented (MVP) | `src/api/routes.py` | F-023 | ✅ Manual import via public URLs; OAuth flow ready for future activation |
-| ADV-001 | ✅ [`ADV-001.md`](specs/ADV-001.md) | ✅ [`ADV-001-record.md`](records/ADV-001-record.md) | ✅ Implemented | `src/ai/trend_analyzer.py`, `src/api/routes.py` | F-024 | ✅ Relevance scoring with interest match, tag similarity, recency, engagement; Hard limit 1000 items |
-| ADV-002 | ✅ [`ADV-002.md`](specs/ADV-002.md) | ✅ [`ADV-002-record.md`](records/ADV-002-record.md) | ✅ Implemented | `src/ai/achievement_checker.py`, `src/api/routes.py` | F-025 | ✅ 16 achievements across streak, volume, diversity, curation categories |
-| ADV-003 | ✅ [`ADV-003.md`](specs/ADV-003.md) | ✅ [`ADV-003-record.md`](records/ADV-003-record.md) | ✅ Implemented | `src/ai/reminder_engine.py`, `src/api/routes.py` | F-026 | ✅ 4 reminder types: backlog, streak, time-based, reengagement; Quiet hours, frequency limits |
+| EXT-001 | ✅ [`EXT-001.md`](specs/EXT-001.md) | ✅ [`EXT-001-record.md`](records/EXT-001-record.md) | ✅ Implemented | `browser-extension/src/` | F-020 | ✅ Chrome/Whale extension (Manifest V3) |
+| EXT-002 | ✅ [`EXT-002.md`](specs/EXT-002.md) | ✅ [`EXT-002-record.md`](records/EXT-002-record.md) | ✅ Implemented | `web-dashboard/src/` | F-021 | ✅ Web dashboard (React 18, Google OAuth) |
+| INT-001 | ✅ [`INT-001.md`](specs/INT-001.md) | ✅ [`INT-001-record.md`](records/INT-001-record.md) | ✅ Implemented (Backend API) | `src/integrations/youtube/`, `src/integrations/repositories/` | F-022 | ✅ OAuth, sync configs, manual trigger |
+| INT-002 | ✅ [`INT-002.md`](specs/INT-002.md) | ✅ [`INT-002-record.md`](records/INT-002-record.md) | ✅ Implemented (Backend API) | `src/api/routes.py` | F-023 | ✅ LinkedIn manual import via public URLs; OAuth flow scaffolded |
+| ADV-001 | ✅ [`ADV-001.md`](specs/ADV-001.md) | ✅ [`ADV-001-record.md`](records/ADV-001-record.md) | ✅ Implemented (Backend API) | `src/ai/trend_analyzer.py`, `src/api/routes.py` | F-024 | ✅ Relevance scoring with interest match, tag similarity, recency, engagement; Hard limit 1000 items |
+| ADV-002 | ✅ [`ADV-002.md`](specs/ADV-002.md) | ✅ [`ADV-002-record.md`](records/ADV-002-record.md) | ✅ Implemented (Backend API) | `src/ai/achievement_checker.py`, `src/api/routes.py` | F-025 | ✅ 16 achievements across streak, volume, diversity, curation categories |
+| ADV-003 | ✅ [`ADV-003.md`](specs/ADV-003.md) | ✅ [`ADV-003-record.md`](records/ADV-003-record.md) | ✅ Implemented (Backend API) | `src/ai/reminder_engine.py`, `src/api/routes.py` | F-026 | ✅ 4 reminder types: backlog, streak, time-based, reengagement; Quiet hours, frequency limits |
 | SEC-001 | ✅ [`SEC-001.md`](specs/SEC-001.md) | ✅ [`SEC-001-record.md`](records/SEC-001-record.md) | ✅ Implemented | `src/utils/token_hashing.py`, `src/utils/token_encryption.py`, `src/middleware/rate_limiter.py` | - | ✅ JWT hashing, OAuth encryption, rate limiting, SSRF protection, multi-user isolation |
 | SEC-002 | ✅ [`SEC-002.md`](specs/SEC-002.md) | ✅ [`SEC-002-record.md`](records/SEC-002-record.md) | ✅ Implemented | `src/data/models.py`, `src/integrations/repositories/integration.py`, `src/api/routes.py` | - | ✅ OAuthState table, random CSRF tokens, 15-min TTL, single-use consumption |
+| DAT-003 | ✅ [`DAT-003.md`](specs/DAT-003.md) | - | ⏸️ Design | - | - | ⏸️ Soft delete & 30-day recovery window — design only, no implementation |
+| SEC-003 | ✅ [`SEC-003.md`](specs/SEC-003.md) | - | ⏸️ Design | - | - | ⏸️ AuditLog table for security events — design only, no implementation |
 | QOL-001 | ✅ [`QOL-001.md`](specs/QOL-001.md) | ✅ [`QOL-001-record.md`](records/QOL-001-record.md) | ✅ Implemented | `src/constants.py`, multiple refactored files | - | ✅ Enum consolidation, type hint standardization, constants centralization |
 | F-021 | - | ✅ [`F-021-migration-record.md`](records/F-021-migration-record.md) | ✅ Implemented | `web-dashboard/src/**` | F-021 | ✅ Vue 3 → React 18 migration complete; 25 E2E tests passing |
 | FRONT-001 | - | ✅ [`FRONT-001-record.md`](records/FRONT-001-record.md) | ✅ Implemented | `web-dashboard/src/components/**`, `browser-extension/src/**` | Cross-cutting | ✅ Design system + shell refresh; spec = ARCH-013 |

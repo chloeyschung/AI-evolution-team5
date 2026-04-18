@@ -6,8 +6,10 @@ TODO #6 (2026-04-14): Fix timezone handling inconsistencies in get_statistics me
 """
 
 from datetime import date, datetime, timedelta
+from typing import Optional
 
 from sqlalchemy import case, delete, func, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.metadata_extractor import ContentMetadata
@@ -15,6 +17,8 @@ from src.ai.metadata_extractor import ContentMetadata
 from .base_repository import BaseRepository
 from .models import (
     AccountDeletion,
+    AuditEventType,
+    AuditLog,
     Content,
     ContentStatus,
     ContentTag,
@@ -53,7 +57,7 @@ class ContentRepository(BaseRepository[Content]):
         """
         # TODO #3 (2026-04-14): Filter by both url and user_id to prevent content leakage
         result = await self.session.execute(
-            select(Content).where(Content.url == metadata.url, Content.user_id == user_id)
+            select(Content).where(Content.url == metadata.url, Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
         )
         existing = result.scalar_one_or_none()
 
@@ -99,20 +103,23 @@ class ContentRepository(BaseRepository[Content]):
             Content object if found, None otherwise.
         """
         result = await self.session.execute(
-            select(Content).where(Content.url == url, Content.user_id == user_id)
+            select(Content).where(Content.url == url, Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
         )
         return result.scalar_one_or_none()
 
     async def get_by_id(self, content_id: int) -> Content | None:
-        """Get content by ID.
+        """Get content by ID (excludes soft-deleted rows).
 
         Args:
             content_id: The content ID.
 
         Returns:
-            Content object if found, None otherwise.
+            Content object if found and not soft-deleted, None otherwise.
         """
-        return await super().get_by_id(Content, content_id)
+        result = await self.session.execute(
+            select(Content).where(Content.id == content_id, Content.is_deleted == False)  # noqa: E712
+        )
+        return result.scalar_one_or_none()
 
     async def get_all(
         self,
@@ -133,7 +140,7 @@ class ContentRepository(BaseRepository[Content]):
             List of Content objects, optionally filtered by status.
         """
         # TODO #4 (2026-04-14): Build query without limit first, apply conditionally
-        query = select(Content).where(Content.user_id == user_id).order_by(Content.created_at.desc()).offset(offset)
+        query = select(Content).where(Content.user_id == user_id, Content.is_deleted == False).order_by(Content.created_at.desc()).offset(offset)  # noqa: E712
         # Only apply limit if not None (SQLAlchemy .limit(None) still limits!)
         if limit is not None:
             query = query.limit(limit)
@@ -159,7 +166,7 @@ class ContentRepository(BaseRepository[Content]):
             ValueError: If content is already ARCHIVED (one-way transition).
             RuntimeError: If content not found or ownership mismatch.
         """
-        query = select(Content).where(Content.id == content_id)
+        query = select(Content).where(Content.id == content_id, Content.is_deleted == False)  # noqa: E712
         if user_id is not None:
             query = query.where(Content.user_id == user_id)
         result = await self.session.execute(query)
@@ -227,7 +234,7 @@ class ContentRepository(BaseRepository[Content]):
         # TODO #4 (2026-04-14): Build query without limit first, apply conditionally
         base_query = (
             select(Content)
-            .where(Content.user_id == user_id)
+            .where(Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
             .outerjoin(SwipeHistory, Content.id == SwipeHistory.content_id)
             .where(SwipeHistory.id.is_(None))
             .order_by(Content.created_at.desc())
@@ -265,7 +272,7 @@ class ContentRepository(BaseRepository[Content]):
         # TODO #4 (2026-04-14): Build query without limit first, apply conditionally
         base_query = (
             select(Content)
-            .where(Content.user_id == user_id)
+            .where(Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
             .join(SwipeHistory, Content.id == SwipeHistory.content_id)
             .where(SwipeHistory.action == SwipeAction.KEEP)
             .order_by(SwipeHistory.swiped_at.desc())
@@ -303,7 +310,7 @@ class ContentRepository(BaseRepository[Content]):
         # TODO #4 (2026-04-14): Build query without limit first, apply conditionally
         base_query = (
             select(Content)
-            .where(Content.user_id == user_id)
+            .where(Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
             .join(SwipeHistory, Content.id == SwipeHistory.content_id)
             .where(SwipeHistory.action == SwipeAction.DISCARD)
             .order_by(SwipeHistory.swiped_at.desc())
@@ -327,7 +334,7 @@ class ContentRepository(BaseRepository[Content]):
         Returns:
             List of (platform, count) tuples, sorted by count descending.
         """
-        query = select(Content.platform, func.count(Content.id)).group_by(Content.platform).order_by(
+        query = select(Content.platform, func.count(Content.id)).where(Content.is_deleted == False).group_by(Content.platform).order_by(  # noqa: E712
             func.count(Content.id).desc()
         )
         if user_id is not None:
@@ -360,7 +367,7 @@ class ContentRepository(BaseRepository[Content]):
         # F-016: Added ContentTag JOIN to enable tag-based search
         query_stmt = (
             select(Content)
-            .where(Content.user_id == user_id)
+            .where(Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
             .outerjoin(ContentTag, Content.id == ContentTag.content_id)
             .where(
                 (Content.title.isnot(None))  # Must have title
@@ -391,7 +398,7 @@ class ContentRepository(BaseRepository[Content]):
             Dictionary with pending, kept, discarded counts.
         """
         # Build base query with optional user filter
-        content_query = select(Content)
+        content_query = select(Content).where(Content.is_deleted == False)  # noqa: E712
         swipe_query = select(SwipeHistory)
         if user_id is not None:
             content_query = content_query.where(Content.user_id == user_id)
@@ -416,6 +423,109 @@ class ContentRepository(BaseRepository[Content]):
             "discarded": discarded_count,
         }
 
+    async def count_all(self, user_id: int) -> int:
+        """Count total non-deleted content rows for a user.
+
+        Args:
+            user_id: User ID to count content for.
+
+        Returns:
+            Total count of non-deleted content rows.
+        """
+        result = await self.session.execute(
+            select(func.count()).where(Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
+        )
+        return result.scalar_one()
+
+    async def count_pending(self, user_id: int) -> int:
+        """Count pending content (no swipe history) for a user.
+
+        Args:
+            user_id: User ID to count for.
+
+        Returns:
+            Total count of pending content rows.
+        """
+        stmt = (
+            select(func.count())
+            .select_from(Content)
+            .where(Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
+            .outerjoin(SwipeHistory, Content.id == SwipeHistory.content_id)
+            .where(SwipeHistory.id.is_(None))
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one()
+
+    async def count_kept(self, user_id: int) -> int:
+        """Count kept content (swiped KEEP) for a user.
+
+        Args:
+            user_id: User ID to count for.
+
+        Returns:
+            Total count of kept content rows.
+        """
+        stmt = (
+            select(func.count())
+            .select_from(Content)
+            .where(Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
+            .join(SwipeHistory, Content.id == SwipeHistory.content_id)
+            .where(SwipeHistory.action == SwipeAction.KEEP)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one()
+
+    async def count_discarded(self, user_id: int) -> int:
+        """Count discarded content (swiped DISCARD) for a user.
+
+        Args:
+            user_id: User ID to count for.
+
+        Returns:
+            Total count of discarded content rows.
+        """
+        stmt = (
+            select(func.count())
+            .select_from(Content)
+            .where(Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
+            .join(SwipeHistory, Content.id == SwipeHistory.content_id)
+            .where(SwipeHistory.action == SwipeAction.DISCARD)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one()
+
+    async def count_search(self, user_id: int, query: str) -> int:
+        """Count total search results for a query.
+
+        Args:
+            user_id: User ID to filter content by.
+            query: Search query string (case-insensitive).
+
+        Returns:
+            Total count of matching content rows.
+        """
+        query_pattern = f"%{query}%"
+        stmt = (
+            select(func.count())
+            .select_from(
+                select(Content.id)
+                .where(Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
+                .outerjoin(ContentTag, Content.id == ContentTag.content_id)
+                .where(
+                    (Content.title.isnot(None))
+                    & (
+                        (Content.title.ilike(query_pattern))
+                        | (Content.author.ilike(query_pattern))
+                        | (ContentTag.tag.ilike(query_pattern))
+                    )
+                )
+                .distinct()
+                .subquery()
+            )
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one()
+
     async def get_all_ordered(
         self,
         user_id: int | None = None,
@@ -432,14 +542,14 @@ class ContentRepository(BaseRepository[Content]):
         Returns:
             List of Content objects ordered by created_at descending.
         """
-        query = select(Content).order_by(Content.created_at.desc()).offset(offset).limit(limit)
+        query = select(Content).where(Content.is_deleted == False).order_by(Content.created_at.desc()).offset(offset).limit(limit)  # noqa: E712
         if user_id is not None:
             query = query.where(Content.user_id == user_id)
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
     async def delete_content(self, content_id: int, user_id: int) -> bool:
-        """Delete content and related records for a user.
+        """Hard-delete content and related records for a user (legacy — prefer soft_delete_content).
 
         Args:
             content_id: Content ID to delete.
@@ -448,9 +558,9 @@ class ContentRepository(BaseRepository[Content]):
         Returns:
             True if deleted, False if not found or not owned by user.
         """
-        from sqlalchemy import delete
+        from sqlalchemy import delete as sql_delete
 
-        # Check ownership
+        # Check ownership (include soft-deleted rows so hard-delete can still clean them)
         result = await self.session.execute(
             select(Content).where(Content.id == content_id, Content.user_id == user_id)
         )
@@ -461,17 +571,98 @@ class ContentRepository(BaseRepository[Content]):
 
         # Delete related records first
         await self.session.execute(
-            delete(ContentTag).where(ContentTag.content_id == content_id)
+            sql_delete(ContentTag).where(ContentTag.content_id == content_id)
         )
         await self.session.execute(
-            delete(SwipeHistory).where(SwipeHistory.content_id == content_id)
+            sql_delete(SwipeHistory).where(SwipeHistory.content_id == content_id)
         )
 
         # Delete the content
-        await self.session.execute(delete(Content).where(Content.id == content_id))
+        await self.session.execute(sql_delete(Content).where(Content.id == content_id))
         await self.session.commit()
 
         return True
+
+    @staticmethod
+    def _soft_delete(obj) -> None:
+        """Set is_deleted=True and deleted_at=utc_now() on any model instance (DAT-003)."""
+        obj.is_deleted = True
+        obj.deleted_at = utc_now()
+
+    async def soft_delete_content(self, content_id: int, user_id: int) -> Content | None:
+        """Soft-delete content by setting is_deleted=True (DAT-003).
+
+        Idempotent: if already soft-deleted, returns the content unchanged.
+
+        Args:
+            content_id: Content ID to soft-delete.
+            user_id: User ID (ownership verification).
+
+        Returns:
+            Content object after soft-delete, or None if not found / not owned.
+        """
+        # Find content (including already-deleted for idempotency)
+        result = await self.session.execute(
+            select(Content).where(Content.id == content_id, Content.user_id == user_id)
+        )
+        content = result.scalar_one_or_none()
+
+        if content is None:
+            return None
+
+        # Idempotent: already deleted — return as-is
+        if not content.is_deleted:
+            self._soft_delete(content)
+            await self.session.commit()
+            await self.session.refresh(content)
+
+        return content
+
+    async def restore_content(self, content_id: int, user_id: int) -> Content:
+        """Restore soft-deleted content within the 30-day recovery window (DAT-003).
+
+        Args:
+            content_id: Content ID to restore.
+            user_id: User ID (ownership verification).
+
+        Returns:
+            Restored Content object.
+
+        Raises:
+            RuntimeError: If content not found or not owned by user (→ 404).
+            ValueError: If recovery window has expired (→ 410).
+        """
+        from datetime import timezone
+
+        RECOVERY_WINDOW_DAYS = 30
+
+        result = await self.session.execute(
+            select(Content).where(Content.id == content_id, Content.user_id == user_id, Content.is_deleted == True)  # noqa: E712
+        )
+        content = result.scalar_one_or_none()
+
+        if content is None:
+            raise RuntimeError(f"Content with ID {content_id} not found or not deleted")
+
+        now = utc_now()
+        # Normalise to naive UTC for comparison: SQLite stores naive datetimes;
+        # utc_now() returns timezone-aware. Strip tzinfo from now for comparison.
+        now_naive = now.replace(tzinfo=None)
+        deleted_at = content.deleted_at
+        if deleted_at is not None and deleted_at.tzinfo is not None:
+            deleted_at = deleted_at.replace(tzinfo=None)
+
+        cutoff = now_naive - timedelta(days=RECOVERY_WINDOW_DAYS)
+        if deleted_at is None or deleted_at < cutoff:
+            raise ValueError("recovery_window_expired")
+
+        content.is_deleted = False
+        content.deleted_at = None
+        content.updated_at = now_naive
+        await self.session.commit()
+        await self.session.refresh(content)
+
+        return content
 
 
 class SwipeRepository(BaseRepository[SwipeHistory]):
@@ -483,7 +674,11 @@ class SwipeRepository(BaseRepository[SwipeHistory]):
     async def record_swipe(
         self, content_id: int, action: SwipeAction, user_id: int
     ) -> SwipeHistory:
-        """Record a swipe action.
+        """Record a swipe action (idempotent — safe for iOS retry on network timeout).
+
+        If a SwipeHistory row already exists for (user_id, content_id), the existing
+        record is returned rather than raising an error.  This handles the case where
+        iOS retries a POST /swipe after a network timeout without corrupting data.
 
         Args:
             content_id: The content ID.
@@ -493,7 +688,7 @@ class SwipeRepository(BaseRepository[SwipeHistory]):
                 - DISCARD: Content status changes to ARCHIVED
 
         Returns:
-            The created SwipeHistory object.
+            The created or pre-existing SwipeHistory object.
         """
         history = SwipeHistory(
             content_id=content_id,
@@ -507,9 +702,21 @@ class SwipeRepository(BaseRepository[SwipeHistory]):
         if action == SwipeAction.DISCARD:
             await self._update_content_status(content_id, user_id, ContentStatus.ARCHIVED)
 
-        await self.session.commit()
-        await self.session.refresh(history)
-        return history
+        try:
+            await self.session.commit()
+            await self.session.refresh(history)
+            return history
+        except IntegrityError:
+            # Duplicate (user_id, content_id) — iOS retry scenario.
+            # Roll back the failed insert and return the existing row.
+            await self.session.rollback()
+            result = await self.session.execute(
+                select(SwipeHistory).where(
+                    SwipeHistory.user_id == user_id,
+                    SwipeHistory.content_id == content_id,
+                )
+            )
+            return result.scalar_one()
 
     async def _update_content_status(self, content_id: int, user_id: int, new_status: ContentStatus) -> None:
         """Helper to update content status (internal use).
@@ -759,8 +966,22 @@ class UserProfileRepository(BaseRepository[UserProfile]):
         # Calculate retention rate
         retention_rate = total_kept / total_swipes if total_swipes > 0 else 0.0
 
-        # Calculate streak using unique active dates (O(1) query instead of O(N) loop)
-        # TODO #6 (2026-04-14): Fixed timezone handling - always convert to UTC before date comparison
+        # Streak calculation: hybrid SQL + Python walk (BE-006 assessed 2026-04-17)
+        # Approach: fetch bounded set of distinct active dates via SQL, then walk backwards in Python.
+        #
+        # A pure-SQL recursive CTE was evaluated as an alternative:
+        #   WITH RECURSIVE streak(d, cnt) AS (
+        #     SELECT ?, 1
+        #     UNION ALL
+        #     SELECT DATE(d, '-1 day'), cnt+1 FROM streak
+        #     WHERE DATE(d, '-1 day') IN (SELECT DISTINCT DATE(swiped_at) ...)
+        #   )
+        #   SELECT MAX(cnt) FROM streak;
+        #
+        # Decision: recursive CTE is more complex and not meaningfully more efficient.
+        # SQLite must still scan the same date rows either way. The hybrid is already
+        # well-bounded (query is capped to [first_swipe_date, end_date]) and the Python
+        # loop does O(1) set lookups stopping at the first gap. This is the right tradeoff.
         streak_days = 0
         if first_swipe_at is not None:
             # Convert to UTC first to ensure consistent date comparison
@@ -774,7 +995,7 @@ class UserProfileRepository(BaseRepository[UserProfile]):
             yesterday = today - timedelta(days=1)
             end_date = yesterday if last_swipe_utc is None or last_swipe_utc.date() < today else today
 
-            # Get all unique active dates in descending order (single query)
+            # Get all unique active dates bounded to [first_swipe_date, end_date] (single query)
             dates_result = await self.session.execute(
                 select(func.date(SwipeHistory.swiped_at))
                 .distinct()
@@ -785,13 +1006,13 @@ class UserProfileRepository(BaseRepository[UserProfile]):
                 )
                 .order_by(func.date(SwipeHistory.swiped_at).desc())
             )
-            # Convert database dates to Python date objects for comparison
+            # Convert database dates to Python date objects for O(1) set membership checks
             active_dates = {
                 date.fromisoformat(str(row[0])) if isinstance(row[0], str) else row[0]
                 for row in dates_result.fetchall()
             }
 
-            # Count consecutive days from end_date backwards
+            # Walk backwards from end_date; stops at first gap — O(streak_length) iterations
             current_date = end_date
             while current_date in active_dates:
                 streak_days += 1
@@ -1010,14 +1231,28 @@ class AccountDeletionRepository(BaseRepository[AccountDeletion]):
         now = utc_now()
         block_expires_at = now + timedelta(days=block_days)
 
-        deletion = AccountDeletion(
-            email=email,
-            google_sub=google_sub,
-            deleted_at=now,
-            block_expires_at=block_expires_at,
-            confirmation_token=confirmation_token,
+        # Upsert: if a record for this email already exists (e.g. step-2 of two-step
+        # deletion), update it rather than inserting a duplicate (AUTH-004).
+        result = await self.session.execute(
+            select(AccountDeletion).where(AccountDeletion.email == email)
         )
-        self.session.add(deletion)
+        deletion = result.scalar_one_or_none()
+
+        if deletion is not None:
+            deletion.google_sub = google_sub
+            deletion.deleted_at = now
+            deletion.block_expires_at = block_expires_at
+            deletion.confirmation_token = confirmation_token
+        else:
+            deletion = AccountDeletion(
+                email=email,
+                google_sub=google_sub,
+                deleted_at=now,
+                block_expires_at=block_expires_at,
+                confirmation_token=confirmation_token,
+            )
+            self.session.add(deletion)
+
         await self.session.commit()
         await self.session.refresh(deletion)
         return deletion
@@ -1154,3 +1389,35 @@ class ContentTagRepository(BaseRepository[ContentTag]):
         """
         await self.session.execute(delete(ContentTag).where(ContentTag.content_id == content_id))
         await self.session.commit()
+
+
+# SEC-003: Audit Logging
+
+class AuditRepository:
+    """Append-only security event log repository (SEC-003).
+
+    Always called with the active session so inserts participate in the
+    surrounding transaction. Caller owns the commit.
+    """
+
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def log_event(
+        self,
+        event_type: AuditEventType,
+        user_id: Optional[int] = None,
+        ip_address: Optional[str] = None,
+        metadata: Optional[dict] = None,
+    ) -> None:
+        """Insert one audit row in the caller's transaction.
+
+        No db.commit() here — caller owns the transaction.
+        """
+        entry = AuditLog(
+            user_id=user_id,
+            event_type=event_type.value,
+            ip_address=ip_address,
+            meta=metadata,
+        )
+        self.db.add(entry)

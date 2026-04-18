@@ -263,6 +263,29 @@ def format_iso_datetime(dt: datetime) -> str:
     return dt.isoformat()
 
 
+def serialize_datetime(dt: datetime | None) -> str | None:
+    """Serialize datetime to an ISO 8601 string with Z suffix for iOS JSONDecoder.
+
+    iOS ``JSONDecoder`` with ``.iso8601`` strategy requires exactly
+    ``YYYY-MM-DDTHH:MM:SSZ`` format — no microseconds, no ``+00:00`` offset.
+
+    Args:
+        dt: Datetime to serialize (naive or aware).  Naive datetimes are
+            treated as UTC.  Aware datetimes in other timezones are converted
+            to UTC before formatting.  ``None`` passes through unchanged.
+
+    Returns:
+        ISO 8601 string ending with ``Z``, or ``None`` if *dt* is ``None``.
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        # Naive → assume UTC; no conversion needed
+        return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    # Aware → convert to UTC first
+    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def combine_date_and_time(date_part: datetime, time_part: time_type) -> datetime:
     """Combine a date and time into a datetime.
 
