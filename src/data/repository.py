@@ -897,6 +897,7 @@ class UserProfileRepository(BaseRepository[UserProfile]):
             display_name=None,
             avatar_url=None,
             bio=None,
+            timezone="UTC",
         )
         self.session.add(profile)
         await self.session.commit()
@@ -909,6 +910,7 @@ class UserProfileRepository(BaseRepository[UserProfile]):
         display_name: str | None = None,
         avatar_url: str | None = None,
         bio: str | None = None,
+        timezone: str | None = None,
     ) -> UserProfile:
         """Update profile fields.
 
@@ -917,6 +919,7 @@ class UserProfileRepository(BaseRepository[UserProfile]):
             display_name: Optional display name to update.
             avatar_url: Optional avatar URL to update.
             bio: Optional bio to update.
+            timezone: Optional timezone to update.
 
         Returns:
             Updated UserProfile object.
@@ -929,6 +932,8 @@ class UserProfileRepository(BaseRepository[UserProfile]):
             profile.avatar_url = avatar_url
         if bio is not None:
             profile.bio = bio
+        if timezone is not None:
+            profile.timezone = timezone
 
         profile.updated_at = utc_now()
         await self.session.commit()

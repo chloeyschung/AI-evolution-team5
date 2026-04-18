@@ -10,6 +10,9 @@ Affected locations:
 - user.py  line ~67-68: profile created_at / updated_at  (PATCH /profile)
 """
 
+from sqlalchemy import select
+
+from src.data.models import UserProfile
 from tests.conftest import AsyncTestingSessionLocal
 from tests.factories import make_user
 
@@ -100,3 +103,70 @@ async def test_patch_profile_datetime_fields_have_z_suffix(async_client, db):
     data = resp.json()
     assert_z_suffix(data["created_at"], "patch_profile.created_at")
     assert_z_suffix(data["updated_at"], "patch_profile.updated_at")
+
+
+async def test_get_profile_includes_timezone_with_default_utc(async_client, db):
+    """GET /profile returns timezone and defaults to UTC for new profile rows."""
+    async with AsyncTestingSessionLocal() as session:
+        _user, access_token = await make_user(session, email="profile-get-timezone@example.com")
+
+    resp = await async_client.get(
+        "/api/v1/profile",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.json()}"
+    data = resp.json()
+    assert data["timezone"] == "UTC"
+
+
+async def test_patch_profile_updates_timezone_and_round_trips(async_client, db):
+    """PATCH /profile can update timezone and GET /profile returns persisted value."""
+    async with AsyncTestingSessionLocal() as session:
+        _user, access_token = await make_user(session, email="profile-patch-timezone@example.com")
+
+    patch_resp = await async_client.patch(
+        "/api/v1/profile",
+        json={"timezone": "Asia/Seoul"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert patch_resp.status_code == 200, f"Expected 200, got {patch_resp.status_code}: {patch_resp.json()}"
+    assert patch_resp.json()["timezone"] == "Asia/Seoul"
+
+    get_resp = await async_client.get(
+        "/api/v1/profile",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert get_resp.status_code == 200, f"Expected 200, got {get_resp.status_code}: {get_resp.json()}"
+    assert get_resp.json()["timezone"] == "Asia/Seoul"
+
+
+async def test_get_profile_timezone_falls_back_to_utc_for_legacy_empty_or_null(async_client, db):
+    """Legacy rows with null/empty timezone should resolve to UTC in API response."""
+    async with AsyncTestingSessionLocal() as session:
+        user, access_token = await make_user(session, email="profile-fallback-timezone@example.com")
+
+        result = await session.execute(select(UserProfile).where(UserProfile.id == user.id))
+        profile = result.scalar_one()
+
+        profile.timezone = None
+        await session.commit()
+
+    null_resp = await async_client.get(
+        "/api/v1/profile",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert null_resp.status_code == 200, f"Expected 200, got {null_resp.status_code}: {null_resp.json()}"
+    assert null_resp.json()["timezone"] == "UTC"
+
+    async with AsyncTestingSessionLocal() as session:
+        result = await session.execute(select(UserProfile).where(UserProfile.id == user.id))
+        profile = result.scalar_one()
+        profile.timezone = ""
+        await session.commit()
+
+    empty_resp = await async_client.get(
+        "/api/v1/profile",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert empty_resp.status_code == 200, f"Expected 200, got {empty_resp.status_code}: {empty_resp.json()}"
+    assert empty_resp.json()["timezone"] == "UTC"

@@ -216,6 +216,7 @@ class UserProfileResponse(BaseModel):
     display_name: str | None = None
     avatar_url: str | None = None
     bio: str | None = None
+    timezone: str
     created_at: str
     updated_at: str
 
@@ -226,6 +227,7 @@ class UserProfileUpdate(BaseModel):
     display_name: str | None = Field(None, max_length=100)
     avatar_url: str | None = Field(None, max_length=500)
     bio: str | None = Field(None, max_length=500)
+    timezone: str | None = Field(None, min_length=1, max_length=64)
 
 
 class UserPreferencesResponse(BaseModel):

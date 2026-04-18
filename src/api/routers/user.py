@@ -23,6 +23,14 @@ router = APIRouter()
 # DAT-002: User Profile & Preferences endpoints
 
 
+def _resolve_profile_timezone(timezone: str | None) -> str:
+    """Resolve profile timezone with backward-compatible fallback."""
+    if timezone is None:
+        return "UTC"
+    normalized = timezone.strip()
+    return normalized if normalized else "UTC"
+
+
 @router.get("/profile", response_model=UserProfileResponse)
 async def get_profile(
     user_id: int = Depends(get_current_user),
@@ -40,6 +48,7 @@ async def get_profile(
         display_name=profile.display_name,
         avatar_url=profile.avatar_url,
         bio=profile.bio,
+        timezone=_resolve_profile_timezone(profile.timezone),
         created_at=serialize_datetime(profile.created_at),
         updated_at=serialize_datetime(profile.updated_at),
     )
@@ -58,6 +67,7 @@ async def update_profile(
         display_name=data.display_name,
         avatar_url=data.avatar_url,
         bio=data.bio,
+        timezone=data.timezone,
     )
 
     return UserProfileResponse(
@@ -65,6 +75,7 @@ async def update_profile(
         display_name=profile.display_name,
         avatar_url=profile.avatar_url,
         bio=profile.bio,
+        timezone=_resolve_profile_timezone(profile.timezone),
         created_at=serialize_datetime(profile.created_at),
         updated_at=serialize_datetime(profile.updated_at),
     )

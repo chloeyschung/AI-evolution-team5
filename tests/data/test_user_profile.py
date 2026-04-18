@@ -36,6 +36,7 @@ class TestUserProfileRepository:
         assert profile.display_name is None
         assert profile.avatar_url is None
         assert profile.bio is None
+        assert profile.timezone == "UTC"
         assert profile.created_at is not None
         assert profile.updated_at is not None
 
@@ -84,6 +85,24 @@ class TestUserProfileRepository:
 
         assert updated.display_name == "Updated"
         assert updated.bio == "Original bio"  # Should remain unchanged
+
+    async def test_update_profile_updates_timezone(self, db_session):
+        """Test that update_profile updates timezone when provided."""
+        repo = UserProfileRepository(db_session)
+
+        updated = await repo.update_profile(timezone="Asia/Seoul")
+
+        assert updated.timezone == "Asia/Seoul"
+
+    async def test_update_profile_keeps_timezone_when_not_provided(self, db_session):
+        """Test that timezone remains unchanged when not included in update."""
+        repo = UserProfileRepository(db_session)
+
+        profile = await repo.update_profile(timezone="America/Los_Angeles")
+        updated = await repo.update_profile(display_name="Updated Name")
+
+        assert profile.timezone == "America/Los_Angeles"
+        assert updated.timezone == "America/Los_Angeles"
 
 
 class TestUserPreferencesRepository:

@@ -120,6 +120,7 @@ class UserProfile(Base):
     display_name = Column(String(100))
     avatar_url = Column(String(500))
     bio = Column(String(500))
+    timezone = Column(String(64), default="UTC", nullable=True)
     last_login_at = Column(DateTime, nullable=True, index=True)  # AUTH-002
     created_at = Column(DateTime, default=utc_now, index=True)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, index=True)
