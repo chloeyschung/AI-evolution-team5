@@ -191,7 +191,10 @@ class TestUserStatisticsRepository:
         assert stats["last_swipe_at"] is None
 
     async def test_get_statistics_with_swipes(self, db_session):
-        """Test statistics calculation with swipe history."""
+        """Test statistics calculation with swipe history.
+
+        Uses one content item per swipe (unique constraint per user+content).
+        """
         repo = UserProfileRepository(db_session)
 
         # Create a user first (required for FK)
@@ -200,23 +203,27 @@ class TestUserStatisticsRepository:
         db_session.add(user)
         await db_session.flush()
 
-        # Create test content
-        content = Content(
-            platform="Test",
-            content_type="article",
-            url="https://example.com/test",
-            user_id=user.id,
-        )
-        db_session.add(content)
-        await db_session.commit()
-        await db_session.refresh(content)
-
-        # Create swipe history
+        # Create distinct content items — one per swipe (unique constraint per user+content)
         now = datetime.now(timezone.utc)
+        contents = []
+        for i in range(3):
+            c = Content(
+                platform="Test",
+                content_type="article",
+                url=f"https://example.com/stat-test-{i}",
+                user_id=user.id,
+            )
+            db_session.add(c)
+            contents.append(c)
+        await db_session.commit()
+        for c in contents:
+            await db_session.refresh(c)
+
+        # Create swipe history: 2 keep, 1 discard — one row per content
         swipes = [
-            SwipeHistory(content_id=content.id, action=SwipeAction.KEEP, swiped_at=now - timedelta(hours=1), user_id=user.id),
-            SwipeHistory(content_id=content.id, action=SwipeAction.KEEP, swiped_at=now - timedelta(hours=2), user_id=user.id),
-            SwipeHistory(content_id=content.id, action=SwipeAction.DISCARD, swiped_at=now - timedelta(hours=3), user_id=user.id),
+            SwipeHistory(content_id=contents[0].id, action=SwipeAction.KEEP, swiped_at=now - timedelta(hours=1), user_id=user.id),
+            SwipeHistory(content_id=contents[1].id, action=SwipeAction.KEEP, swiped_at=now - timedelta(hours=2), user_id=user.id),
+            SwipeHistory(content_id=contents[2].id, action=SwipeAction.DISCARD, swiped_at=now - timedelta(hours=3), user_id=user.id),
         ]
         db_session.add_all(swipes)
         await db_session.commit()
@@ -231,7 +238,11 @@ class TestUserStatisticsRepository:
         assert stats["streak_days"] >= 1
 
     async def test_get_statistics_retention_rate(self, db_session):
-        """Test retention rate calculation."""
+        """Test retention rate calculation.
+
+        Uses one content item per swipe (unique constraint per user+content).
+        Creates 10 distinct content items: 6 kept, 4 discarded.
+        """
         repo = UserProfileRepository(db_session)
 
         # Create a user first (required for FK)
@@ -240,29 +251,33 @@ class TestUserStatisticsRepository:
         db_session.add(user)
         await db_session.flush()
 
-        # Create test content
-        content = Content(
-            platform="Test",
-            content_type="article",
-            url="https://example.com/test",
-            user_id=user.id,
-        )
-        db_session.add(content)
-        await db_session.commit()
-        await db_session.refresh(content)
-
-        # Create 10 swipes: 6 keep, 4 discard
+        # Create 10 distinct content items (one per swipe — unique constraint)
         now = datetime.now(timezone.utc)
+        contents = []
+        for i in range(10):
+            c = Content(
+                platform="Test",
+                content_type="article",
+                url=f"https://example.com/retention-{i}",
+                user_id=user.id,
+            )
+            db_session.add(c)
+            contents.append(c)
+        await db_session.commit()
+        for c in contents:
+            await db_session.refresh(c)
+
+        # 6 keep, 4 discard — one row per content item
         for i in range(6):
             db_session.add(SwipeHistory(
-                content_id=content.id,
+                content_id=contents[i].id,
                 action=SwipeAction.KEEP,
                 swiped_at=now - timedelta(hours=i),
                 user_id=user.id,
             ))
         for i in range(4):
             db_session.add(SwipeHistory(
-                content_id=content.id,
+                content_id=contents[6 + i].id,
                 action=SwipeAction.DISCARD,
                 swiped_at=now - timedelta(hours=10+i),
                 user_id=user.id,
