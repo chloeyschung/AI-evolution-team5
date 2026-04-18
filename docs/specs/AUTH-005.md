@@ -139,10 +139,10 @@
 { "email": "user@example.com", "password": "..." }
 
 // 201 Created
-{ "message": "Verification email sent" }
+{ "message": "Verification email sent. Please check your inbox." }
 
 // 409 Conflict (email already registered)
-{ "error": "email_exists", "providers": ["google"] }
+{ "error": "email_exists", "providers": ["email_password"] }
 ```
 
 **POST /api/v1/auth/verify-email/resend**
@@ -151,7 +151,7 @@
 { "email": "user@example.com" }
 
 // 200 OK
-{ "message": "If that email is registered and not yet verified, a verification email has been sent." }
+{ "message": "If the account exists and is not verified, a verification email has been sent." }
 ```
 
 **POST /api/v1/auth/login**
@@ -179,7 +179,7 @@
 { "email": "user@example.com" }
 
 // 200 OK (always, regardless of whether email exists)
-{ "message": "If that email exists, a reset link was sent" }
+{ "message": "If that email is registered, a reset link has been sent." }
 ```
 
 ---
@@ -307,6 +307,15 @@ Tests require zero SMTP config and zero manual DB inspection.
   - Forgot password → reset → login with new password
   - Google login + same email → 409 → link → both methods work
 - **Factories** used for all tests; SMTP never called in test suite
+
+### Verification Evidence (2026-04-18)
+- `set -a; source .env; set +a; uv run pytest tests/data/test_email_auth_repository.py tests/api/test_auth_email.py tests/auth/test_email_auth.py -v`
+  - Result: `42 passed`
+- `cd web-dashboard && npm run test:e2e -- tests/e2e/auth.spec.ts`
+  - Result: `10 passed`
+- `cd web-dashboard && npm run lint && npm run test:e2e -- tests/e2e/auth.spec.ts`
+  - Result: blocked at lint step (`ESLint couldn't find an eslint.config.(js|mjs|cjs) file`)
+  - Impact: e2e execution still confirmed via direct playwright run above
 
 ---
 
