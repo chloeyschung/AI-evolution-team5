@@ -1,7 +1,7 @@
 # AUTH-005: Email/Password Authentication & Multi-Provider Identity Layer
 
-**Status**: Design | **Created**: 2026-04-16 | **Author**: abraxaspark
-**F-xxx Mapping**: TBD | **Phase**: Phase 1 - MVP | **Priority**: High
+**Status**: Implemented | **Created**: 2026-04-16 | **Author**: abraxaspark
+**F-xxx Mapping**: F-027 | **Phase**: Phase 1 - MVP | **Priority**: High
 
 ---
 
