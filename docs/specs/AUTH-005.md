@@ -125,6 +125,7 @@
 |----------|--------|------|-------------|
 | `/api/v1/auth/register` | POST | None | Create account, send verification email |
 | `/api/v1/auth/verify-email` | GET | None | Consume `?token=` link from email |
+| `/api/v1/auth/verify-email/resend` | POST | None | Reissue verification email for an unverified email/password account |
 | `/api/v1/auth/login` | POST | None | Email+password → access+refresh tokens |
 | `/api/v1/auth/password-reset/request` | POST | None | Send reset link to email |
 | `/api/v1/auth/password-reset/confirm` | POST | None | Consume token + set new password |
@@ -144,6 +145,15 @@
 { "error": "email_exists", "providers": ["google"] }
 ```
 
+**POST /api/v1/auth/verify-email/resend**
+```json
+// Request
+{ "email": "user@example.com" }
+
+// 200 OK
+{ "message": "If that email is registered and not yet verified, a verification email has been sent." }
+```
+
 **POST /api/v1/auth/login**
 ```json
 // Request
@@ -156,7 +166,11 @@
 { "error": "invalid_credentials" }
 
 // 403 Forbidden (not verified)
-{ "error": "email_not_verified" }
+{
+  "error": "email_not_verified",
+  "can_resend": true,
+  "message": "Email not verified. Please verify your email or request a new verification email."
+}
 ```
 
 **POST /api/v1/auth/password-reset/request**
@@ -276,8 +290,8 @@ Tests require zero SMTP config and zero manual DB inspection.
 | Scenario | Handling |
 |----------|----------|
 | Register with already-verified email | 409 with `providers` list (no info leak) |
-| Login before email verification | 403 `email_not_verified` |
-| Expired verification token | Error page with "resend" option |
+| Login before email verification | 403 with `error=email_not_verified`, `can_resend=true`, and a user-facing `message` |
+| Expired verification token | Error page prompts recovery via `POST /api/v1/auth/verify-email/resend` |
 | Expired reset token | 400 `token_expired`; user re-requests |
 | Link account — one token invalid | 401; restart linking flow |
 | `google_sub` migration — NULL google_sub rows | Skip migration row, log warning |
