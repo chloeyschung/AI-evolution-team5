@@ -57,18 +57,18 @@
 1. User visits `/auth/login`, enters email + password
 2. Backend computes `HMAC-SHA256(email, LOOKUP_KEY)`, looks up matching `user_auth_methods` row, verifies Argon2id hash
 3. On success: issues access + refresh tokens (same as Google OAuth path)
-4. On 409 (email exists under different provider): frontend shows linking prompt
+4. If the email is unverified, backend returns `403` with resend guidance payload (`error`, `can_resend`, `message`)
 
 ### Account Linking
-1. User signs in with Google; backend detects same email exists under `email_password`
-2. Returns `HTTP 409 {"conflict": "email_exists", "providers": ["email_password"]}`
-3. Frontend: "An account with this email exists. Sign in with email/password to link accounts."
-4. User authenticates with email/password → `POST /api/v1/auth/link-account` with both tokens
-5. Backend verifies both identities → adds second `user_auth_methods` row on same `user_id`
+1. User is already authenticated (`Bearer` access token)
+2. User submits email/password to `POST /api/v1/auth/link-account`
+3. Backend creates `email_password` auth method on the same `user_id` if that email is not already linked
+4. If email is already linked to current account → `409 already_linked`
+5. If email is linked to another account → `409 email_taken_by_another_account`
 
 ### Forgot Password
 1. User visits `/auth/forgot-password`, submits email
-2. Backend always responds: *"If that email exists, a reset link was sent"* (no enumeration)
+2. Backend always responds: *"If that email is registered, a reset link has been sent."* (no enumeration)
 3. User clicks reset link → enters new password → `POST /api/v1/auth/password-reset/confirm`
 4. Token marked used; user redirected to sign-in
 
@@ -160,7 +160,7 @@
 { "email": "user@example.com", "password": "..." }
 
 // 200 OK
-{ "access_token": "...", "refresh_token": "...", "expires_at": "..." }
+{ "access_token": "...", "refresh_token": "...", "expires_at": "...", "user_id": 1, "email": "user@example.com" }
 
 // 401 Unauthorized
 { "detail": { "error": "invalid_credentials" } }
@@ -294,8 +294,8 @@ Tests require zero SMTP config and zero manual DB inspection.
 | Register with already-verified email | 409 with `providers` list (no info leak) |
 | Login before email verification | 403 with `error=email_not_verified`, `can_resend=true`, and a user-facing `message` |
 | Expired verification token | Error page prompts recovery via `POST /api/v1/auth/verify-email/resend` |
-| Expired reset token | 400 `token_expired`; user re-requests |
-| Link account — one token invalid | 401; restart linking flow |
+| Expired reset token | 400 with `detail.error=invalid_or_expired_token`; user re-requests |
+| Link account — email already linked/taken | 409 (`already_linked` or `email_taken_by_another_account`) |
 | `google_sub` migration — NULL google_sub rows | Skip migration row, log warning |
 
 ---
