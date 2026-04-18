@@ -152,17 +152,18 @@ function showSuccess(): void {
     container.innerHTML = '';
 
     const successDiv = document.createElement('div');
-    successDiv.style.cssText = 'display: flex; flex-direction: column; align-items: center;';
+    successDiv.className = 'login-success';
 
     const iconDiv = document.createElement('div');
-    iconDiv.style.cssText = 'width: 64px; height: 64px; background: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 16px;';
+    iconDiv.className = 'login-success-icon';
 
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('width', '32');
     svg.setAttribute('height', '32');
     svg.setAttribute('viewBox', '0 0 24 24');
     svg.setAttribute('fill', 'none');
-    svg.setAttribute('stroke', 'white');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('stroke', 'currentColor');
     svg.setAttribute('stroke-width', '3');
 
     const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
@@ -174,12 +175,12 @@ function showSuccess(): void {
 
     const h2 = document.createElement('h2');
     h2.textContent = 'Login Successful!';
-    h2.style.cssText = 'margin-bottom: 8px; color: #111827;';
+    h2.className = 'login-success-title';
     successDiv.appendChild(h2);
 
     const p = document.createElement('p');
     p.textContent = 'You can close this window and return to the extension.';
-    p.style.cssText = 'color: #6b7280;';
+    p.className = 'login-success-copy';
     successDiv.appendChild(p);
 
     container.appendChild(successDiv);

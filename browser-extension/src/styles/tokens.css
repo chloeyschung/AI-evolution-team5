@@ -1,0 +1,43 @@
+:root {
+  --briefly-bg-canvas: #f7f6f3;
+  --briefly-bg-surface: #fffdfa;
+  --briefly-bg-surface-muted: #f1efe9;
+  --briefly-bg-hover: #ebe8df;
+  --briefly-bg-active: #e4e0d6;
+
+  --briefly-text-primary: #1c2127;
+  --briefly-text-secondary: #5f6b7c;
+  --briefly-text-muted: #738091;
+  --briefly-text-inverse: #ffffff;
+
+  --briefly-border-default: rgba(28, 33, 39, 0.14);
+  --briefly-border-hover: rgba(28, 33, 39, 0.22);
+  --briefly-border-gold: rgba(185, 139, 36, 0.28);
+
+  --briefly-accent-primary: #2d72d2;
+  --briefly-accent-secondary: #742ddd;
+  --briefly-accent-success: #238551;
+  --briefly-accent-danger: #cd4246;
+  --briefly-gold: #b98b24;
+  --briefly-gold-bright: #cfa03b;
+
+  --briefly-space-1: 4px;
+  --briefly-space-2: 8px;
+  --briefly-space-3: 12px;
+  --briefly-space-4: 16px;
+  --briefly-space-5: 20px;
+  --briefly-space-6: 24px;
+
+  --briefly-radius-sm: 6px;
+  --briefly-radius-md: 8px;
+  --briefly-radius-lg: 12px;
+  --briefly-radius-xl: 16px;
+
+  --briefly-shadow-sm:
+    0 0 0 1px rgba(17, 20, 24, 0.1),
+    0 1px 3px 0 rgba(0, 0, 0, 0.1),
+    0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --briefly-shadow-gold: 0 0 0 1px rgba(185, 139, 36, 0.26), 0 6px 20px rgba(185, 139, 36, 0.14);
+
+  --briefly-font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}

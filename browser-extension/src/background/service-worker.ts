@@ -22,7 +22,8 @@ chrome.runtime.onInstalled.addListener(() => {
 
 // Handle context menu clicks
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  if (!tab.id) return;
+  const tabId = tab?.id;
+  if (!tabId) return;
 
   try {
     if (!(await authManager.isAuthenticated())) {
@@ -40,15 +41,15 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     if (info.menuItemId === 'save-selection-to-briefly') {
       selectedText = info.selectionText;
       metadata = {
-        url: tab.url || '',
-        title: tab.title,
+        url: tab?.url || '',
+        title: tab?.title ?? null,
         author: null,
         description: null,
         type: 'text',
       };
     } else {
       // Get metadata from content script
-      const response = await chrome.tabs.sendMessage(tab.id, { action: 'getMetadata' });
+      const response = await chrome.tabs.sendMessage(tabId, { action: 'getMetadata' });
       metadata = response.metadata;
     }
 
@@ -70,13 +71,13 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 // Handle messages from content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'saveContent') {
-    handleSaveContent(message.data, sender as chrome.tabs.Tab).then(sendResponse);
+    handleSaveContent(message.data).then(sendResponse);
     return true; // Keep message channel open for async response
   }
   return false;
 });
 
-async function handleSaveContent(data: SaveRequest, tab: chrome.tabs.Tab): Promise<SaveResult> {
+async function handleSaveContent(data: SaveRequest): Promise<SaveResult> {
   try {
     if (!(await authManager.isAuthenticated())) {
       return {
@@ -113,6 +114,6 @@ function showNotification(notification: Notification): void {
 }
 
 // Handle action icon clicks - open popup
-chrome.action.onClicked.addListener((tab) => {
+chrome.action.onClicked.addListener(() => {
   chrome.action.openPopup();
 });

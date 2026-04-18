@@ -23,21 +23,7 @@ async function handleGetMetadata(): Promise<{ metadata: PageMetadata }> {
 function injectSaveButton(): void {
   const button = document.createElement('button');
   button.textContent = '💾 Save to Briefly';
-  button.style.cssText = `
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    padding: 12px 20px;
-    background: #6366f1;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    z-index: 999999;
-    font-size: 14px;
-    font-weight: 500;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  `;
+  button.className = 'briefly-save-button';
   button.title = 'Save this page to Briefly';
 
   button.onclick = async () => {
@@ -49,8 +35,12 @@ function injectSaveButton(): void {
       data: { metadata, selectedText },
     }, (response) => {
       if (response?.success) {
+        button.classList.add('saved');
         button.textContent = '✅ Saved!';
-        setTimeout(() => { button.textContent = '💾 Save to Briefly'; }, 2000);
+        setTimeout(() => {
+          button.classList.remove('saved');
+          button.textContent = '💾 Save to Briefly';
+        }, 2000);
       }
     });
   };

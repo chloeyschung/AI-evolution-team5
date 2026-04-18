@@ -45,9 +45,12 @@ describe('PageExtractor', () => {
     });
 
     it('should fallback to title tag when og:title not available', async () => {
-      mockDocument.querySelector = vi.fn()
-        .mockReturnValueOnce(null) // og:title
-        .mockReturnValueOnce({ textContent: 'Fallback Title' }); // title
+      mockDocument.querySelector = vi.fn().mockImplementation((selector: string) => {
+        if (selector === 'meta[property="og:title"]') return null;
+        if (selector === 'meta[name="twitter:title"]') return null;
+        if (selector === 'title') return { textContent: 'Fallback Title' };
+        return null;
+      });
 
       const metadata = await extractor['extractMetadata']();
 

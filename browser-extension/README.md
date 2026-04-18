@@ -32,6 +32,13 @@ uv run uvicorn src.api.app:app --host 0.0.0.0 --port 8000 --reload
 
 The server should be accessible at `http://localhost:8000`.
 
+For full local stack boot (backend + dashboard + extension watcher), use:
+
+```bash
+cd /path/to/Briefly
+./scripts/run-stack.sh start
+```
+
 ## Configuration
 
 ### 1. Create `.env` file
@@ -107,6 +114,18 @@ npm run build      # Build for production
 npm run dev        # Build with watch mode
 npm run lint       # Run ESLint
 npm run typecheck  # Run TypeScript type checking
+```
+
+### Verification Commands
+
+Run these before loading/reloading in Chrome:
+
+```bash
+cd browser-extension
+npx vitest run src/__tests__/web-guidelines-extension.test.ts
+npm run test -- --run src/__tests__/extractor.test.ts
+npm run typecheck
+npm run build
 ```
 
 ## Usage

@@ -37,7 +37,7 @@ async function init(): Promise<void> {
     }
   } catch (error) {
     console.error('Error initializing popup:', error);
-    showError(error instanceof Error ? error.message : 'Failed to initialize extension');
+    showError(error instanceof Error ? error.message : 'Failed to initialize extension. Please retry.');
   }
 }
 
@@ -139,7 +139,7 @@ loginBtn.addEventListener('click', async () => {
     throw new Error('Login did not complete. Please try again.');
   } catch (error) {
     console.error('Login error:', error);
-    showError(error instanceof Error ? error.message : 'Login failed');
+    showError(error instanceof Error ? error.message : 'Login failed. Please try again.');
   }
 });
 
@@ -165,7 +165,7 @@ saveCurrentPageBtn.addEventListener('click', async () => {
     }, 1600);
   } catch (error) {
     console.error('Save error:', error);
-    showError(error instanceof Error ? error.message : 'Failed to save content');
+    showError(error instanceof Error ? error.message : 'Failed to save content. Check API URL and retry.');
     saveCurrentPageBtn.textContent = 'Save current page';
     saveCurrentPageBtn.disabled = false;
   }
@@ -177,7 +177,7 @@ logoutBtn.addEventListener('click', async () => {
     showLoggedOut();
   } catch (error) {
     console.error('Logout error:', error);
-    showError('Failed to logout');
+    showError('Failed to logout. Retry in a moment.');
   }
 });
 

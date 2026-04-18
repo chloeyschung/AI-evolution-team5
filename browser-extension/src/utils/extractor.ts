@@ -13,11 +13,11 @@ export class PageExtractor {
 
   private extractTitle(): string | null {
     // Try og:title first (Open Graph)
-    const ogTitle = document.querySelector('meta[property="og:title"]')?.content;
+    const ogTitle = this.getMetaContent('meta[property="og:title"]');
     if (ogTitle) return ogTitle;
 
     // Try twitter:title
-    const twitterTitle = document.querySelector('meta[name="twitter:title"]')?.content;
+    const twitterTitle = this.getMetaContent('meta[name="twitter:title"]');
     if (twitterTitle) return twitterTitle;
 
     // Try standard title tag
@@ -33,23 +33,23 @@ export class PageExtractor {
 
   private extractAuthor(): string | null {
     // Try og:author
-    const ogAuthor = document.querySelector('meta[property="og:author"]')?.content;
+    const ogAuthor = this.getMetaContent('meta[property="og:author"]');
     if (ogAuthor) return ogAuthor;
 
     // Try article:author
-    const articleAuthor = document.querySelector('meta[property="article:author"]')?.content;
+    const articleAuthor = this.getMetaContent('meta[property="article:author"]');
     if (articleAuthor) return articleAuthor;
 
     // Try twitter:creator
-    const twitterCreator = document.querySelector('meta[name="twitter:creator"]')?.content;
+    const twitterCreator = this.getMetaContent('meta[name="twitter:creator"]');
     if (twitterCreator) return twitterCreator.replace('@', '');
 
     // Try standard author meta
-    const authorMeta = document.querySelector('meta[name="author"]')?.content;
+    const authorMeta = this.getMetaContent('meta[name="author"]');
     if (authorMeta) return authorMeta;
 
     // Try article author
-    const articleAuthorTag = document.querySelector('meta[name="article:author"]')?.content;
+    const articleAuthorTag = this.getMetaContent('meta[name="article:author"]');
     if (articleAuthorTag) return articleAuthorTag;
 
     return null;
@@ -57,19 +57,19 @@ export class PageExtractor {
 
   private extractDescription(): string | null {
     // Try og:description first
-    const ogDesc = document.querySelector('meta[property="og:description"]')?.content;
+    const ogDesc = this.getMetaContent('meta[property="og:description"]');
     if (ogDesc) return ogDesc;
 
     // Try twitter:description
-    const twitterDesc = document.querySelector('meta[name="twitter:description"]')?.content;
+    const twitterDesc = this.getMetaContent('meta[name="twitter:description"]');
     if (twitterDesc) return twitterDesc;
 
     // Try standard description
-    const descMeta = document.querySelector('meta[name="description"]')?.content;
+    const descMeta = this.getMetaContent('meta[name="description"]');
     if (descMeta) return descMeta;
 
     // Try content
-    const contentMeta = document.querySelector('meta[name="content"]')?.content;
+    const contentMeta = this.getMetaContent('meta[name="content"]');
     if (contentMeta) return contentMeta;
 
     return null;
@@ -124,6 +124,18 @@ export class PageExtractor {
     }
 
     return false;
+  }
+
+  private getMetaContent(selector: string): string | null {
+    const element = document.querySelector(selector);
+    if (!element) return null;
+
+    const maybeWithContent = element as Element & { content?: unknown };
+    if (typeof maybeWithContent.content === 'string') {
+      return maybeWithContent.content;
+    }
+
+    return null;
   }
 
   getSelectedText(): string | null {
