@@ -54,6 +54,8 @@ Feature dependency mapping for optimal implementation order.
 |---------|------------|------------|-------|---------------|
 | **DAT-001** Hybrid Storage | AI-002 | - | Stores metadata + summary. ✅ `status` field (INBOX/ARCHIVED) implemented for F-012. | F-018 |
 | **DAT-002** User Profile | DAT-001 | - | Preferences, stats, interest tags. ✅ `InterestTag` for user-created tags; F-014 uses `ContentTag` (AI-generated). | F-017, F-015 |
+| **DAT-004** Cursor Pagination Contract | DAT-001 | - | Opaque cursor tokens (`cursor`, `next_cursor`) for content list stability under concurrent inserts. | N/A |
+| **DAT-005** User Timezone Storage | DAT-002 | - | Persist IANA timezone on profile with `UTC` default and profile API round-trip. | N/A |
 
 *DAT-002 provides data models for F-015 (default_sort preference). F-014 AI category filtering requires AI-003 first.
 
@@ -73,18 +75,20 @@ Feature dependency mapping for optimal implementation order.
 
 ### Wave 4: Data Persistence
 7. **DAT-001** Hybrid Storage Engine ✅
+8. **DAT-004** Cursor Pagination Contract ✅
 
 ### Wave 5: User Experience
-8. **UX-001** Swipe Card Stack ✅ Backend
-9. **UX-002** Swipe Actions ✅
-10. **UX-003** Detail View
+9. **UX-001** Swipe Card Stack ✅ Backend
+10. **UX-002** Swipe Actions ✅
+11. **UX-003** Detail View
 
 ### Wave 6: User Management
-11. **AUTH-002** Social Login (Google)
-12. **AUTH-003** Logout
-13. **AUTH-004** Account Delete
-14. **AUTH-005** Email/Password Auth + Identity Layer
-14. **DAT-002** User Profile ✅ (Models exist, API complete)
+12. **AUTH-002** Social Login (Google)
+13. **AUTH-003** Logout
+14. **AUTH-004** Account Delete
+15. **AUTH-005** Email/Password Auth + Identity Layer
+16. **DAT-002** User Profile ✅ (Models exist, API complete)
+17. **DAT-005** User Timezone Storage ✅
 
 ## Critical Path
 
@@ -132,6 +136,8 @@ ING-001 → ING-002 → AI-001 → UX-001 → UX-002
 | SEC-001 | ✅ [`SEC-001.md`](specs/SEC-001.md) | ✅ [`SEC-001-record.md`](records/SEC-001-record.md) | ✅ Implemented | `src/utils/token_hashing.py`, `src/utils/token_encryption.py`, `src/middleware/rate_limiter.py` | - | ✅ JWT hashing, OAuth encryption, rate limiting, SSRF protection, multi-user isolation |
 | SEC-002 | ✅ [`SEC-002.md`](specs/SEC-002.md) | ✅ [`SEC-002-record.md`](records/SEC-002-record.md) | ✅ Implemented | `src/data/models.py`, `src/integrations/repositories/integration.py`, `src/api/routes.py` | - | ✅ OAuthState table, random CSRF tokens, 15-min TTL, single-use consumption |
 | DAT-003 | ✅ [`DAT-003.md`](specs/DAT-003.md) | - | ⏸️ Design | - | - | ⏸️ Soft delete & 30-day recovery window — design only, no implementation |
+| DAT-004 | ✅ [`DAT-004.md`](specs/DAT-004.md) | - | ✅ Implemented | `src/utils/cursor_pagination.py`, `src/data/repository.py`, `src/api/routers/content.py`, `src/api/routers/swipe.py`, `src/api/schemas.py` | - | ✅ Additive cursor contract on content list endpoints with backward-compatible offset path |
+| DAT-005 | ✅ [`DAT-005.md`](specs/DAT-005.md) | - | ✅ Implemented | `src/data/models.py`, `src/data/repository.py`, `src/api/routers/user.py`, `src/api/schemas.py` | - | ✅ Profile timezone persistence and API round-trip with `UTC` fallback |
 | SEC-003 | ✅ [`SEC-003.md`](specs/SEC-003.md) | - | ⏸️ Design | - | - | ⏸️ AuditLog table for security events — design only, no implementation |
 | QOL-001 | ✅ [`QOL-001.md`](specs/QOL-001.md) | ✅ [`QOL-001-record.md`](records/QOL-001-record.md) | ✅ Implemented | `src/constants.py`, multiple refactored files | - | ✅ Enum consolidation, type hint standardization, constants centralization |
 | F-021 | - | ✅ [`F-021-migration-record.md`](records/F-021-migration-record.md) | ✅ Implemented | `web-dashboard/src/**` | F-021 | ✅ Vue 3 → React 18 migration complete; 25 E2E tests passing |

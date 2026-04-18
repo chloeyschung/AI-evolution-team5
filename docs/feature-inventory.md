@@ -33,6 +33,8 @@ This document tracks all identified features for the **Briefly** project, catego
 ### Data & Sync
 - [x] **[DAT-001] Hybrid Storage Engine** (F-018): Implementation of local on-device storage with background synchronization to the cloud. ✅ Implemented
 - [x] **[DAT-002] User Profile & Preferences** (F-017, F-015): Storage for user settings, preferences, statistics, and swipe history. ✅ Implemented
+- [x] **[DAT-004] Cursor Pagination Contract** (N/A): Add opaque `cursor` / `next_cursor` to content list endpoints while preserving offset compatibility. ✅ Implemented
+- [x] **[DAT-005] User Timezone Storage** (N/A): Persist profile timezone (`UTC` default) and expose/update via `/profile` APIs. ✅ Implemented
 - [ ] **[DAT-003] Soft Delete & Data Recovery** (N/A): Replace hard deletes with `is_deleted` flag + 30-day recovery window. Restore endpoint, background purge task. ✅ Design complete
 - [x] **[UX-007] Filter by AI Category** (F-014): Filter saved content by AI-generated category tags. ✅ Implemented (`tags` query parameter on `/content/pending`, `/content/kept`, `/content/discarded`)
 
