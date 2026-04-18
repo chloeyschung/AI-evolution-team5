@@ -672,7 +672,7 @@ async def test_callback_integer_state_rejected(async_client):
         params={"code": "fake_code", "state": "42"},
     )
     assert response.status_code == 400
-    assert response.json()["detail"] == "invalid_state"
+    assert response.json()["error"] == "invalid_state"
 
 
 @pytest.mark.asyncio
@@ -683,7 +683,7 @@ async def test_callback_unknown_opaque_state_rejected(async_client):
         params={"code": "fake_code", "state": "totally_unknown_token_xyz"},
     )
     assert response.status_code == 400
-    assert response.json()["detail"] == "invalid_state"
+    assert response.json()["error"] == "invalid_state"
 
 
 @pytest.mark.asyncio
@@ -705,4 +705,4 @@ async def test_callback_expired_state_rejected(async_client, db_session):
         params={"code": "fake_code", "state": "expired_cb_token"},
     )
     assert response.status_code == 400
-    assert response.json()["detail"] == "invalid_state"
+    assert response.json()["error"] == "invalid_state"

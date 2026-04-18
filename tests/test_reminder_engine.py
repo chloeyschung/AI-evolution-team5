@@ -1,7 +1,7 @@
 """Tests for smart reminder engine (ADV-003)."""
 
 import pytest
-from datetime import datetime, timedelta, time as time_type
+from datetime import UTC, datetime, timedelta, time as time_type
 from sqlalchemy import select
 
 from src.data.models import (
@@ -237,7 +237,7 @@ async def test_get_suggestion_streak_reminder(db_session):
         user_id=1,
         current_streak=7,
         longest_streak=7,
-        last_activity_date=datetime.now() - timedelta(days=1),  # Yesterday
+        last_activity_date=datetime.now(UTC) - timedelta(days=1),  # Yesterday UTC
         total_active_days=7,
     )
     db_session.add(streak)

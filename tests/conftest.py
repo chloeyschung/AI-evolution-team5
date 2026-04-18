@@ -14,6 +14,8 @@ from src.ai.metadata_extractor import MetadataExtractor
 from src.api.app import app
 from src.auth.tokens import create_access_token, create_refresh_token
 from src.data.models import (
+    AccountDeletion,
+    AuditLog,
     Base,
     SwipeHistory,
     Content,
@@ -100,9 +102,11 @@ async def setup_test_database():
         await session.execute(delete(UserAuthMethod))
         await session.execute(delete(InterestTag))
         await session.execute(delete(UserPreferences))
+        await session.execute(delete(AccountDeletion))
         await session.execute(delete(UserProfile))
         await session.execute(delete(SwipeHistory))
         await session.execute(delete(Content))
+        await session.execute(delete(AuditLog))
         await session.commit()
 
 
@@ -134,9 +138,11 @@ async def test_db_session():
         await session.execute(delete(UserAuthMethod))
         await session.execute(delete(InterestTag))
         await session.execute(delete(UserPreferences))
+        await session.execute(delete(AccountDeletion))
         await session.execute(delete(UserProfile))
         await session.execute(delete(SwipeHistory))
         await session.execute(delete(Content))
+        await session.execute(delete(AuditLog))
         await session.commit()
 
     async with AsyncTestingSessionLocal() as session:

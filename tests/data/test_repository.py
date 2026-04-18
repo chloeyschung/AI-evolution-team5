@@ -345,7 +345,12 @@ class TestSwipeRepository:
 
     @pytest.mark.asyncio
     async def test_get_history(self, db_session, test_user_id):
-        """Test getting swipe history."""
+        """Test getting swipe history.
+
+        Each (user_id, content_id) pair allows exactly one SwipeHistory row
+        (unique constraint added for iOS retry idempotency). The test verifies
+        that get_history returns the row for the requested content only.
+        """
         content_repo = ContentRepository(db_session)
         content1 = await content_repo.save(
             ContentMetadata(platform="Test", content_type=ContentType.ARTICLE, url="https://example.com/h1"),
@@ -357,14 +362,13 @@ class TestSwipeRepository:
         )
         repo = SwipeRepository(db_session)
 
-        # Record multiple swipes
+        # One swipe per content item (unique constraint per user+content)
         await repo.record_swipe(content1.id, SwipeAction.KEEP, test_user_id)
-        await repo.record_swipe(content1.id, SwipeAction.DISCARD, test_user_id)
-        await repo.record_swipe(content2.id, SwipeAction.KEEP, test_user_id)
+        await repo.record_swipe(content2.id, SwipeAction.DISCARD, test_user_id)
 
         history = await repo.get_history(content1.id)
 
-        assert len(history) == 2
+        assert len(history) == 1
 
     @pytest.mark.asyncio
     async def test_get_history_empty(self, db_session):
