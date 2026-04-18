@@ -142,7 +142,7 @@
 { "message": "Verification email sent. Please check your inbox." }
 
 // 409 Conflict (email already registered)
-{ "error": "email_exists", "providers": ["email_password"] }
+{ "detail": { "error": "email_exists", "providers": ["email_password"] } }
 ```
 
 **POST /api/v1/auth/verify-email/resend**
@@ -163,13 +163,15 @@
 { "access_token": "...", "refresh_token": "...", "expires_at": "..." }
 
 // 401 Unauthorized
-{ "error": "invalid_credentials" }
+{ "detail": { "error": "invalid_credentials" } }
 
 // 403 Forbidden (not verified)
 {
-  "error": "email_not_verified",
-  "can_resend": true,
-  "message": "Email not verified. Please verify your email or request a new verification email."
+  "detail": {
+    "error": "email_not_verified",
+    "can_resend": true,
+    "message": "Email not verified. Please verify your email or request a new verification email."
+  }
 }
 ```
 
