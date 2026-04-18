@@ -151,7 +151,7 @@
 { "email": "user@example.com" }
 
 // 200 OK
-{ "message": "If the account exists and is not verified, a verification email has been sent." }
+{ "message": "If that email is registered and not yet verified, a verification email has been sent." }
 ```
 
 **POST /api/v1/auth/login**
