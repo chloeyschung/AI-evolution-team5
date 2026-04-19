@@ -2,6 +2,7 @@
 
 import os
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from src.config import settings
@@ -36,3 +37,24 @@ async def init_db() -> None:
     """Create all tables in the database."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await _ensure_user_profile_timezone_column(conn)
+
+
+async def _ensure_user_profile_timezone_column(conn) -> None:
+    """Backfill schema drift for existing SQLite DBs.
+
+    `create_all()` does not alter existing tables. If `user_profile` was created
+    before the `timezone` column existed, add it at startup to keep API responses
+    compatible with profile schema expectations.
+    """
+    if not DATABASE_URL.startswith("sqlite"):
+        return
+
+    result = await conn.execute(text("PRAGMA table_info(user_profile)"))
+    existing_columns = {row[1] for row in result.fetchall()}
+    if "timezone" in existing_columns:
+        return
+
+    await conn.execute(
+        text("ALTER TABLE user_profile ADD COLUMN timezone VARCHAR(64) DEFAULT 'UTC'")
+    )

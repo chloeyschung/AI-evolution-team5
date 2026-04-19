@@ -14,10 +14,12 @@ from ...data.email_auth_repository import EmailAuthRepository
 from ...data.models import AuditEventType, UserAuthMethod, UserProfile, utc_now
 from ...data.repository import AuditRepository, UserProfileRepository
 from ...auth.email_auth import hash_password, hmac_email, encrypt_email, verify_password, generate_token
+from ...auth.tokens import verify_access_token
 from ...services.email_service import EmailService
 from ...utils.datetime_utils import serialize_datetime
 from ...utils.token_hashing import hash_access_token as _hash_token
 from ..dependencies import get_current_user
+from ...middleware.rate_limiter import limiter
 from ..schemas import (
     AuthStatusResponse,
     GoogleLoginRequest,
@@ -94,6 +96,11 @@ async def get_auth_status(
 
     # Extract token
     token = authorization[7:]  # Remove "Bearer " prefix
+
+    # Verify JWT signature before touching the database
+    if verify_access_token(token) is None:
+        return AuthStatusResponse(is_authenticated=False)
+
     auth_repo = AuthenticationRepository(db)
 
     # Get token from database
@@ -115,8 +122,9 @@ async def get_auth_status(
 
 
 @router.post("/auth/refresh", response_model=TokenRefreshResponse)
+@limiter.limit("10/minute")
 async def refresh_auth_token(
-    http_request: Request,
+    request: Request,
     data: TokenRefreshRequest,
     db: AsyncSession = Depends(get_db),
 ) -> TokenRefreshResponse:
@@ -125,7 +133,7 @@ async def refresh_auth_token(
     Implements token rotation: issues new refresh token on each refresh.
 
     Args:
-        http_request: Incoming HTTP request (for IP extraction).
+        request: Incoming HTTP request (for IP extraction).
         data: Refresh token request.
         db: Database session.
 
@@ -135,7 +143,7 @@ async def refresh_auth_token(
     Raises:
         401: Invalid or expired refresh token.
     """
-    ip = http_request.client.host if http_request.client else None
+    ip = request.client.host if request.client else None
     auth_repo = AuthenticationRepository(db)
 
     # Refresh token (includes token rotation)
@@ -169,8 +177,9 @@ async def refresh_auth_token(
 
 
 @router.post("/auth/google", status_code=200, response_model=GoogleLoginResponse)
+@limiter.limit("5/minute")
 async def google_login(
-    http_request: Request,
+    request: Request,
     data: GoogleLoginRequest,
     db: AsyncSession = Depends(get_db),
 ) -> GoogleLoginResponse:
@@ -261,7 +270,7 @@ async def google_login(
     # Create authentication tokens (returns tuple of record and plaintext JWT)
     token_record, access_token = await auth_repo.create_tokens(existing_user.id)
 
-    ip = http_request.client.host if http_request.client else None
+    ip = request.client.host if request.client else None
     audit = AuditRepository(db)
     await audit.log_event(
         AuditEventType.LOGIN_SUCCESS,
@@ -440,13 +449,15 @@ async def google_login_with_code(
 # AUTH-005: Email/Password auth routes ────────────────────────────────────────
 
 
-@router.post("/auth/register", status_code=201)
+@router.post("/auth/register", status_code=201, response_model=RegisterResponse)
+@limiter.limit("5/minute")
 async def register(
-    request: RegisterRequest,
+    request: Request,
+    data: RegisterRequest,
     db: AsyncSession = Depends(get_db),
 ) -> RegisterResponse:
     email_repo = EmailAuthRepository(db)
-    normalized_email = _normalize_email(request.email)
+    normalized_email = _normalize_email(data.email)
     provider_id = hmac_email(normalized_email)
 
     existing = await email_repo.get_auth_method_by_provider(AuthProvider.EMAIL_PASSWORD, provider_id)
@@ -454,10 +465,10 @@ async def register(
         if existing.email_verified:
             raise HTTPException(
                 status_code=409,
-                detail={"error": "email_exists", "providers": [AuthProvider.EMAIL_PASSWORD.value]},
+                detail={"error": "email_exists", "message": "An account with this email already exists.", "providers": [AuthProvider.EMAIL_PASSWORD.value]},
             )
 
-        existing.password_hash = hash_password(request.password)
+        existing.password_hash = hash_password(data.password)
         raw_token = await _rotate_verification_token(email_repo, existing.user_id)
         _send_verification_email_safely(normalized_email, raw_token)
         return RegisterResponse(message="Verification email sent. Please check your inbox.")
@@ -468,7 +479,7 @@ async def register(
         auth_methods = await email_repo.get_auth_methods_for_user(existing_user.id)
         raise HTTPException(
             status_code=409,
-            detail={"error": "email_exists", "providers": [method.provider.value for method in auth_methods]},
+            detail={"error": "email_exists", "message": "An account with this email already exists.", "providers": [method.provider.value for method in auth_methods]},
         )
 
     user = UserProfile(
@@ -483,7 +494,7 @@ async def register(
         user_id=user.id,
         provider=AuthProvider.EMAIL_PASSWORD,
         provider_id=provider_id,
-        password_hash=hash_password(request.password),
+        password_hash=hash_password(data.password),
         email_encrypted=encrypt_email(normalized_email),
     )
 
@@ -540,16 +551,17 @@ async def resend_verification_email(
     return ResendVerificationResponse(message=_VERIFICATION_EMAIL_SENT_MESSAGE)
 
 
-@router.post("/auth/login")
+@router.post("/auth/login", response_model=LoginResponse)
+@limiter.limit("3/minute")
 async def login_email(
-    http_request: Request,
-    request: LoginRequest,
+    request: Request,
+    data: LoginRequest,
     db: AsyncSession = Depends(get_db),
 ) -> LoginResponse:
-    ip = http_request.client.host if http_request.client else None
+    ip = request.client.host if request.client else None
     audit = AuditRepository(db)
     email_repo = EmailAuthRepository(db)
-    normalized_email = _normalize_email(request.email)
+    normalized_email = _normalize_email(data.email)
     provider_id = hmac_email(normalized_email)
 
     method = await email_repo.get_auth_method_by_provider(AuthProvider.EMAIL_PASSWORD, provider_id)
@@ -565,7 +577,7 @@ async def login_email(
             detail={"error": "invalid_credentials", "message": "Invalid email or password."},
         )
 
-    if not verify_password(request.password, method.password_hash or ""):
+    if not verify_password(data.password, method.password_hash or ""):
         await audit.log_event(
             AuditEventType.LOGIN_FAILURE,
             user_id=method.user_id,
@@ -622,7 +634,7 @@ async def login_email(
     )
 
 
-@router.post("/auth/password-reset/request")
+@router.post("/auth/password-reset/request", response_model=PasswordResetRequestResponse)
 async def password_reset_request(
     request: PasswordResetRequestSchema,
     db: AsyncSession = Depends(get_db),
@@ -647,7 +659,7 @@ async def password_reset_request(
     return PasswordResetRequestResponse(message="If that email is registered, a reset link has been sent.")
 
 
-@router.post("/auth/password-reset/confirm")
+@router.post("/auth/password-reset/confirm", response_model=PasswordResetConfirmResponse)
 async def password_reset_confirm(
     request: PasswordResetConfirmSchema,
     db: AsyncSession = Depends(get_db),

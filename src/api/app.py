@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from ..ai.summarizer import Summarizer
@@ -210,6 +211,9 @@ app.add_middleware(BaseHTTPMiddleware, dispatch=security_headers_middleware)
 
 # GZip compression for JSON responses (iOS API compliance — responses ≥ 1 KB)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# SlowAPI middleware must be installed for per-route limiter decorators to enforce limits.
+app.add_middleware(SlowAPIMiddleware)
 
 app.include_router(well_known.router,   prefix="",        tags=[])
 app.include_router(auth.router,         prefix="/api/v1", tags=["auth"])
