@@ -237,7 +237,10 @@ class ContentRepository(BaseRepository[Content]):
         base_query = (
             select(Content)
             .where(Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
-            .outerjoin(SwipeHistory, Content.id == SwipeHistory.content_id)
+            .outerjoin(
+                SwipeHistory,
+                (Content.id == SwipeHistory.content_id) & (SwipeHistory.user_id == user_id),
+            )
             .where(SwipeHistory.id.is_(None))
             .order_by(Content.created_at.desc(), Content.id.desc())
         )
@@ -500,7 +503,10 @@ class ContentRepository(BaseRepository[Content]):
             select(func.count())
             .select_from(Content)
             .where(Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
-            .outerjoin(SwipeHistory, Content.id == SwipeHistory.content_id)
+            .outerjoin(
+                SwipeHistory,
+                (Content.id == SwipeHistory.content_id) & (SwipeHistory.user_id == user_id),
+            )
             .where(SwipeHistory.id.is_(None))
         )
         result = await self.session.execute(stmt)
@@ -780,7 +786,14 @@ class SwipeRepository(BaseRepository[SwipeHistory]):
                     SwipeHistory.content_id == content_id,
                 )
             )
-            return result.scalar_one()
+            existing_history = result.scalar_one()
+
+            # Retry path for DISCARD must preserve ARCHIVED status after rollback.
+            if action == SwipeAction.DISCARD:
+                await self._update_content_status(content_id, user_id, ContentStatus.ARCHIVED)
+                await self.session.commit()
+
+            return existing_history
 
     async def _update_content_status(self, content_id: int, user_id: int, new_status: ContentStatus) -> None:
         """Helper to update content status (internal use).

@@ -122,6 +122,11 @@ async def test_verify_email_post_invalid_token_returns_400(async_client, db):
     assert resp.status_code == 400
 
 
+async def test_verify_email_get_legacy_route_not_allowed(async_client, db):
+    resp = await async_client.get("/api/v1/auth/verify-email?token=legacy")
+    assert resp.status_code in (404, 405)
+
+
 async def test_resend_verification_for_unverified_email_returns_200(async_client, db):
     async with AsyncTestingSessionLocal() as session:
         await make_unverified_user(session, email="resend@example.com", password="Pass1!")

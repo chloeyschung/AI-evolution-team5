@@ -14,6 +14,27 @@ from fastapi.responses import JSONResponse
 logger = logging.getLogger(__name__)
 
 
+def _apply_security_headers(response: Response) -> Response:
+    """Attach SEC-001 headers to a response object."""
+    # Prevent MIME type sniffing (browsers won't guess content type)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+
+    # Prevent clickjacking (page cannot be embedded in frames)
+    # SEC-001 requirement (line 70)
+    response.headers["X-Frame-Options"] = "DENY"
+
+    # Enable XSS filter in legacy browsers (Chrome, Safari)
+    # SEC-001 requirement (line 71)
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+
+    # Prevent IE from downloading files as attachments
+    response.headers["X-Download-Options"] = "noopen"
+
+    # Block cross-domain policies (Flash, JavaApplets)
+    response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
+    return response
+
+
 async def security_headers_middleware(request: Request, call_next):
     """Add security headers to all responses.
 
@@ -37,26 +58,10 @@ async def security_headers_middleware(request: Request, call_next):
         response = await call_next(request)
     except Exception as exc:
         logger.error("Unhandled exception in request %s %s: %s", request.method, request.url.path, exc, exc_info=True)
-        return JSONResponse(
+        response = JSONResponse(
             status_code=500,
             content={"error": "internal_server_error", "message": "An unexpected error occurred.", "code": 500},
         )
+        return _apply_security_headers(response)
 
-    # Prevent MIME type sniffing (browsers won't guess content type)
-    response.headers["X-Content-Type-Options"] = "nosniff"
-
-    # Prevent clickjacking (page cannot be embedded in frames)
-    # SEC-001 requirement (line 70)
-    response.headers["X-Frame-Options"] = "DENY"
-
-    # Enable XSS filter in legacy browsers (Chrome, Safari)
-    # SEC-001 requirement (line 71)
-    response.headers["X-XSS-Protection"] = "1; mode=block"
-
-    # Prevent IE from downloading files as attachments
-    response.headers["X-Download-Options"] = "noopen"
-
-    # Block cross-domain policies (Flash, JavaApplets)
-    response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
-
-    return response
+    return _apply_security_headers(response)

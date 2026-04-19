@@ -81,9 +81,9 @@ class TestPendingPaginatedEnvelope:
         response = await authenticated_client.get("/api/v1/content/pending?limit=2&offset=0")
         assert response.status_code == 200
         data = response.json()
-        if data["has_more"]:
-            assert data["next_offset"] is not None
-            assert data["next_offset"] == 2
+        assert data["has_more"] is True
+        assert data["next_offset"] is not None
+        assert data["next_offset"] == 2
 
     async def test_pending_cursor_mode_returns_next_cursor(self, authenticated_client):
         """Cursor mode should include next_cursor and suppress next_offset."""
@@ -281,9 +281,9 @@ class TestSearchPaginatedEnvelope:
         )
         assert response.status_code == 200
         data = response.json()
-        if data["has_more"]:
-            assert data["next_offset"] is not None
-            assert data["next_offset"] == 2
+        assert data["has_more"] is True
+        assert data["next_offset"] is not None
+        assert data["next_offset"] == 2
 
     async def test_search_cursor_mode_returns_next_cursor(self, authenticated_client):
         """Cursor mode should paginate forward with next_cursor."""

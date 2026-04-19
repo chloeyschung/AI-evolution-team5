@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, Field, field_serializer, field_validator
 
 from src.constants import (
     ContentStatus,
@@ -59,6 +59,9 @@ class ContentResponse(BaseModel):
         Returns:
             ContentResponse instance
         """
+        created_at = serialize_datetime(content.created_at)
+        assert created_at is not None
+
         return cls(
             id=content.id,
             platform=content.platform,
@@ -69,8 +72,8 @@ class ContentResponse(BaseModel):
             summary=content.summary,
             thumbnail_url=content.thumbnail_url,
             status=content.status,
-            created_at=content.created_at.isoformat(),
-            updated_at=content.updated_at.isoformat() if content.updated_at else None,
+            created_at=created_at,
+            updated_at=serialize_datetime(content.updated_at),
         )
 
     @classmethod
@@ -83,6 +86,9 @@ class ContentResponse(BaseModel):
         Returns:
             ContentResponse instance
         """
+        created_at = serialize_datetime(utc_now())
+        assert created_at is not None
+
         return cls(
             id=metadata.id if hasattr(metadata, "id") else 0,
             platform=metadata.platform,
@@ -93,7 +99,7 @@ class ContentResponse(BaseModel):
             summary=metadata.summary if hasattr(metadata, "summary") else None,
             thumbnail_url=metadata.thumbnail_url,
             status=ContentStatus.INBOX,
-            created_at=utc_now().isoformat(),
+            created_at=created_at,
             updated_at=None,
         )
 
@@ -184,6 +190,15 @@ class SwipeHistoryResponse(BaseModel):
 
     action: str
     swiped_at: str
+
+    @field_validator("swiped_at", mode="before")
+    @classmethod
+    def serialize_swiped_at(cls, value: datetime | str) -> str:
+        if isinstance(value, datetime):
+            serialized = serialize_datetime(value)
+            assert serialized is not None
+            return serialized
+        return value
 
 
 class ContentDetailResponse(BaseModel):
@@ -680,6 +695,13 @@ class AchievementProgress(BaseModel):
     progress_percent: int
     unlocked_at: str | None = None
 
+    @field_validator("unlocked_at", mode="before")
+    @classmethod
+    def serialize_unlocked_at(cls, value: datetime | str | None) -> str | None:
+        if isinstance(value, datetime):
+            return serialize_datetime(value)
+        return value
+
 
 class AchievementsListResponse(BaseModel):
     """Schema for achievements list response."""
@@ -712,6 +734,15 @@ class NewAchievement(BaseModel):
     name: str
     icon: str
     unlocked_at: str
+
+    @field_validator("unlocked_at", mode="before")
+    @classmethod
+    def serialize_unlocked_at(cls, value: datetime | str) -> str:
+        if isinstance(value, datetime):
+            serialized = serialize_datetime(value)
+            assert serialized is not None
+            return serialized
+        return value
 
 
 class CheckAchievementsResponse(BaseModel):

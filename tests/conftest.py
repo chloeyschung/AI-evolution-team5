@@ -19,6 +19,7 @@ from src.data.models import (
     Base,
     SwipeHistory,
     Content,
+    ContentTag,
     UserProfile,
     UserPreferences,
     InterestTag,
@@ -72,6 +73,32 @@ async def async_get_db():
 app.dependency_overrides[db_module.get_db] = async_get_db
 
 
+async def _clear_all_test_data(session: AsyncSession) -> None:
+    """Delete test data in FK-safe child-before-parent order."""
+    await session.execute(delete(AuditLog))
+    await session.execute(delete(SwipeHistory))
+    await session.execute(delete(ContentTag))
+    await session.execute(delete(UserActivityPattern))
+    await session.execute(delete(ReminderLog))
+    await session.execute(delete(ReminderPreference))
+    await session.execute(delete(UserAchievement))
+    await session.execute(delete(UserStreak))
+    await session.execute(delete(AchievementDefinition))
+    await session.execute(delete(IntegrationSyncLog))
+    await session.execute(delete(IntegrationSyncConfig))
+    await session.execute(delete(IntegrationTokens))
+    await session.execute(delete(AuthenticationToken))
+    await session.execute(delete(PasswordResetToken))
+    await session.execute(delete(EmailVerificationToken))
+    await session.execute(delete(UserAuthMethod))
+    await session.execute(delete(InterestTag))
+    await session.execute(delete(UserPreferences))
+    await session.execute(delete(Content))
+    await session.execute(delete(AccountDeletion))
+    await session.execute(delete(UserProfile))
+    await session.commit()
+
+
 @pytest.fixture(scope="function", name="db")
 async def setup_test_database():
     """Create tables and clear data before each test.
@@ -87,27 +114,7 @@ async def setup_test_database():
 
     # Cleanup: drop all data after test (keep tables for next test)
     async with AsyncTestingSessionLocal() as session:
-        await session.execute(delete(UserActivityPattern))
-        await session.execute(delete(ReminderLog))
-        await session.execute(delete(ReminderPreference))
-        await session.execute(delete(UserAchievement))
-        await session.execute(delete(UserStreak))
-        await session.execute(delete(AchievementDefinition))
-        await session.execute(delete(IntegrationSyncLog))
-        await session.execute(delete(IntegrationSyncConfig))
-        await session.execute(delete(IntegrationTokens))
-        await session.execute(delete(AuthenticationToken))
-        await session.execute(delete(PasswordResetToken))
-        await session.execute(delete(EmailVerificationToken))
-        await session.execute(delete(UserAuthMethod))
-        await session.execute(delete(InterestTag))
-        await session.execute(delete(UserPreferences))
-        await session.execute(delete(AccountDeletion))
-        await session.execute(delete(UserProfile))
-        await session.execute(delete(SwipeHistory))
-        await session.execute(delete(Content))
-        await session.execute(delete(AuditLog))
-        await session.commit()
+        await _clear_all_test_data(session)
 
 
 @pytest.fixture(scope="function", name="db_session")
@@ -123,27 +130,7 @@ async def test_db_session():
 
     # Clear all data before test
     async with AsyncTestingSessionLocal() as session:
-        await session.execute(delete(UserActivityPattern))
-        await session.execute(delete(ReminderLog))
-        await session.execute(delete(ReminderPreference))
-        await session.execute(delete(UserAchievement))
-        await session.execute(delete(UserStreak))
-        await session.execute(delete(AchievementDefinition))
-        await session.execute(delete(IntegrationSyncLog))
-        await session.execute(delete(IntegrationSyncConfig))
-        await session.execute(delete(IntegrationTokens))
-        await session.execute(delete(AuthenticationToken))
-        await session.execute(delete(PasswordResetToken))
-        await session.execute(delete(EmailVerificationToken))
-        await session.execute(delete(UserAuthMethod))
-        await session.execute(delete(InterestTag))
-        await session.execute(delete(UserPreferences))
-        await session.execute(delete(AccountDeletion))
-        await session.execute(delete(UserProfile))
-        await session.execute(delete(SwipeHistory))
-        await session.execute(delete(Content))
-        await session.execute(delete(AuditLog))
-        await session.commit()
+        await _clear_all_test_data(session)
 
     async with AsyncTestingSessionLocal() as session:
         try:

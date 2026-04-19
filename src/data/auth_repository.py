@@ -11,12 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth import tokens as token_utils
 from src.data.base_repository import BaseRepository
 from src.data.models import AuthenticationToken
-from src.utils.datetime_utils import utc_now
+from src.utils.datetime_utils import convert_to_utc, utc_now
 from src.utils.token_hashing import hash_access_token
 
 
 class AuthenticationRepository(BaseRepository[AuthenticationToken]):
     """Repository for authentication token management."""
+    REFRESH_TOKEN_TTL_SECONDS = 604800  # 7 days
 
     def __init__(self, db: AsyncSession):
         super().__init__(db)
@@ -144,24 +145,36 @@ class AuthenticationRepository(BaseRepository[AuthenticationToken]):
         Returns:
             Tuple of (Updated AuthenticationToken, plaintext JWT access token) or None if refresh failed
         """
-        # Get existing token by refresh token
-        existing_token = await self.get_token_by_refresh_token(refresh_token)
-        if not existing_token:
-            return None
+        async with self.db.begin():
+            # Lock row and rotate inside one transaction to avoid race windows.
+            result = await self.db.execute(
+                select(AuthenticationToken)
+                .where(AuthenticationToken.refresh_token == refresh_token)
+                .where(AuthenticationToken.revoked_at.is_(None))
+                .with_for_update()
+            )
+            existing_token = result.scalar_one_or_none()
+            if not existing_token:
+                return None
 
-        # Generate new tokens (token rotation)
-        new_access_token = token_utils.create_access_token(existing_token.user_id)
-        new_refresh_token = token_utils.create_refresh_token()
-        new_expires_at = utc_now() + timedelta(seconds=access_expires_in)
+            # Enforce refresh token TTL from token creation time.
+            created_at_utc = convert_to_utc(existing_token.created_at)
+            if created_at_utc is None:
+                return None
+            if utc_now() >= created_at_utc + timedelta(seconds=self.REFRESH_TOKEN_TTL_SECONDS):
+                return None
 
-        # Update token record with hashed access token
-        existing_token.access_token = hash_access_token(new_access_token)
-        existing_token.refresh_token = new_refresh_token
-        existing_token.expires_at = new_expires_at
+            # Generate new tokens (token rotation)
+            new_access_token = token_utils.create_access_token(existing_token.user_id)
+            new_refresh_token = token_utils.create_refresh_token()
+            new_expires_at = utc_now() + timedelta(seconds=access_expires_in)
 
-        await self.db.commit()
+            # Update token record with hashed access token
+            existing_token.access_token = hash_access_token(new_access_token)
+            existing_token.refresh_token = new_refresh_token
+            existing_token.expires_at = new_expires_at
+
         await self.db.refresh(existing_token)
-
         return existing_token, new_access_token  # Return both record and plaintext JWT
 
     async def revoke_token_by_user_id(self, user_id: int) -> bool:
@@ -198,4 +211,3 @@ class AuthenticationRepository(BaseRepository[AuthenticationToken]):
         await self.db.execute(
             delete(AuthenticationToken).where(AuthenticationToken.user_id == user_id)
         )
-        await self.db.commit()

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...constants import ErrorCode
 from ...data.database import get_db
+from ...utils.datetime_utils import serialize_datetime
 from ..dependencies import get_current_user
 from ..schemas import (
     AchievementProgress,
@@ -106,7 +107,7 @@ async def get_achievements_stats(
                 is_unlocked=True,
                 progress=definition.trigger_value,
                 progress_percent=100,
-                unlocked_at=ua.unlocked_at.isoformat(),
+                unlocked_at=serialize_datetime(ua.unlocked_at),
             )
         )
 
