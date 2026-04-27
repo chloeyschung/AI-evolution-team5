@@ -4,6 +4,9 @@ export interface ShareData {
   content: string;
   platform?: string;
   metadata?: Record<string, unknown>;
+  options?: {
+    auto_summarize?: boolean;
+  };
 }
 
 export interface ShareResponse {
@@ -48,6 +51,19 @@ export interface GoogleLoginResponse {
   is_new_user: boolean;
 }
 
+export interface EmailPasswordLoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface EmailPasswordLoginResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_at: string;
+  user_id: number;
+  email: string;
+}
+
 export interface LogoutResponse {
   message: string;
 }
@@ -86,6 +102,6 @@ export interface ExtensionSettings {
 }
 
 export const DEFAULT_SETTINGS: ExtensionSettings = {
-  apiBaseUrl: 'http://localhost:8000',
+  apiBaseUrl: '',
   autoSummarize: true,
 };

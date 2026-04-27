@@ -1,6 +1,7 @@
 import { ShareData, ShareResponse, PageMetadata } from './types';
 import { authManager } from './auth';
 import { storageManager } from './storage';
+import { resolveApiBaseUrl } from './runtime-config';
 
 export class APIError extends Error {
   constructor(
@@ -32,15 +33,20 @@ export class APIClient {
     }
 
     const settings = await storageManager.getSettings();
+    const apiBaseUrl = resolveApiBaseUrl(settings.apiBaseUrl);
 
     const shareData: ShareData = {
       content: selectedText || metadata.url,
       platform: this.detectPlatform(metadata.url),
       metadata: {
+        url: metadata.url,
         title: metadata.title,
         author: metadata.author,
         description: metadata.description,
         content_type: metadata.type,
+      },
+      options: {
+        auto_summarize: settings.autoSummarize,
       },
     };
 
@@ -48,7 +54,7 @@ export class APIClient {
     const timeoutId = setTimeout(() => controller.abort(), this.TIMEOUT_MS);
 
     try {
-      const response = await fetch(`${settings.apiBaseUrl}/api/v1/share`, {
+      const response = await fetch(`${apiBaseUrl}/api/v1/share`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

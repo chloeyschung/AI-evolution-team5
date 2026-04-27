@@ -3,7 +3,7 @@
   "name": "Briefly - Save & Summarize",
   "version": "1.0.0",
   "description": "Save any web content to Briefly with AI-powered summaries",
-  "permissions": ["storage", "contextMenus", "activeTab"],
+  "permissions": ["storage", "contextMenus", "activeTab", "notifications", "identity"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "src/background/service-worker.ts",
@@ -33,7 +33,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["login/login.html"],
+      "resources": ["src/login/login.html"],
       "matches": ["<all_urls>"]
     }
   ]

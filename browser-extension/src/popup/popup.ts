@@ -1,8 +1,8 @@
 import { authManager } from '../shared/auth';
 import { apiClient } from '../shared/api';
 import { storageManager } from '../shared/storage';
-import type { AuthStatus } from '../shared/types';
-import { pageExtractor } from '../utils/extractor';
+import type { AuthStatus, PageMetadata } from '../shared/types';
+import { getRuntimeConfig } from '../shared/runtime-config';
 
 const loadingEl = document.getElementById('loading') as HTMLDivElement;
 const loggedOutEl = document.getElementById('logged-out') as HTMLDivElement;
@@ -11,12 +11,17 @@ const errorEl = document.getElementById('error') as HTMLDivElement;
 const errorMessageEl = document.getElementById('error-message') as HTMLParagraphElement;
 
 const loginBtn = document.getElementById('login-btn') as HTMLButtonElement;
+const emailLoginForm = document.getElementById('email-login-form') as HTMLFormElement;
+const emailLoginBtn = document.getElementById('email-login-btn') as HTMLButtonElement;
+const emailInput = document.getElementById('email-input') as HTMLInputElement;
+const passwordInput = document.getElementById('password-input') as HTMLInputElement;
 const saveCurrentPageBtn = document.getElementById('save-current-page') as HTMLButtonElement;
 const logoutBtn = document.getElementById('logout-btn') as HTMLButtonElement;
 const retryBtn = document.getElementById('retry-btn') as HTMLButtonElement;
 const userEmailEl = document.getElementById('user-email') as HTMLSpanElement;
 const autoSummarizeEl = document.getElementById('auto-summarize') as HTMLInputElement;
 const apiUrlEl = document.getElementById('api-url') as HTMLInputElement;
+const apiUrlSettingEl = document.getElementById('api-url-setting') as HTMLDivElement;
 
 let currentTab: chrome.tabs.Tab | null = null;
 
@@ -77,11 +82,13 @@ async function loadSettings(): Promise<void> {
   const settings = await storageManager.getSettings();
   autoSummarizeEl.checked = settings.autoSummarize;
   apiUrlEl.value = settings.apiBaseUrl;
+  apiUrlSettingEl.style.display = getRuntimeConfig().SHOW_API_URL_SETTING ? 'block' : 'none';
 }
 
+// Google login
 loginBtn.addEventListener('click', async () => {
   try {
-    const clientId = (window as any).__BRIEFLY_CONFIG?.GOOGLE_CLIENT_ID || '';
+    const clientId = getRuntimeConfig().GOOGLE_CLIENT_ID || '';
 
     if (!clientId) {
       showError('Google Client ID is not configured.');
@@ -143,6 +150,66 @@ loginBtn.addEventListener('click', async () => {
   }
 });
 
+// Email/password login
+emailLoginForm.addEventListener('submit', async (e: Event) => {
+  e.preventDefault();
+
+  try {
+    emailLoginBtn.disabled = true;
+    emailLoginBtn.textContent = 'Signing in…';
+
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+
+    if (!email || !password) {
+      throw new Error('Please enter both email and password');
+    }
+
+    await authManager.loginWithEmailPassword(email, password);
+
+    const authStatus = await authManager.getAuthStatus();
+    if (authStatus?.is_authenticated) {
+      showLoggedIn(authStatus);
+      return;
+    }
+
+    throw new Error('Login did not complete. Please try again.');
+  } catch (error) {
+    console.error('Email login error:', error);
+    showError(error instanceof Error ? error.message : 'Sign in failed. Please check your credentials.');
+  } finally {
+    emailLoginBtn.disabled = false;
+    emailLoginBtn.textContent = 'Sign in with email';
+  }
+});
+
+async function getActiveTabMetadata(): Promise<PageMetadata> {
+  if (!currentTab?.id || !currentTab.url) {
+    throw new Error('No active page to save.');
+  }
+
+  // chrome-extension:// and chrome:// pages cannot receive messages
+  if (currentTab.url.startsWith('chrome') || currentTab.url.startsWith('about:')) {
+    throw new Error('Cannot save browser internal pages.');
+  }
+
+  try {
+    const response = await chrome.tabs.sendMessage(currentTab.id, { action: 'getMetadata' });
+    if (response?.metadata) return response.metadata as PageMetadata;
+    throw new Error('No metadata from content script.');
+  } catch {
+    // Content script not yet injected — fall back to tab info
+    return {
+      url: currentTab.url,
+      title: currentTab.title ?? null,
+      author: null,
+      description: null,
+      type: 'unknown',
+    };
+  }
+}
+
+// Save content
 saveCurrentPageBtn.addEventListener('click', async () => {
   if (!currentTab || !currentTab.url) {
     showError('No active page to save.');
@@ -153,10 +220,8 @@ saveCurrentPageBtn.addEventListener('click', async () => {
     saveCurrentPageBtn.disabled = true;
     saveCurrentPageBtn.textContent = 'Saving…';
 
-    const metadata = await pageExtractor.extractMetadata();
-    const selectedText = pageExtractor.getSelectedText() || undefined;
-
-    await apiClient.shareContent(metadata, selectedText);
+    const metadata = await getActiveTabMetadata();
+    await apiClient.shareContent(metadata);
 
     saveCurrentPageBtn.textContent = 'Saved';
     setTimeout(() => {
@@ -171,6 +236,7 @@ saveCurrentPageBtn.addEventListener('click', async () => {
   }
 });
 
+// Logout
 logoutBtn.addEventListener('click', async () => {
   try {
     await authManager.logout();
@@ -181,10 +247,12 @@ logoutBtn.addEventListener('click', async () => {
   }
 });
 
+// Retry
 retryBtn.addEventListener('click', () => {
   void init();
 });
 
+// Settings
 autoSummarizeEl.addEventListener('change', async () => {
   await storageManager.updateSettings({ autoSummarize: autoSummarizeEl.checked });
 });
