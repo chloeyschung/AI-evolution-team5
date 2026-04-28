@@ -19,6 +19,19 @@ function formatDate(iso: string) {
   }).format(new Date(iso));
 }
 
+/** Collapse a multi-bullet AI summary into one inline string so table rows
+ *  stay even-height. CSS line-clamps to 2 lines after this. */
+function flattenSummary(raw?: string | null) {
+  if (!raw) return 'No summary yet.';
+  const parts = raw
+    .split('\n')
+    .map((line) => line.trim().replace(/^[•*\-–]\s*/, ''))
+    .filter(Boolean);
+  if (parts.length === 0) return raw;
+  if (parts.length === 1) return parts[0];
+  return parts.join(' · ');
+}
+
 export default function ContentTable({
   items,
   onOpen,
@@ -47,7 +60,7 @@ export default function ContentTable({
       render: (item) => (
         <button className={styles.titleButton} onClick={() => onOpen(item.id)}>
           <strong>{item.title || item.url || 'Untitled content'}</strong>
-          <span>{item.author || item.platform}</span>
+          {item.author ? <span>by {item.author}</span> : null}
         </button>
       ),
     },
@@ -55,7 +68,7 @@ export default function ContentTable({
       key: 'platform',
       header: 'Platform',
       width: '14%',
-      render: (item) => item.platform,
+      render: (item) => <span className={styles.platform}>{item.platform}</span>,
     },
     {
       key: 'status',
@@ -71,13 +84,13 @@ export default function ContentTable({
       key: 'summary',
       header: 'Summary',
       width: '26%',
-      render: (item) => <span className={styles.summary}>{item.summary || 'No summary yet.'}</span>,
+      render: (item) => <span className={styles.summary}>{flattenSummary(item.summary)}</span>,
     },
     {
       key: 'date',
       header: 'Created',
       width: '10%',
-      render: (item) => formatDate(item.created_at),
+      render: (item) => <span className={styles.date}>{formatDate(item.created_at)}</span>,
     },
     {
       key: 'actions',
@@ -86,12 +99,27 @@ export default function ContentTable({
       render: (item) => (
         <div className={styles.actions}>
           {item.status === 'inbox' && onSwipe ? (
-            <>
-              <button className="btn" onClick={() => void onSwipe({ content_id: item.id, action: 'keep' })}>Keep</button>
-              <button className="btn" onClick={() => void onSwipe({ content_id: item.id, action: 'discard' })}>Discard</button>
-            </>
+            <button
+              className={styles.iconAction}
+              onClick={() => void onSwipe({ content_id: item.id, action: 'keep' })}
+              aria-label="Keep item"
+              title="Keep"
+            >
+              <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path d="M7 3a5 5 0 1 1-4.8 6.4.75.75 0 1 1 1.45-.38A3.5 3.5 0 1 0 7 4.5H4.8l1.7 1.7a.75.75 0 1 1-1.06 1.06L2.46 4.3a.75.75 0 0 1 0-1.06L5.44.26A.75.75 0 0 1 6.5 1.32L4.84 3H7Z" />
+              </svg>
+            </button>
           ) : null}
-          <button className="btn btn-danger" onClick={() => void onDelete(item.id)}>Delete</button>
+          <button
+            className={`${styles.iconAction} ${styles.iconActionDanger}`}
+            onClick={() => void onDelete(item.id)}
+            aria-label="Discard item"
+            title="Discard"
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+              <path d="M6 1.75A1.75 1.75 0 0 1 7.75 0h.5A1.75 1.75 0 0 1 10 1.75V2h3.25a.75.75 0 0 1 0 1.5h-.62l-.53 9.03A2 2 0 0 1 10.1 14.5H5.9a2 2 0 0 1-1.99-1.97L3.38 3.5h-.63a.75.75 0 1 1 0-1.5H6v-.25ZM7.5 2h1V1.75a.25.25 0 0 0-.25-.25h-.5a.25.25 0 0 0-.25.25V2Zm-2.62 1.5.53 9.03a.5.5 0 0 0 .49.47h4.2a.5.5 0 0 0 .5-.47l.52-9.03H4.88ZM6.75 5a.75.75 0 0 1 .75.75v4a.75.75 0 1 1-1.5 0v-4A.75.75 0 0 1 6.75 5Zm2.5 0a.75.75 0 0 1 .75.75v4a.75.75 0 1 1-1.5 0v-4A.75.75 0 0 1 9.25 5Z" />
+            </svg>
+          </button>
         </div>
       ),
     },

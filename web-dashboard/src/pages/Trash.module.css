@@ -1,0 +1,224 @@
+.page {
+  display: grid;
+  gap: 14px;
+}
+
+.hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 14px;
+  border: 1px solid var(--color-border-muted);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.heroText {
+  display: grid;
+  gap: 4px;
+}
+
+.hero h1 {
+  margin-top: 0;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+}
+
+.subtitle {
+  margin-top: 6px;
+  color: var(--color-ink-muted);
+  font-size: 0.86rem;
+  letter-spacing: 0.01em;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 0 2px;
+}
+
+.selectAllTextBtn {
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: 0.84rem;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.selectionCount {
+  color: var(--color-ink-muted);
+  font-size: 0.82rem;
+  font-family: var(--font-mono);
+}
+
+.bulkBtn,
+.bulkDangerBtn {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  background: var(--color-surface);
+  color: var(--color-ink-primary);
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+  transition: background 140ms var(--ease-standard), border-color 140ms var(--ease-standard), opacity 140ms var(--ease-standard);
+}
+
+.bulkBtn:disabled,
+.bulkDangerBtn:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.bulkBtn:hover:not(:disabled) {
+  background: var(--color-surface-muted);
+}
+
+.bulkDangerBtn {
+  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
+  color: var(--color-danger);
+}
+
+.bulkDangerBtn:hover:not(:disabled) {
+  background: var(--color-danger-subtle);
+}
+
+.message {
+  color: var(--color-ink-secondary);
+  padding: 12px 0;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-border-muted);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  transition: border-color 140ms var(--ease-standard), box-shadow 140ms var(--ease-standard);
+}
+
+.row:hover,
+.row:focus-within {
+  border-color: var(--color-border);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.04);
+}
+
+.checkboxWrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.checkboxWrap input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+}
+
+.rowInfo {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.rowTitle {
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--color-ink-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowMeta {
+  font-size: 0.78rem;
+  color: var(--color-ink-muted);
+  text-transform: capitalize;
+}
+
+.rowActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.28;
+  transform: translateX(3px);
+  transition: opacity 140ms var(--ease-standard), transform 140ms var(--ease-standard);
+}
+
+.row:hover .rowActions,
+.row:focus-within .rowActions {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.clearBtn,
+.restoreBtn {
+  min-width: 30px;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 6px;
+  background: var(--color-surface);
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+  transition: background 140ms var(--ease-standard), border-color 140ms var(--ease-standard);
+}
+
+.restoreBtn {
+  border: 1px solid #e5e7eb;
+  color: var(--color-ink-primary);
+}
+
+.restoreBtn:hover {
+  background: var(--color-surface-muted);
+}
+
+.clearBtn {
+  border: 1px solid color-mix(in srgb, var(--color-danger) 40%, var(--color-border));
+  color: var(--color-danger);
+}
+
+.clearBtn:hover {
+  background: var(--color-danger-subtle);
+}
+
+.restoreBtn svg,
+.clearBtn svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+}
