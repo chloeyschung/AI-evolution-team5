@@ -56,6 +56,28 @@
   padding: 0 12px;
 }
 
+.removeDuplicatesBtn {
+  margin-left: auto;
+  min-height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-ink-secondary);
+  padding: 0 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.removeDuplicatesBtn:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-ink-primary);
+}
+
+.removeDuplicatesBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .grid {
   display: grid;
   gap: 14px;

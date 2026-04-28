@@ -7,6 +7,7 @@ TODO #6 (2026-04-14): Fix timezone handling inconsistencies in get_statistics me
 
 from datetime import date, datetime, timedelta
 import unicodedata
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from typing import Optional
 
 from sqlalchemy import case, delete, func, or_, select, update
@@ -41,6 +42,34 @@ class ContentRepository(BaseRepository[Content]):
     def __init__(self, session: AsyncSession):
         super().__init__(session)
 
+    @staticmethod
+    def _build_duplicate_group_key(url: str | None) -> str | None:
+        """Normalize URL for duplicate grouping (stable across common trackers)."""
+        if not url:
+            return None
+        try:
+            parsed = urlparse(url.strip())
+        except Exception:
+            return None
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            return None
+
+        filtered_query = [
+            (k, v)
+            for k, v in parse_qsl(parsed.query, keep_blank_values=True)
+            if not k.lower().startswith("utm_")
+            and k.lower() not in {"si", "igshid", "fbclid", "gclid", "mc_cid", "mc_eid"}
+        ]
+        normalized = parsed._replace(
+            scheme=parsed.scheme.lower(),
+            netloc=parsed.netloc.lower(),
+            path=parsed.path.rstrip("/") or "/",
+            params="",
+            query=urlencode(filtered_query, doseq=True),
+            fragment="",
+        )
+        return urlunparse(normalized)
+
     async def save(
         self,
         metadata: ContentMetadata,
@@ -58,6 +87,8 @@ class ContentRepository(BaseRepository[Content]):
             The saved or updated Content object.
         """
         # TODO #3 (2026-04-14): Filter by both url and user_id to prevent content leakage
+        duplicate_group_key = self._build_duplicate_group_key(metadata.url)
+
         result = await self.session.execute(
             select(Content).where(Content.url == metadata.url, Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
         )
@@ -71,12 +102,25 @@ class ContentRepository(BaseRepository[Content]):
             existing.author = metadata.author
             existing.timestamp = metadata.timestamp
             existing.thumbnail_url = metadata.thumbnail_url
+            existing.duplicate_group_key = duplicate_group_key
             if metadata.summary is not None:
                 existing.summary = metadata.summary
+                existing.is_ai_summarized = True
             existing.updated_at = utc_now()
             await self.session.commit()
             return existing
         else:
+            duplicate_index = 1
+            if duplicate_group_key:
+                dup_count_result = await self.session.execute(
+                    select(func.count())
+                    .select_from(Content)
+                    .where(
+                        Content.user_id == user_id,
+                        Content.duplicate_group_key == duplicate_group_key,
+                    )
+                )
+                duplicate_index = (dup_count_result.scalar() or 0) + 1
             # Create new with user_id
             content = Content(
                 platform=metadata.platform,
@@ -88,6 +132,10 @@ class ContentRepository(BaseRepository[Content]):
                 thumbnail_url=metadata.thumbnail_url,
                 status=status,
                 summary=metadata.summary,
+                is_ai_summarized=metadata.summary is not None,
+                is_ai_titled=False,
+                duplicate_group_key=duplicate_group_key,
+                duplicate_index=duplicate_index,
                 user_id=user_id,  # TODO #3 (2026-04-14): Set user_id on new content
             )
             self.session.add(content)
@@ -128,7 +176,7 @@ class ContentRepository(BaseRepository[Content]):
         await self.session.execute(
             update(Content)
             .where(Content.id == content_id, Content.user_id == user_id)
-            .values(summary=summary, updated_at=utc_now())
+            .values(summary=summary, is_ai_summarized=True, updated_at=utc_now())
         )
         await self.session.commit()
 
@@ -137,9 +185,59 @@ class ContentRepository(BaseRepository[Content]):
         await self.session.execute(
             update(Content)
             .where(Content.id == content_id, Content.user_id == user_id)
-            .values(title=title, updated_at=utc_now())
+            .values(title=title, is_ai_titled=True, updated_at=utc_now())
         )
         await self.session.commit()
+
+    async def remove_duplicates(self, user_id: int) -> int:
+        """Remove duplicate rows and keep the newest row per duplicate_group_key."""
+        result = await self.session.execute(
+            select(Content)
+            .where(
+                Content.user_id == user_id,
+                Content.is_deleted == False,  # noqa: E712
+                Content.duplicate_group_key.isnot(None),
+            )
+            .order_by(Content.duplicate_group_key.asc(), Content.created_at.desc(), Content.id.desc())
+        )
+        rows = list(result.scalars().all())
+        keep_ids: set[int] = set()
+        delete_ids: list[int] = []
+        next_index_by_group: dict[str, int] = {}
+
+        for row in rows:
+            group = row.duplicate_group_key or ""
+            if group not in next_index_by_group:
+                keep_ids.add(row.id)
+                next_index_by_group[group] = 1
+                row.duplicate_index = 1
+                continue
+            delete_ids.append(row.id)
+
+        # Re-index kept rows across all content (including deleted) for consistency.
+        kept_rows_result = await self.session.execute(
+            select(Content)
+            .where(
+                Content.user_id == user_id,
+                Content.duplicate_group_key.isnot(None),
+            )
+            .order_by(Content.duplicate_group_key.asc(), Content.created_at.asc(), Content.id.asc())
+        )
+        reindex: dict[str, int] = {}
+        for row in kept_rows_result.scalars().all():
+            group = row.duplicate_group_key or ""
+            reindex[group] = reindex.get(group, 0) + 1
+            row.duplicate_index = reindex[group]
+
+        if delete_ids:
+            await self.session.execute(delete(SwipeHistory).where(SwipeHistory.content_id.in_(delete_ids)))
+            await self.session.execute(delete(ContentTag).where(ContentTag.content_id.in_(delete_ids)))
+            await self.session.execute(
+                delete(Content).where(Content.user_id == user_id, Content.id.in_(delete_ids))
+            )
+
+        await self.session.commit()
+        return len(delete_ids)
 
     @staticmethod
     def _normalize_search_text(value: str | None) -> str:

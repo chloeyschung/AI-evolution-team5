@@ -38,6 +38,7 @@ async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await _ensure_user_profile_timezone_column(conn)
+        await _ensure_content_ai_columns(conn)
 
 
 async def _ensure_user_profile_timezone_column(conn) -> None:
@@ -58,3 +59,29 @@ async def _ensure_user_profile_timezone_column(conn) -> None:
     await conn.execute(
         text("ALTER TABLE user_profile ADD COLUMN timezone VARCHAR(64) DEFAULT 'UTC'")
     )
+
+
+async def _ensure_content_ai_columns(conn) -> None:
+    """Backfill content schema drift for AI flags and duplicate indexing columns."""
+    if not DATABASE_URL.startswith("sqlite"):
+        return
+
+    result = await conn.execute(text("PRAGMA table_info(content)"))
+    existing_columns = {row[1] for row in result.fetchall()}
+
+    if "is_ai_summarized" not in existing_columns:
+        await conn.execute(
+            text("ALTER TABLE content ADD COLUMN is_ai_summarized BOOLEAN NOT NULL DEFAULT 0")
+        )
+    if "is_ai_titled" not in existing_columns:
+        await conn.execute(
+            text("ALTER TABLE content ADD COLUMN is_ai_titled BOOLEAN NOT NULL DEFAULT 0")
+        )
+    if "duplicate_group_key" not in existing_columns:
+        await conn.execute(
+            text("ALTER TABLE content ADD COLUMN duplicate_group_key VARCHAR(1024)")
+        )
+    if "duplicate_index" not in existing_columns:
+        await conn.execute(
+            text("ALTER TABLE content ADD COLUMN duplicate_index INTEGER")
+        )

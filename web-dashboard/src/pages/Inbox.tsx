@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { useContentStore } from '../stores/useContentStore';
 import ContentDrawer from '../components/content/ContentDrawer';
 import ContentTable from '../components/content/ContentTable';
+import { removeDuplicates } from '../api/endpoints';
 import styles from './Inbox.module.css';
 
 export default function Inbox() {
   const contentStore = useContentStore();
   const [selectedPlatform, setSelectedPlatform] = useState('');
   const [selectedContentId, setSelectedContentId] = useState<number | null>(null);
+  const [isRemovingDuplicates, setIsRemovingDuplicates] = useState(false);
 
   useEffect(() => {
     contentStore.updateFilters({ status: 'all' });
@@ -39,6 +41,17 @@ export default function Inbox() {
     contentStore.updateSort({ option, order: nextOrder });
   };
 
+  const handleRemoveDuplicates = async () => {
+    setIsRemovingDuplicates(true);
+    try {
+      await removeDuplicates();
+      await contentStore.loadContent(1);
+      await contentStore.loadPlatforms();
+    } finally {
+      setIsRemovingDuplicates(false);
+    }
+  };
+
   return (
     <section className={styles.page} data-testid="inbox-page">
       <header className={styles.hero}>
@@ -61,6 +74,14 @@ export default function Inbox() {
             </option>
           ))}
         </select>
+        <button
+          type="button"
+          className={styles.removeDuplicatesBtn}
+          onClick={() => void handleRemoveDuplicates()}
+          disabled={isRemovingDuplicates}
+        >
+          {isRemovingDuplicates ? 'Removing…' : 'Remove duplicates'}
+        </button>
       </div>
 
       {contentStore.isLoading ? <p className={styles.message}>Refreshing queue…</p> : null}

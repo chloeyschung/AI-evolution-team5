@@ -8,7 +8,11 @@ export interface Content {
   title: string | null;
   author: string | null;
   summary: string | null;
+  is_ai_summarized: boolean;
+  is_ai_titled: boolean;
   thumbnail_url: string | null;
+  duplicate_group_key: string | null;
+  duplicate_index: number | null;
   status: 'inbox' | 'archived';
   created_at: string;
   updated_at: string | null;

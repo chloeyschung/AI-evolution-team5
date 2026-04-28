@@ -687,14 +687,21 @@ async def _background_summarize(
         _, text_content = await content_extractor.fetch_html_and_text(url)
         if not text_content:
             return
-        summary = await summarizer.summarize(text_content)
         async with AsyncSessionLocal() as db:
             repo = ContentRepository(db)
+            content = await repo.get_by_id(content_id)
+            if not content:
+                return
+            # AI enrichment runs once per item to avoid repeated rewriting.
+            if bool(getattr(content, "is_ai_summarized", False)) or content.summary:
+                return
+
+            summary = await summarizer.summarize(text_content, max_retries=1)
             await repo.update_summary(content_id, user_id, summary)
             content = await repo.get_by_id(content_id)
-            if content and _needs_title_improvement(content.title):
+            if content and not bool(getattr(content, "is_ai_titled", False)) and _needs_title_improvement(content.title):
                 try:
-                    generated_title = await summarizer.generate_title(text_content)
+                    generated_title = await summarizer.generate_title(text_content, max_retries=1)
                     cleaned = _clean_generated_title(generated_title)
                     if cleaned:
                         await repo.update_title(content_id, user_id, cleaned)
@@ -757,5 +764,18 @@ async def share_content(
         title=content.title,
         author=content.author,
         summary=content.summary,
+        is_ai_summarized=bool(getattr(content, "is_ai_summarized", False)),
+        is_ai_titled=bool(getattr(content, "is_ai_titled", False)),
         created_at=serialize_datetime(content.created_at),
     )
+
+
+@router.post("/content/remove-duplicates", response_model=DeleteContentResponse)
+async def remove_duplicates(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+) -> DeleteContentResponse:
+    """Remove duplicate rows and keep the most recent row in each duplicate group."""
+    content_repo = ContentRepository(db)
+    removed = await content_repo.remove_duplicates(user_id)
+    return DeleteContentResponse(message=f"Removed {removed} duplicate item(s).")

@@ -198,6 +198,9 @@ export default function Dashboard() {
             onOpen={() => {}}
             onDelete={handleDelete}
             onSwipe={handleSwipe}
+            keepActionLabel="Keep"
+            keepActionTone="signal"
+            keepActionIcon="archive"
             emptyMessage=""
           />
         ) : (

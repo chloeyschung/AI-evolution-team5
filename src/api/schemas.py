@@ -45,7 +45,11 @@ class ContentResponse(BaseModel):
     title: str | None = None
     author: str | None = None
     summary: str | None = None
+    is_ai_summarized: bool = False
+    is_ai_titled: bool = False
     thumbnail_url: str | None = None
+    duplicate_group_key: str | None = None
+    duplicate_index: int | None = None
     status: ContentStatus = ContentStatus.INBOX
     created_at: str
     updated_at: str | None = None
@@ -72,7 +76,11 @@ class ContentResponse(BaseModel):
             title=content.title,
             author=content.author,
             summary=content.summary,
+            is_ai_summarized=bool(getattr(content, "is_ai_summarized", False)),
+            is_ai_titled=bool(getattr(content, "is_ai_titled", False)),
             thumbnail_url=content.thumbnail_url,
+            duplicate_group_key=getattr(content, "duplicate_group_key", None),
+            duplicate_index=getattr(content, "duplicate_index", None),
             status=content.status,
             created_at=created_at,
             updated_at=serialize_datetime(content.updated_at),
@@ -100,7 +108,11 @@ class ContentResponse(BaseModel):
             title=metadata.title,
             author=metadata.author,
             summary=metadata.summary if hasattr(metadata, "summary") else None,
+            is_ai_summarized=bool(getattr(metadata, "summary", None)),
+            is_ai_titled=False,
             thumbnail_url=metadata.thumbnail_url,
+            duplicate_group_key=None,
+            duplicate_index=None,
             status=ContentStatus.INBOX,
             created_at=created_at,
             updated_at=None,
@@ -187,6 +199,8 @@ class ShareResponse(BaseModel):
     title: str | None = None
     author: str | None = None
     summary: str | None = None
+    is_ai_summarized: bool = False
+    is_ai_titled: bool = False
     created_at: str
 
 
@@ -430,11 +444,13 @@ class GoogleLoginRequest(BaseModel):
 class GoogleOAuthCodeRequest(BaseModel):
     """Schema for Google OAuth code exchange (web flow).
 
-    The frontend sends only the authorization code.
     The backend handles the token exchange with client_secret.
+    `redirect_uri` may be overridden for Chrome extension flows that use the
+    chromiumapp.org redirect (which Chrome intercepts without Console registration).
     """
 
     code: str
+    redirect_uri: str | None = None
 
 
 class GoogleLoginResponse(BaseModel):

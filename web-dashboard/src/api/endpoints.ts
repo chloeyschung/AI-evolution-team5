@@ -184,6 +184,12 @@ export async function clearTrash(): Promise<{ message: string }> {
   return response.data;
 }
 
+export async function removeDuplicates(): Promise<{ message: string }> {
+  const client = getApiClient();
+  const response = await client.post<{ message: string }>('/api/v1/content/remove-duplicates');
+  return response.data;
+}
+
 // Swipe
 export async function recordSwipe(action: SwipeAction): Promise<{ id: number; content_id: number; action: string }> {
   const client = getApiClient();
