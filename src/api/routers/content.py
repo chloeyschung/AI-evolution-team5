@@ -6,7 +6,7 @@ import hashlib
 import json
 from datetime import timedelta
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Request, Response
 from fastapi import Request as FastAPIRequest
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +16,7 @@ from ...data.models import ContentStatus
 from ...data.repository import (
     ContentRepository,
     ContentTagRepository,
+    IdempotencyRepository,
     SwipeRepository,
 )
 from ...ingestion.share_handler import ShareHandler
@@ -735,6 +736,7 @@ async def share_content(
     user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     share_handler: ShareHandler = Depends(get_share_handler),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
 ) -> ShareResponse:
     """Process shared content from mobile share sheet.
 
@@ -745,6 +747,27 @@ async def share_content(
     """
     options = dict(data.options or {})
     auto_summarize = options.pop("auto_summarize", True)
+
+    # Check idempotency — return existing result if key was already processed
+    if idempotency_key:
+        idempotency_repo = IdempotencyRepository(db)
+        existing_record = await idempotency_repo.get(user_id, idempotency_key)
+        if existing_record and existing_record.content_id:
+            repo = ContentRepository(db)
+            existing_content = await repo.get_by_id(existing_record.content_id)
+            if existing_content and not existing_content.is_deleted:
+                return ShareResponse(
+                    id=existing_content.id,
+                    platform=existing_content.platform,
+                    content_type=existing_content.content_type,
+                    url=existing_content.url,
+                    title=existing_content.title,
+                    author=existing_content.author,
+                    summary=existing_content.summary,
+                    is_ai_summarized=bool(getattr(existing_content, "is_ai_summarized", False)),
+                    is_ai_titled=bool(getattr(existing_content, "is_ai_titled", False)),
+                    created_at=serialize_datetime(existing_content.created_at),
+                )
 
     # Disable inline summarization — we'll schedule it as a background task
     raw_payload = {
@@ -759,6 +782,11 @@ async def share_content(
     # Save content immediately (no summary yet)
     repo = ContentRepository(db)
     content = await repo.save(metadata, user_id=user_id)
+
+    # Persist idempotency mapping for future retries
+    if idempotency_key:
+        idempotency_repo = IdempotencyRepository(db)
+        await idempotency_repo.create(user_id, idempotency_key, content.id)
 
     # Schedule summarization to run after the response is sent
     if auto_summarize and share_handler._summarizer and data.content:

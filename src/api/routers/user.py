@@ -1,12 +1,10 @@
 """User domain router — /profile, /preferences, /user/statistics, /interests."""
 
-from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...data.database import get_db
-from ...data.models import DeviceToken, utc_now
-from ...data.repository import UserProfileRepository
+from ...data.repository import DeviceTokenRepository, UserProfileRepository
 from ...utils.datetime_utils import serialize_datetime
 from ..dependencies import get_current_user
 from ..schemas import (
@@ -161,30 +159,8 @@ async def register_device_token(
     db: AsyncSession = Depends(get_db),
 ) -> DeviceTokenResponse:
     """Register or reactivate an APNs device token for the authenticated user."""
-    now = utc_now()
-    result = await db.execute(
-        select(DeviceToken).where(
-            DeviceToken.user_id == user_id,
-            DeviceToken.device_token == data.device_token,
-        )
-    )
-    token = result.scalar_one_or_none()
-    if token is None:
-        token = DeviceToken(
-            user_id=user_id,
-            device_token=data.device_token,
-            platform=data.platform,
-            is_active=True,
-            last_seen_at=now,
-            created_at=now,
-            updated_at=now,
-        )
-        db.add(token)
-    else:
-        token.platform = data.platform
-        token.is_active = True
-        token.last_seen_at = now
-        token.updated_at = now
+    repo = DeviceTokenRepository(db)
+    token = await repo.upsert(user_id, data.device_token, data.platform)
     await db.commit()
     await db.refresh(token)
     return DeviceTokenResponse(
@@ -202,29 +178,10 @@ async def deactivate_device_token(
     db: AsyncSession = Depends(get_db),
 ) -> DeviceTokenResponse:
     """Deactivate an APNs device token for the authenticated user."""
-    now = utc_now()
-    result = await db.execute(
-        select(DeviceToken).where(
-            DeviceToken.user_id == user_id,
-            DeviceToken.device_token == data.device_token,
-        )
-    )
-    token = result.scalar_one_or_none()
+    repo = DeviceTokenRepository(db)
+    token = await repo.deactivate(user_id, data.device_token)
     if token is None:
-        token = DeviceToken(
-            user_id=user_id,
-            device_token=data.device_token,
-            platform=data.platform,
-            is_active=False,
-            last_seen_at=now,
-            created_at=now,
-            updated_at=now,
-        )
-        db.add(token)
-    else:
-        token.platform = data.platform
-        token.is_active = False
-        token.updated_at = now
+        raise HTTPException(status_code=404, detail={"error": "device_token_not_found", "message": "Device token not found."})
     await db.commit()
     await db.refresh(token)
     return DeviceTokenResponse(

@@ -1792,3 +1792,89 @@ class AuditRepository:
             meta=metadata,
         )
         self.db.add(entry)
+
+
+class IdempotencyRepository:
+    """Repository for Idempotency-Key → content_id persistence."""
+
+    IDEMPOTENCY_TTL_HOURS = 24
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def get(self, user_id: int, key: str) -> "IdempotencyRecord | None":
+        from .models import IdempotencyRecord
+        from src.utils.datetime_utils import utc_now
+        from datetime import timedelta
+
+        cutoff = utc_now() - timedelta(hours=self.IDEMPOTENCY_TTL_HOURS)
+        result = await self.session.execute(
+            select(IdempotencyRecord).where(
+                IdempotencyRecord.user_id == user_id,
+                IdempotencyRecord.idempotency_key == key,
+                IdempotencyRecord.created_at >= cutoff,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def create(self, user_id: int, key: str, content_id: int) -> None:
+        from .models import IdempotencyRecord
+        record = IdempotencyRecord(user_id=user_id, idempotency_key=key, content_id=content_id)
+        self.session.add(record)
+        await self.session.flush()
+
+
+class DeviceTokenRepository:
+    """Repository for APNs/FCM device token lifecycle management."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def upsert(self, user_id: int, device_token: str, platform: str) -> "DeviceToken":
+        from .models import DeviceToken
+        from src.utils.datetime_utils import utc_now
+        now = utc_now()
+        result = await self.session.execute(
+            select(DeviceToken).where(
+                DeviceToken.user_id == user_id,
+                DeviceToken.device_token == device_token,
+            )
+        )
+        token = result.scalar_one_or_none()
+        if token is None:
+            token = DeviceToken(
+                user_id=user_id,
+                device_token=device_token,
+                platform=platform,
+                is_active=True,
+                last_seen_at=now,
+                created_at=now,
+                updated_at=now,
+            )
+            self.session.add(token)
+        else:
+            token.platform = platform
+            token.is_active = True
+            token.last_seen_at = now
+            token.updated_at = now
+        await self.session.flush()
+        await self.session.refresh(token)
+        return token
+
+    async def deactivate(self, user_id: int, device_token: str) -> "DeviceToken | None":
+        from .models import DeviceToken
+        from src.utils.datetime_utils import utc_now
+        result = await self.session.execute(
+            select(DeviceToken).where(
+                DeviceToken.user_id == user_id,
+                DeviceToken.device_token == device_token,
+            )
+        )
+        token = result.scalar_one_or_none()
+        if token is None:
+            return None
+        token.is_active = False
+        token.updated_at = utc_now()
+        await self.session.flush()
+        await self.session.refresh(token)
+        return token

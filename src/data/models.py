@@ -524,3 +524,24 @@ class PasswordResetToken(Base):
     expires_at = Column(DateTime, nullable=False, index=True)
     used_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+class IdempotencyRecord(Base):
+    """Persisted idempotency key → content_id mapping for write operations.
+
+    Allows iOS clients to safely retry POST /share by sending the same
+    Idempotency-Key header — repeated calls within the TTL return the
+    original content_id without creating duplicates.
+    """
+
+    __tablename__ = "idempotency_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("user_profile.id", ondelete="CASCADE"), nullable=False, index=True)
+    idempotency_key = Column(String(128), nullable=False, index=True)
+    content_id = Column(Integer, ForeignKey("content.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False, index=True)
+
+    __table_args__ = (
+        sqlalchemy.UniqueConstraint("user_id", "idempotency_key", name="uq_idempotency_user_key"),
+    )

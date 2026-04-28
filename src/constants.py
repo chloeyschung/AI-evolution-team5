@@ -41,9 +41,6 @@ class AuthProvider(StrEnum):
     GOOGLE = "google"
     APPLE = "apple"
     EMAIL_PASSWORD = "email_password"
-    KAKAO = "kakao"
-    NAVER = "naver"
-    GITHUB = "github"
 
 
 class SwipeAction(StrEnum):
@@ -108,10 +105,6 @@ SWIPE_HISTORY_DAYS_FOR_STREAK = 30
 # Content limits
 MAX_CONTENT_SUMMARY_LENGTH = 500
 MIN_CONTENT_SUMMARY_LENGTH = 50
-
-# Rate limiting
-SHARE_RATE_LIMIT = "10/minute"
-INGEST_RATE_LIMIT = "30/minute"
 
 # Tag generation limits
 MAX_TAGS_PER_CONTENT = 3

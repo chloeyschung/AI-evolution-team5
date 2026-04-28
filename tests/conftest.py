@@ -20,6 +20,7 @@ from src.data.models import (
     SwipeHistory,
     Content,
     ContentTag,
+    IdempotencyRecord,
     UserProfile,
     UserPreferences,
     InterestTag,
@@ -90,6 +91,7 @@ async def _clear_all_test_data(session: AsyncSession) -> None:
     """Delete test data in FK-safe child-before-parent order."""
     await session.execute(delete(AuditLog))
     await session.execute(delete(SwipeHistory))
+    await session.execute(delete(IdempotencyRecord))
     await session.execute(delete(ContentTag))
     await session.execute(delete(UserActivityPattern))
     await session.execute(delete(ReminderLog))
