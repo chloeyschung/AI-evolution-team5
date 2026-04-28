@@ -106,10 +106,12 @@ export async function getContent(
     params.order = sort.order;
   }
 
-  const response = await client.get<Content[]>('/api/v1/content', { params });
+  // BC-01: Server returns PaginatedContentResponse { items: [...], has_more: bool, ... }
+  // Extract the array from the wrapper, don't assign the wrapper object to items
+  const response = await client.get<{ items: Content[]; has_more: boolean }>('/api/v1/content', { params });
   return {
-    items: response.data,
-    hasMore: response.data.length === limit,
+    items: response.data.items,
+    hasMore: response.data.has_more,
   };
 }
 
@@ -121,16 +123,18 @@ export async function getPendingContent(
   const params: Record<string, string | number> = { limit };
   if (platform) params.platform = platform;
 
-  const response = await client.get<Content[]>('/api/v1/content/pending', { params });
-  return response.data;
+  // BC-01: Server returns PaginatedContentResponse { items: [...], has_more: bool, ... }
+  const response = await client.get<{ items: Content[]; has_more: boolean }>('/api/v1/content/pending', { params });
+  return response.data.items;
 }
 
 export async function getKeptContent(limit: number, offset: number): Promise<Content[]> {
   const client = getApiClient();
-  const response = await client.get<Content[]>('/api/v1/content/kept', {
+  // BC-01: Server returns PaginatedContentResponse { items: [...], has_more: bool, ... }
+  const response = await client.get<{ items: Content[]; has_more: boolean }>('/api/v1/content/kept', {
     params: { limit, offset },
   });
-  return response.data;
+  return response.data.items;
 }
 
 export async function getContentDetail(id: number): Promise<Content> {
@@ -162,10 +166,11 @@ export async function getPlatforms(): Promise<PlatformCount[]> {
 // Search
 export async function searchContent(query: string, limit: number, offset: number): Promise<Content[]> {
   const client = getApiClient();
-  const response = await client.get<Content[]>('/api/v1/search', {
+  // BC-01: Server returns PaginatedContentResponse { items: [...], has_more: bool, ... }
+  const response = await client.get<{ items: Content[]; has_more: boolean }>('/api/v1/search', {
     params: { q: query, limit, offset },
   });
-  return response.data;
+  return response.data.items;
 }
 
 // Stats

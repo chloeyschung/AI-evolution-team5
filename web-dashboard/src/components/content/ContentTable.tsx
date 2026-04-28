@@ -46,8 +46,8 @@ export default function ContentTable({
       width: '32%',
       render: (item) => (
         <button className={styles.titleButton} onClick={() => onOpen(item.id)}>
-          <strong>{item.title || 'Untitled content'}</strong>
-          <span>{item.author || 'Unknown author'}</span>
+          <strong>{item.title || item.url || 'Untitled content'}</strong>
+          <span>{item.author || item.platform}</span>
         </button>
       ),
     },

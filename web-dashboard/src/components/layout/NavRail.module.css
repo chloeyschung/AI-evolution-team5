@@ -2,13 +2,8 @@
   position: sticky;
   top: 0;
   height: 100vh;
-  border-right: 1px solid color-mix(in srgb, var(--border-default) 86%, var(--accent-primary) 14%);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--bg-surface) 96%, var(--accent-primary) 4%),
-      color-mix(in srgb, var(--bg-surface) 98%, var(--bg-canvas) 2%)
-    );
+  border-right: 1px solid var(--color-border-muted);
+  background: var(--color-surface);
   padding: var(--space-5) var(--space-4);
   display: grid;
   grid-template-rows: auto 1fr;
@@ -24,13 +19,11 @@
 .logo {
   width: 34px;
   height: 34px;
-  border-radius: 12px;
+  flex-shrink: 0;
+  border-radius: 10px;
   display: grid;
   place-items: center;
-  background: linear-gradient(140deg, var(--accent-primary), color-mix(in srgb, var(--accent-secondary) 72%, white));
-  color: var(--text-inverse);
-  font-weight: 700;
-  box-shadow: var(--shadow-sm);
+  overflow: hidden;
 }
 
 .brandText {
@@ -45,8 +38,8 @@
 }
 
 .brandText span {
-  font-size: var(--fs-small);
-  color: color-mix(in srgb, var(--text-muted) 85%, var(--gold));
+  font-size: var(--text-micro);
+  color: var(--color-ink-muted);
 }
 
 .nav {
@@ -68,33 +61,35 @@
 }
 
 .link:hover {
-  border-color: color-mix(in srgb, var(--border-default) 82%, var(--gold-line));
-  background: var(--bg-surface);
-  color: var(--text-primary);
+  border-color: var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-ink-primary);
 }
 
-.short {
+.iconWrap {
   width: 26px;
   height: 26px;
   border-radius: 9px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-muted);
   display: grid;
   place-items: center;
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
+  flex-shrink: 0;
+  color: var(--color-ink-muted);
 }
 
 .active {
-  border-color: color-mix(in srgb, var(--accent-primary) 40%, var(--border-default));
-  background:
-    linear-gradient(
-      120deg,
-      color-mix(in srgb, var(--accent-primary) 10%, var(--bg-surface)),
-      color-mix(in srgb, var(--gold) 7%, var(--bg-surface))
-    );
-  color: var(--text-primary);
-  box-shadow: var(--shadow-sm);
+  border-color: color-mix(in srgb, var(--color-signal) 36%, var(--color-border));
+  background: var(--color-signal-subtle);
+  color: var(--color-ink-primary);
+  font-weight: 600;
+  box-shadow: var(--elevation-01);
+}
+
+.active .iconWrap {
+  background: var(--color-signal);
+  border-color: transparent;
+  color: var(--color-signal-on);
 }
 
 @media (max-width: 980px) {
@@ -102,7 +97,7 @@
     position: static;
     height: auto;
     border-right: 0;
-    border-bottom: 1px solid color-mix(in srgb, var(--border-default) 86%, var(--accent-primary) 14%);
+    border-bottom: 1px solid var(--color-border-muted);
     padding: var(--space-4);
     gap: var(--space-4);
   }

@@ -1,10 +1,24 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useContentStore } from '../stores/useContentStore';
 import ContentCard from '../components/content/ContentCard';
+import ContentTable from '../components/content/ContentTable';
+import type { SwipeAction, ViewMode } from '../types';
+import { DEFAULT_SETTINGS } from '../types';
 import styles from './Dashboard.module.css';
+
+function loadDefaultView(): ViewMode {
+  try {
+    const raw = localStorage.getItem('briefly_settings');
+    if (raw) return (JSON.parse(raw).defaultView as ViewMode) || DEFAULT_SETTINGS.defaultView;
+  } catch {
+    // ignore
+  }
+  return DEFAULT_SETTINGS.defaultView;
+}
 
 export default function Dashboard() {
   const contentStore = useContentStore();
+  const [viewMode] = useState<ViewMode>(loadDefaultView);
 
   useEffect(() => {
     void Promise.all([
@@ -17,7 +31,7 @@ export default function Dashboard() {
     await contentStore.deleteItem(id);
   };
 
-  const handleSwipe = async (action: { content_id: number; action: 'keep' | 'discard' }) => {
+  const handleSwipe = async (action: SwipeAction) => {
     await contentStore.performSwipe(action);
   };
 
@@ -40,16 +54,26 @@ export default function Dashboard() {
           </p>
         ) : null}
 
-        <div className={styles.grid}>
-          {contentStore.items.map((item) => (
-            <ContentCard
-              key={item.id}
-              content={item}
-              onDelete={handleDelete}
-              onSwipe={handleSwipe}
-            />
-          ))}
-        </div>
+        {viewMode === 'list' ? (
+          <ContentTable
+            items={contentStore.items}
+            onOpen={() => {}}
+            onDelete={handleDelete}
+            onSwipe={handleSwipe}
+            emptyMessage=""
+          />
+        ) : (
+          <div className={styles.grid}>
+            {contentStore.items.map((item) => (
+              <ContentCard
+                key={item.id}
+                content={item}
+                onDelete={handleDelete}
+                onSwipe={handleSwipe}
+              />
+            ))}
+          </div>
+        )}
       </section>
     </section>
   );

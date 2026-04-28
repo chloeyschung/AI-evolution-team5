@@ -1,209 +1,285 @@
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap');
+/* ============================================================
+   BRIEFLY — main.css  v4.0 "Resolution"
+   ============================================================
 
+   ┌─ HOW TO CHANGE THE COLOR THEME ──────────────────────────┐
+   │  1. Ctrl+F the hex you want to change (e.g. #1F6B58)     │
+   │  2. Replace ALL occurrences in this file only            │
+   │  3. Save — CSS variables propagate everywhere            │
+   │                                                          │
+   │  THEME PALETTE (the only hexes you need to touch):       │
+   │                                                          │
+   │  Signal (CTA / accent)  →  #1F6B58                       │
+   │  Canvas (page bg)       →  #FAF8F4                       │
+   │  Ink    (primary text)  →  #141210                       │
+   │  AI     (machine mark)  →  #4A7C7E                       │
+   │                                                          │
+   │  To go dark-mode-first, swap --bg values in             │
+   │  [data-theme='dark'] block at the bottom.               │
+   └──────────────────────────────────────────────────────────┘
+
+   BANNED — never re-introduce these:
+   • #E07A3C amber / any gold   → reads Anthropic
+   • #6B5BFF purple / iris      → reads Sendbird
+   • #D42B20 BBC-red            → reads news authority
+   • #2D72D2 cold blue          → reads enterprise
+   • Newsreader or any serif    → reads LongBlack/editorial
+   • Radial gradient body bg    → competes with content
+   • Left-border metric cards   → 2015 dashboard trope
+
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+/* ============================================================
+   §1  DESIGN TOKENS  (:root)
+   ─────────────────────────────────────────────────────────────
+   All visual decisions live here. Engineers use the token
+   names (e.g. var(--color-signal)) — never raw hex values.
+   ============================================================ */
 :root {
-  /* Quiet Momentum canonical tokens */
-  --color-canvas: #F6F7FB;
-  --color-surface: #FFFFFF;
-  --color-surface-muted: #EEF2F8;
-  --color-text-primary: #1C2127;
-  --color-text-secondary: #5F6B7C;
-  --color-text-muted: #738091;
-  --color-primary: #2D72D2;
-  --color-primary-strong: #1F5FBF;
-  --color-accent-warm: #F2A94A;
-  --color-accent-mint: #1FAF9A;
-  --color-info: #147EB3;
-  --color-success: #238551;
-  --color-danger: #CD4246;
-  --radius-panel: 16px;
 
-  /* Foundation */
-  --bg-canvas: var(--color-canvas);
-  --bg-base: var(--color-canvas);
-  --bg-surface: var(--color-surface);
-  --bg-surface-muted: var(--color-surface-muted);
-  --bg-elevated: #ffffff;
-  --bg-hover: #ebe8df;
-  --bg-overlay: rgba(17, 20, 24, 0.55);
-  --bg-active: #e4e0d6;
-  --bg-primary: var(--color-primary);
+  /* ── §1.1  SIGNAL ACCENT ────────────────────────────────────
+     THE one color that calls the eye. One per view.
+     Max one --color-signal-filled element per page region.
+     ───────────────────────────────────────────────────────── */
+  --color-signal:         #1F6B58;   /* ← change theme accent HERE */
+  --color-signal-hover:   #185746;
+  --color-signal-active:  #124038;
+  --color-signal-subtle:  #E6F2EF;   /* tinted bg: focus rings, AI blocks  */
+  --color-signal-on:      #FFFFFF;   /* text color on signal fill           */
 
-  --text-primary: var(--color-text-primary);
-  --text-secondary: var(--color-text-secondary);
-  --text-muted: var(--color-text-muted);
-  --text-inverse: #ffffff;
+  /* ── §1.2  CANVAS & SURFACES ────────────────────────────────
+     Warm stone scale. Never blue-grey, never cream paper.
+     ───────────────────────────────────────────────────────── */
+  --color-canvas:           #FAF8F4;   /* ← page background — always plain, no gradient */
+  --color-surface:          #FFFFFF;   /* cards, panels, inputs                          */
+  --color-surface-muted:    #F4F1EC;   /* sidebars, recessed panels                      */
+  --color-surface-overlay:  #F4F1EC;   /* drawer / modal backing                         */
 
-  --border-subtle: rgba(28, 33, 39, 0.09);
-  --border-default: rgba(28, 33, 39, 0.14);
-  --border-hover: rgba(28, 33, 39, 0.22);
-  --border-gold: color-mix(in srgb, var(--color-accent-warm) 28%, transparent);
-  --border: var(--border-default);
+  /* ── §1.3  INK (TEXT) ───────────────────────────────────────
+     Warm near-black scale. Never pure #000000.
+     ───────────────────────────────────────────────────────── */
+  --color-ink-primary:      #141210;   /* ← primary text — change HERE for all text      */
+  --color-ink-secondary:    #5C5347;   /* labels, secondary body                         */
+  --color-ink-muted:        #8A7F72;   /* captions, timestamps, eyebrows                 */
+  --color-ink-disabled:     #B3A99A;   /* non-interactive text                           */
 
-  /* Accent system */
-  --accent-primary: var(--color-primary);
-  --accent-secondary: #742ddd;
-  --accent-success: var(--color-success);
-  --accent-info: var(--color-info);
-  --gold: var(--color-accent-warm);
-  --gold-bright: color-mix(in srgb, var(--color-accent-warm) 86%, #ffffff 14%);
-  --gold-dim: color-mix(in srgb, var(--color-accent-warm) 16%, transparent);
-  --gold-line: color-mix(in srgb, var(--color-accent-warm) 32%, transparent);
-  --teal: var(--color-accent-mint);
-  --sage: #238551;
-  --coral: #cd4246;
-  --lavender: #e9ddff;
+  /* ── §1.4  BORDERS ──────────────────────────────────────────
+     Derived from the ink scale. Adjust strength here.
+     ───────────────────────────────────────────────────────── */
+  --color-border:           #E8E3DA;   /* default hairline                               */
+  --color-border-muted:     #F0EDE6;   /* subtle separation                              */
+  --color-border-strong:    #D4CCBF;   /* emphasized / hover                             */
 
-  /* Typography */
-  --font-display: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-body: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  --fs-small: 12px;
+  /* ── §1.5  SEMANTIC COLORS ──────────────────────────────────
+     Desaturated by design — these are information signals,
+     NOT brand colors. Never use as CTA fills.
+     ───────────────────────────────────────────────────────── */
 
-  /* Spacing (Blueprint 4px base + Sendbird cadence) */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-8: 32px;
+  /* AI / Machine-generated content — the ONLY cool tone */
+  --color-ai:               #4A7C7E;   /* ← AI teal — used ONLY for summaries/suggestions */
+  --color-ai-subtle:        #E5EEEE;
+  --color-ai-on:            #FFFFFF;
 
-  /* Shape */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: var(--radius-panel);
+  /* Success / Kept / Cleared */
+  --color-success:          #3E7A4E;
+  --color-success-subtle:   #E2EEE5;
+  --color-success-on:       #FFFFFF;
 
-  /* Layout rhythm */
-  --rail-width: 320px;
-  --content-max: 1280px;
-  --topbar-height: 64px;
+  /* Attention / Mild heads-up (never for deadlines or guilt) */
+  --color-attention:        #8C6B2E;
+  --color-attention-subtle: #F0E8D6;
+  --color-attention-on:     #FFFFFF;
 
-  /* Effects */
-  --shadow-sm:
-    0 0 0 1px rgba(17, 20, 24, 0.1),
-    0 1px 3px 0 rgba(0, 0, 0, 0.1),
-    0 1px 2px -1px rgba(0, 0, 0, 0.1);
-  --shadow-md:
-    0 1px 5px 0 rgba(33, 34, 66, 0.04),
-    0 0 3px 0 rgba(0, 0, 0, 0.08),
-    0 2px 1px 0 rgba(0, 0, 0, 0.12);
-  --shadow-lg:
-    0 0 0 1px rgba(17, 20, 24, 0.1),
-    0 20px 25px -5px rgba(0, 0, 0, 0.1),
-    0 10px 15px -3px rgba(0, 0, 0, 0.1);
-  --shadow-gold:
-    0 0 0 1px color-mix(in srgb, var(--color-accent-warm) 26%, transparent),
-    0 6px 20px color-mix(in srgb, var(--color-accent-warm) 14%, transparent);
+  /* Danger — permanent deletion ONLY. Never for archive/skip. */
+  --color-danger:           #A14234;
+  --color-danger-subtle:    #F0DDD9;
+  --color-danger-on:        #FFFFFF;
 
-  --ease-standard: cubic-bezier(0.4, 1, 0.75, 0.9);
-  --ease-emphasized: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --ease-out: var(--ease-standard);
-  --dur-base: 160ms;
-  --dur-slow: 280ms;
-  --duration-fast: 120ms;
-  --duration-base: 180ms;
-  --duration-slow: 280ms;
+  /* ── §1.6  TYPOGRAPHY ───────────────────────────────────────
+     One family (DM Sans) + mono for data.
+     No serif. No Newsreader. No Geist.
+     ───────────────────────────────────────────────────────── */
+  --font-display: 'DM Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-body:    'DM Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
-  /* Quiet Momentum motion categories */
-  --motion-arrival-duration: 220ms;
-  --motion-arrival-ease: var(--ease-standard);
-  --motion-progression-duration: 180ms;
-  --motion-progression-ease: var(--ease-standard);
-  --motion-affordance-duration: 140ms;
-  --motion-affordance-ease: var(--ease-standard);
+  /* Type scale — 6 sizes, no more */
+  --text-hero:   clamp(44px, 5vw, 68px);  /* H1  lh:1.06  tracking:-0.04em               */
+  --text-title:  36px;                     /* H2  lh:1.20  tracking:-0.03em               */
+  --text-h3:     26px;                     /* H3  lh:1.30  tracking:-0.025em              */
+  --text-lede:   18px;                     /* Lead copy  lh:1.6  max:58ch                 */
+  --text-body:   16px;                     /* Prose  lh:1.55  max:68ch                    */
+  --text-ui:     14px;                     /* Buttons, labels, nav  lh:1.4                */
+  --text-micro:  11px;                     /* MONO ONLY — timestamps, counts  lh:1.4      */
 
-  /* Legacy aliases */
-  --sidebar-width: var(--rail-width);
-  --sidebar-collapsed-width: 72px;
-  --primary-color: var(--accent-primary);
-  --primary-hover: #215db0;
+  /* ── §1.7  SPACING  (4px base, strict) ─────────────────────
+     Use these tokens. Never write raw px in components.
+     ───────────────────────────────────────────────────────── */
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+
+  /* ── §1.8  BORDER RADIUS ────────────────────────────────────
+     sm → inputs/chips   md → buttons   lg → cards   pill → status
+     ───────────────────────────────────────────────────────── */
+  --radius-sm:    8px;
+  --radius-md:    12px;
+  --radius-lg:    18px;
+  --radius-xl:    24px;
+  --radius-pill:  999px;
+
+  /* ── §1.9  ELEVATION ────────────────────────────────────────
+     01 rest · 02 card hover · 03 sticky bars · 04 modals
+     Shadows are warm (rgba brown-black). Never blue shadows.
+     ───────────────────────────────────────────────────────── */
+  --elevation-01:
+    0 1px 2px rgba(20, 18, 16, .05);
+  --elevation-02:
+    0 1px 2px rgba(20, 18, 16, .05),
+    0 6px 18px -6px rgba(20, 18, 16, .10);
+  --elevation-03:
+    0 1px 2px rgba(20, 18, 16, .05),
+    0 16px 36px -10px rgba(20, 18, 16, .16);
+  --elevation-04:
+    0 1px 2px rgba(20, 18, 16, .05),
+    0 28px 64px -14px rgba(20, 18, 16, .24);
+
+  /* Signal halo — CTA only, never decorative */
+  --elevation-signal:
+    0 0 0 1px color-mix(in srgb, var(--color-signal) 32%, transparent),
+    0 8px 24px -6px color-mix(in srgb, var(--color-signal) 28%, transparent);
+
+  /* ── §1.10  MOTION ──────────────────────────────────────────
+     Three categories. No bounce. No ornamental shimmer.
+     arrival=page load · progression=navigation · affordance=hover/click
+     ───────────────────────────────────────────────────────── */
+  --ease-standard:   cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-out:        cubic-bezier(0.22, 1, 0.36, 1);
+
+  --motion-arrival:     220ms;   /* soft staged reveal for hero/first-view  */
+  --motion-progression: 180ms;   /* drawer, table, panel transitions        */
+  --motion-affordance:  140ms;   /* hover, focus, active micro-states       */
+
+  /* ── §1.11  LAYOUT ──────────────────────────────────────────
+     App shell dimensions. Adjust rail-width for sidebar.
+     ───────────────────────────────────────────────────────── */
+  --rail-width:         260px;   /* ← sidebar width — change here           */
+  --content-max:       1160px;
+  --topbar-height:       60px;
+  --gutter: clamp(20px, 3vw, 48px);
+
+  /* ── §1.12  LEGACY ALIASES ──────────────────────────────────
+     Keep these so existing component files don't break.
+     Remove gradually as components migrate to v4 tokens.
+     ───────────────────────────────────────────────────────── */
+  --bg-canvas:          var(--color-canvas);
+  --bg-base:            var(--color-canvas);
+  --bg-surface:         var(--color-surface);
+  --bg-surface-muted:   var(--color-surface-muted);
+  --bg-elevated:        var(--color-surface);
+  --bg-hover:           var(--color-surface-muted);
+  --bg-active:          var(--color-signal-subtle);
+  --bg-overlay:         rgba(20, 18, 16, 0.52);
+  --bg-primary:         var(--color-signal);
+
+  --text-primary:       var(--color-ink-primary);
+  --text-secondary:     var(--color-ink-secondary);
+  --text-muted:         var(--color-ink-muted);
+  --text-inverse:       #FFFFFF;
+
+  --border-subtle:      var(--color-border-muted);
+  --border-default:     var(--color-border);
+  --border-hover:       var(--color-border-strong);
+  --border:             var(--color-border);
+
+  --accent-primary:     var(--color-signal);
+  --accent-success:     var(--color-success);
+  --accent-info:        var(--color-ai);
+  --color-primary:      var(--color-signal);
+  --color-primary-strong: var(--color-signal-active);
+  --primary-color:      var(--color-signal);
+  --primary-hover:      var(--color-signal-hover);
+
+  --radius-panel:       var(--radius-lg);
+  --sidebar-width:      var(--rail-width);
+  --sidebar-collapsed-width: 64px;
+
+  --shadow-sm:          var(--elevation-01);
+  --shadow-md:          var(--elevation-02);
+  --shadow-lg:          var(--elevation-03);
+
+  --dur-base:           var(--motion-affordance);
+  --dur-slow:           var(--motion-arrival);
+  --duration-fast:      var(--motion-affordance);
+  --duration-base:      var(--motion-progression);
+  --duration-slow:      var(--motion-arrival);
+  --ease-emphasized:    var(--ease-out);
+  --fs-small:           var(--text-micro);
+
+  --font-ui:            var(--font-body);
+  --font-mono:          'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
 
-@keyframes qm-arrival {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes qm-progression {
-  from {
-    opacity: 0.92;
-    transform: translateX(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes qm-affordance {
-  from {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 24%, transparent);
-  }
-  to {
-    box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-primary) 0%, transparent);
-  }
-}
-
+/* ============================================================
+   §2  DARK MODE
+   ─────────────────────────────────────────────────────────────
+   Only role tokens change here. Primitives stay the same.
+   The signal (#1F6B58) is bright enough for both modes.
+   ============================================================ */
 [data-theme='dark'] {
-  --bg-canvas: #1c2127;
-  --bg-base: #1c2127;
-  --bg-surface: #272c34;
-  --bg-surface-muted: #303640;
-  --bg-elevated: #383e47;
-  --bg-hover: #3a414c;
-  --bg-overlay: rgba(0, 0, 0, 0.55);
-  --bg-active: #404854;
-  --bg-primary: #4c90f0;
+  /* §2.1 Canvas — near-black warm, not cold */
+  --color-canvas:           #0E0D0B;
+  --color-surface:          #181613;
+  --color-surface-muted:    #1E1B17;
+  --color-surface-overlay:  #1C1A15;
 
-  --text-primary: #f6f7f9;
-  --text-secondary: #d3d8de;
-  --text-muted: #abb3bf;
-  --text-inverse: #1c2127;
+  /* §2.2 Ink — inverted */
+  --color-ink-primary:      #F4F1EC;
+  --color-ink-secondary:    #B3A99A;
+  --color-ink-muted:        #8A7F72;
+  --color-ink-disabled:     #5C5347;
 
-  --border-subtle: rgba(255, 255, 255, 0.1);
-  --border-default: rgba(255, 255, 255, 0.18);
-  --border-hover: rgba(255, 255, 255, 0.3);
-  --border-gold: color-mix(in srgb, var(--color-accent-warm) 42%, transparent);
-  --border: var(--border-default);
+  /* §2.3 Signal — same hex, works on dark */
+  --color-signal-subtle:    #122820;
 
-  --accent-primary: #4c90f0;
-  --accent-secondary: #8a63d2;
-  --color-accent-warm: #f6c04b;
-  --color-accent-mint: #13c9ba;
-  --accent-success: #32a467;
-  --accent-info: #3fa6da;
-  --gold: var(--color-accent-warm);
-  --gold-bright: color-mix(in srgb, var(--color-accent-warm) 86%, #ffffff 14%);
-  --gold-dim: color-mix(in srgb, var(--color-accent-warm) 18%, transparent);
-  --gold-line: color-mix(in srgb, var(--color-accent-warm) 42%, transparent);
-  --teal: var(--color-accent-mint);
-  --sage: #32a467;
-  --coral: #e76a6e;
+  /* §2.4 Borders — lighter on dark */
+  --color-border:           #2C2822;
+  --color-border-muted:     #231F1B;
+  --color-border-strong:    #3A342C;
 
-  --shadow-sm:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.2),
-    0 1px 10px 0 rgba(0, 0, 0, 0.2),
-    inset 0 0 0.5px 0 rgba(255, 255, 255, 0.3),
-    inset 0 0.5px 0 0 rgba(255, 255, 255, 0.08);
-  --shadow-md:
-    0 1px 5px 0 rgba(33, 34, 66, 0.12),
-    0 0 1px 0 rgba(33, 34, 66, 0.16),
-    0 2px 1px 0 rgba(33, 34, 66, 0.08),
-    0 1px 5px 0 rgba(0, 0, 0, 0.12);
+  /* §2.5 Semantic dark variants */
+  --color-ai-subtle:        #142121;
+  --color-success-subtle:   #142019;
+  --color-attention-subtle: #201A0E;
+  --color-danger-subtle:    #1E120F;
+
+  /* §2.6 Dark elevations (deeper shadows) */
+  --elevation-01: 0 1px 2px rgba(0,0,0,.5);
+  --elevation-02: 0 1px 2px rgba(0,0,0,.5), 0 8px 20px -4px rgba(0,0,0,.65);
+  --elevation-03: 0 1px 2px rgba(0,0,0,.5), 0 20px 40px -10px rgba(0,0,0,.75);
+  --elevation-04: 0 1px 2px rgba(0,0,0,.5), 0 32px 72px -14px rgba(0,0,0,.85);
+
+  --bg-hover:     var(--color-surface-muted);
+  --bg-overlay:   rgba(0, 0, 0, 0.65);
 }
 
+/* ============================================================
+   §3  BASE RESET
+   ============================================================ */
 *,
 *::before,
-*::after {
-  box-sizing: border-box;
-}
+*::after { box-sizing: border-box; }
 
 html {
   font-size: 16px;
@@ -212,214 +288,474 @@ html {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
-
-[data-theme='dark'] {
-  color-scheme: dark;
-}
+[data-theme='dark'] { color-scheme: dark; }
 
 body {
   margin: 0;
   min-height: 100vh;
   font-family: var(--font-body);
-  font-size: 14px;
-  line-height: 1.43;
-  color: var(--text-primary);
-  background:
-    radial-gradient(1200px 520px at 0% -10%, color-mix(in srgb, var(--accent-primary) 10%, transparent), transparent 70%),
-    radial-gradient(900px 420px at 100% -20%, color-mix(in srgb, var(--color-accent-warm) 9%, transparent), transparent 68%),
-    var(--bg-canvas);
+  font-size: var(--text-body);
+  line-height: 1.55;
+  color: var(--color-ink-primary);
+  background: var(--color-canvas); /* plain — no gradient */
 }
 
-#app {
-  min-height: 100vh;
-}
+#app { min-height: 100vh; }
 
-h1,
-h2,
-h3,
-h4 {
+/* ============================================================
+   §4  TYPOGRAPHY BASE
+   ─────────────────────────────────────────────────────────────
+   §4 controls heading defaults.
+   To change ALL heading sizes: edit --text-* tokens in §1.6.
+   To change heading font family: edit --font-display in §1.6.
+   ============================================================ */
+h1, h2, h3, h4, h5, h6 {
   margin: 0;
   font-family: var(--font-display);
-  letter-spacing: -0.01em;
+  font-weight: 500;
+  color: var(--color-ink-primary);
 }
 
 h1 {
-  font-size: 32px;
+  font-size: var(--text-hero);
+  line-height: 1.06;
+  letter-spacing: -0.04em;
+}
+h2 {
+  font-size: var(--text-title);
   line-height: 1.2;
+  letter-spacing: -0.03em;
+}
+h3 {
+  font-size: var(--text-h3);
+  line-height: 1.3;
+  letter-spacing: -0.025em;
 }
 
-h2 {
-  font-size: 24px;
-  line-height: 1.25;
+p {
+  max-inline-size: 68ch;
+  margin: 0;
 }
 
 a {
-  color: var(--accent-primary);
+  color: var(--color-signal);
   text-decoration: none;
 }
+a:hover { color: var(--color-signal-hover); }
 
-a:hover {
-  color: var(--primary-hover);
-}
-
-button,
-input,
-select,
-textarea {
+/* ============================================================
+   §5  FORM ELEMENTS
+   ─────────────────────────────────────────────────────────────
+   To change focus ring color: change --color-signal in §1.1.
+   To change input border radius: change --radius-md in §1.8.
+   ============================================================ */
+button, input, select, textarea {
   font: inherit;
   color: inherit;
 }
-
-button {
-  touch-action: manipulation;
-}
+button { touch-action: manipulation; cursor: pointer; }
 
 input,
 select,
 textarea {
   min-height: 44px;
-  border: 1px solid var(--border-default);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: var(--bg-surface);
-  color: var(--text-primary);
+  background: var(--color-surface);
+  color: var(--color-ink-primary);
   padding: 0 var(--space-3);
+  font-size: var(--text-ui);
+  transition:
+    border-color   var(--motion-affordance) var(--ease-standard),
+    box-shadow     var(--motion-affordance) var(--ease-standard);
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--color-signal);
+  box-shadow: 0 0 0 4px var(--color-signal-subtle);
 }
 
 :focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent-primary) 80%, white);
+  outline: 2px solid var(--color-signal);
   outline-offset: 2px;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 18%, transparent);
+  box-shadow: 0 0 0 4px var(--color-signal-subtle);
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--accent-primary) 25%, transparent);
+  background: var(--color-signal-subtle);
+  color: var(--color-ink-primary);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  :root {
-    --motion-arrival-duration: 1ms;
-    --motion-progression-duration: 1ms;
-    --motion-affordance-duration: 1ms;
-    --dur-base: 1ms;
-    --dur-slow: 1ms;
-    --duration-fast: 1ms;
-    --duration-base: 1ms;
-    --duration-slow: 1ms;
-  }
+/* ============================================================
+   §6  BUTTONS
+   ─────────────────────────────────────────────────────────────
+   To change CTA color: change --color-signal in §1.1.
+   Primary = one per view. Secondary = peer of primary.
+   Ghost = minor/reversible. Destructive = permanent delete ONLY.
+   ============================================================ */
 
-  *,
-  *::before,
-  *::after {
-    animation-duration: 1ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 1ms !important;
-    transition-delay: 0ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-
-/* Utility */
-.mono {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-}
-
-.display {
-  font-family: var(--font-display);
-}
-
-.btn {
-  min-height: 32px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-sm);
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  padding: 0 var(--space-3);
-  font-size: 12px;
+/* §6.1 Primary — signal fill, max ONE per view */
+.btn-primary {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-5);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--color-signal);
+  color: var(--color-signal-on);
+  font-family: var(--font-body);
+  font-size: var(--text-ui);
   font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
   transition:
-    border-color var(--dur-base) var(--ease-standard),
-    background-color var(--dur-base) var(--ease-standard),
-    transform var(--dur-base) var(--ease-standard);
+    background-color var(--motion-affordance) var(--ease-standard),
+    box-shadow       var(--motion-affordance) var(--ease-standard),
+    transform        var(--motion-affordance) var(--ease-standard);
+}
+.btn-primary:hover  { background: var(--color-signal-hover); box-shadow: var(--elevation-signal); transform: translateY(-1px); }
+.btn-primary:active { background: var(--color-signal-active); transform: translateY(0); box-shadow: none; }
+.btn-primary:focus-visible { outline: 2px solid var(--color-signal); outline-offset: 2px; box-shadow: 0 0 0 4px var(--color-signal-subtle); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* §6.2 Secondary — outlined, peer of primary */
+.btn-secondary {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-ink-primary);
+  font-family: var(--font-body);
+  font-size: var(--text-ui);
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color     var(--motion-affordance) var(--ease-standard),
+    background-color var(--motion-affordance) var(--ease-standard);
+}
+.btn-secondary:hover { border-color: var(--color-ink-primary); background: var(--color-surface-muted); }
+.btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* §6.3 Ghost — transparent, minor actions */
+.btn-ghost {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-family: var(--font-body);
+  font-size: var(--text-ui);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-affordance) var(--ease-standard),
+    color            var(--motion-affordance) var(--ease-standard);
+}
+.btn-ghost:hover { background: var(--color-surface-muted); color: var(--color-ink-primary); }
+
+/* §6.4 Destructive — permanent delete ONLY, never for archive */
+.btn-destructive {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 40%, var(--color-border));
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-danger);
+  font-family: var(--font-body);
+  font-size: var(--text-ui);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-affordance) var(--ease-standard),
+    border-color     var(--motion-affordance) var(--ease-standard);
+}
+.btn-destructive:hover { background: var(--color-danger-subtle); border-color: var(--color-danger); }
+
+/* §6.5 Legacy .btn alias */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-ink-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    border-color     var(--motion-affordance) var(--ease-standard),
+    background-color var(--motion-affordance) var(--ease-standard);
+}
+.btn:hover { border-color: var(--color-border-strong); background: var(--color-surface-muted); }
+.btn-danger { border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border)); color: var(--color-danger); }
+.btn-danger:hover { background: var(--color-danger-subtle); }
+
+/* ============================================================
+   §7  STATUS PILLS & TAGS
+   ─────────────────────────────────────────────────────────────
+   Dot (6px) + text + tinted background.
+   NO colored left-borders. NO full color flood.
+   To change kept-color: edit --color-success in §1.5.
+   To change AI-color: edit --color-ai in §1.5.
+   ============================================================ */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 22px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-muted);
+  background: var(--color-surface);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--color-ink-secondary);
 }
 
-.btn:hover {
-  border-color: var(--border-hover);
-  background: color-mix(in srgb, var(--bg-hover) 86%, var(--lavender));
+.pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
 }
 
-.btn-danger {
-  border-color: color-mix(in srgb, var(--coral) 45%, var(--border-default));
-  color: color-mix(in srgb, var(--coral) 82%, var(--text-primary));
+.pill-ai {
+  background: var(--color-ai-subtle);
+  border-color: color-mix(in srgb, var(--color-ai) 30%, var(--color-border-muted));
+  color: var(--color-ai);
+}
+.pill-kept {
+  background: var(--color-success-subtle);
+  border-color: color-mix(in srgb, var(--color-success) 30%, var(--color-border-muted));
+  color: var(--color-success);
+}
+.pill-inbox {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  color: var(--color-ink-secondary);
+}
+.pill-archived {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  color: var(--color-ink-muted);
 }
 
-.btn-danger:hover {
-  background: color-mix(in srgb, var(--coral) 12%, var(--bg-surface));
+/* ============================================================
+   §8  EYEBROWS & LABELS
+   ─────────────────────────────────────────────────────────────
+   Eyebrows use mono + muted — NEVER signal, never gold.
+   Signal eyebrow: max ONE per page, on the most important section.
+   ============================================================ */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-weight: 500;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted); /* neutral — NOT signal */
 }
 
+.eyebrow-signal { color: var(--color-signal); }   /* max once per page */
+.eyebrow-ai     { color: var(--color-ai);     }   /* AI context only   */
+
+/* ============================================================
+   §9  METRIC / DATA DISPLAY
+   ─────────────────────────────────────────────────────────────
+   Large numeral + mono label. NO left-border accent strips.
+   tabular-nums is REQUIRED on all numeric values.
+   ============================================================ */
+.metric { display: flex; flex-direction: column; gap: var(--space-1); }
+
+.metric-value {
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-primary);
+}
+
+.metric-label {
+  font-family: var(--font-body);
+  font-size: var(--text-ui);
+  color: var(--color-ink-secondary);
+}
+
+.metric-context {
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-muted);
+  letter-spacing: 0.04em;
+}
+
+/* ============================================================
+   §10  BADGES
+   ============================================================ */
 .badge {
   display: inline-flex;
   align-items: center;
-  min-height: 24px;
-  padding: 0 8px;
-  border-radius: 999px;
-  border: 1px solid var(--border-subtle);
+  min-height: 20px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-muted);
   font-family: var(--font-mono);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: var(--text-micro);
+  font-weight: 500;
+  color: var(--color-ink-muted);
 }
 
 .badge-inbox {
-  border-color: color-mix(in srgb, var(--accent-info) 45%, var(--border-subtle));
-  background: color-mix(in srgb, var(--accent-info) 10%, var(--bg-surface));
-  color: color-mix(in srgb, var(--accent-info) 75%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--color-ai) 40%, var(--color-border-muted));
+  background: var(--color-ai-subtle);
+  color: var(--color-ai);
 }
 
 .badge-archived {
-  border-color: color-mix(in srgb, var(--accent-success) 45%, var(--border-subtle));
-  background: color-mix(in srgb, var(--accent-success) 10%, var(--bg-surface));
-  color: color-mix(in srgb, var(--accent-success) 74%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--color-success) 40%, var(--color-border-muted));
+  background: var(--color-success-subtle);
+  color: var(--color-success);
 }
 
+/* ============================================================
+   §11  PAGE HEADER
+   ============================================================ */
 .page-header {
   margin-bottom: var(--space-6);
   padding-bottom: var(--space-4);
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--color-border-muted);
 }
 
-/* Animations */
-@keyframes fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* ============================================================
+   §12  LAYOUT UTILITIES
+   ─────────────────────────────────────────────────────────────
+   App shell grid, content containers, common spacing helpers.
+   ============================================================ */
+.container {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
 }
 
+/* §12.1  App shell: side-rail + main content */
+.app-shell {
+  display: grid;
+  grid-template-columns: var(--rail-width) 1fr;
+  min-height: 100vh;
+}
+@media (max-width: 900px) {
+  .app-shell { grid-template-columns: 1fr; }
+}
+
+/* §12.2  Card grid: responsive columns */
+.card-grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+/* §12.3  Stack: vertical rhythm */
+.stack   > * + * { margin-top: var(--space-4); }
+.stack-sm > * + * { margin-top: var(--space-2); }
+.stack-lg > * + * { margin-top: var(--space-6); }
+
+/* §12.4  Cluster: flex row */
+.cluster { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+
+/* ============================================================
+   §13  SKELETON LOADER
+   ============================================================ */
 @keyframes shimmer {
-  from {
-    background-position: -200% 0;
-  }
-  to {
-    background-position: 200% 0;
-  }
+  from { background-position: -200% 0; }
+  to   { background-position:  200% 0; }
 }
-
 .skeleton {
-  background: linear-gradient(90deg, var(--bg-surface-muted) 25%, var(--bg-hover) 50%, var(--bg-surface-muted) 75%);
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-muted) 25%,
+    color-mix(in srgb, var(--color-surface-muted) 60%, var(--color-surface)) 50%,
+    var(--color-surface-muted) 75%
+  );
   background-size: 200% 100%;
   animation: shimmer 1.4s linear infinite;
   border-radius: var(--radius-sm);
   color: transparent;
 }
 
+/* ============================================================
+   §14  MOTION KEYFRAMES
+   ============================================================ */
+@keyframes qm-arrival {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes qm-progression {
+  from { opacity: 0.9; transform: translateX(-4px); }
+  to   { opacity: 1;   transform: translateX(0); }
+}
+@keyframes qm-signal-pulse {
+  from { box-shadow: 0 0 0 0   color-mix(in srgb, var(--color-signal) 32%, transparent); }
+  to   { box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-signal)  0%, transparent); }
+}
+
+/* ============================================================
+   §15  TEXT UTILITIES
+   ============================================================ */
+.mono    { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.display { font-family: var(--font-display); }
+
+.text-signal   { color: var(--color-signal);    }
+.text-ai       { color: var(--color-ai);        }
+.text-success  { color: var(--color-success);   }
+.text-muted    { color: var(--color-ink-muted); }
+
+/* ============================================================
+   §16  REDUCED MOTION
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-arrival:     1ms;
+    --motion-progression: 1ms;
+    --motion-affordance:  1ms;
+    --dur-base:  1ms;
+    --dur-slow:  1ms;
+  }
+  *, *::before, *::after {
+    animation-duration:        1ms !important;
+    animation-iteration-count: 1  !important;
+    transition-duration:       1ms !important;
+    transition-delay:          0ms !important;
+    scroll-behavior:           auto !important;
+  }
+}
+
+/* ============================================================
+   §17  RESPONSIVE
+   ============================================================ */
 @media (max-width: 980px) {
   :root {
-    --rail-width: 100%;
-    --content-max: 100%;
+    --rail-width:   100%;
+    --content-max:  100%;
   }
 }

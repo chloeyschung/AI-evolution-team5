@@ -8,6 +8,7 @@ export interface Content {
   title: string | null;
   author: string | null;
   summary: string | null;
+  thumbnail_url: string | null;
   status: 'inbox' | 'archived';
   created_at: string;
   updated_at: string | null;
@@ -85,7 +86,7 @@ export interface AppSettings {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  apiBaseUrl: 'http://localhost:8000',
+  apiBaseUrl: '',
   theme: 'system',
   defaultView: 'grid',
   itemsPerPage: 20,

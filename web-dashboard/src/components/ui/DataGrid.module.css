@@ -1,8 +1,8 @@
 .wrap {
   overflow: auto;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--color-border-muted);
   border-radius: var(--radius-lg);
-  background: var(--bg-surface);
+  background: var(--color-surface);
   box-shadow: var(--shadow-sm);
 }
 
@@ -17,7 +17,7 @@
 th,
 td {
   padding: 10px var(--space-3);
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--color-border-muted);
   vertical-align: top;
 }
 
@@ -25,23 +25,18 @@ th {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--bg-surface-muted);
-  font-size: var(--fs-small);
-  color: var(--text-muted);
+  background: var(--color-surface-muted);
+  font-size: var(--text-ui);
+  color: var(--color-ink-muted);
   font-family: var(--font-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   font-weight: 500;
-  box-shadow: inset 0 -1px 0 var(--border-subtle);
+  box-shadow: inset 0 -1px 0 var(--color-border-muted);
 }
 
 tbody tr:hover {
-  background:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--accent-primary) 4%, var(--bg-surface)),
-      color-mix(in srgb, var(--gold) 5%, var(--bg-surface))
-    );
+  background: var(--color-surface-muted);
 }
 
 tbody tr:last-child td {
@@ -52,6 +47,6 @@ tbody tr:last-child td {
   border: 1px dashed var(--border-default);
   border-radius: var(--radius-lg);
   padding: var(--space-6);
-  color: var(--text-secondary);
-  background: var(--bg-surface);
+  color: var(--color-ink-secondary);
+  background: var(--color-surface);
 }

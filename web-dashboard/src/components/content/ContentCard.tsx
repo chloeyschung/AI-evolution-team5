@@ -48,7 +48,16 @@ export default function ContentCard({ content, onDelete, onSwipe }: ContentCardP
       </div>
 
       <div className={styles.body}>
-        <h3 className={styles.title}>{content.title || 'Untitled note'}</h3>
+        {content.thumbnail_url ? (
+          <img
+            src={content.thumbnail_url}
+            alt=""
+            className={styles.thumb}
+            loading="lazy"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+          />
+        ) : null}
+        <h3 className={styles.title}>{content.title || content.url}</h3>
         {content.author ? <p className={styles.author}>by {content.author}</p> : null}
         <p className={styles.summary}>
           {content.summary || 'No summary yet. Open it once and Briefly will produce your bite-sized takeaway.'}

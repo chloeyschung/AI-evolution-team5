@@ -1,8 +1,6 @@
 import { create } from 'zustand';
 import {
   getContent,
-  getPendingContent,
-  getKeptContent,
   deleteContent,
   recordSwipe,
   getPlatforms,
@@ -94,17 +92,9 @@ export const useContentStore = create<ContentState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      let newItems: Content[];
-
-      if (filters.status === 'inbox') {
-        newItems = await getPendingContent(DEFAULT_PAGE_SIZE, filters.platform || undefined);
-      } else if (filters.status === 'archived') {
-        newItems = await getKeptContent(DEFAULT_PAGE_SIZE, (newPage - 1) * DEFAULT_PAGE_SIZE);
-      } else {
-        const { sort } = get();
-        const result = await getContent(filters, sort, newPage, DEFAULT_PAGE_SIZE);
-        newItems = result.items;
-      }
+      const { sort } = get();
+      const result = await getContent(filters, sort, newPage, DEFAULT_PAGE_SIZE);
+      const newItems = result.items;
 
       if (append) {
         const { items } = get();

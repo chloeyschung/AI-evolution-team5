@@ -3,197 +3,316 @@
   display: grid;
   place-items: center;
   padding: 16px;
-  background:
-    radial-gradient(circle at 12% 18%, color-mix(in srgb, var(--accent-primary) 13%, transparent), transparent 30%),
-    radial-gradient(circle at 88% 8%, color-mix(in srgb, var(--gold) 8%, transparent), transparent 36%),
-    var(--bg-base);
+  background: var(--color-canvas);
 }
 
 .card {
   width: min(440px, 100%);
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
-  background: color-mix(in srgb, var(--bg-surface) 86%, transparent);
+  background: color-mix(in srgb, var(--color-surface) 86%, transparent);
   padding: var(--space-5);
   display: grid;
   gap: var(--space-4);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--elevation-03);
   font-family: var(--font-body);
 }
 
-.brandRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-1);
-}
-
-.brandGlyph {
-  width: 28px;
-  height: 28px;
-  display: inline-grid;
-  place-items: center;
-  border-radius: 8px;
-  background: linear-gradient(
-    145deg,
-    color-mix(in srgb, var(--accent-primary) 90%, white),
-    color-mix(in srgb, var(--accent-primary) 68%, var(--accent-info))
-  );
-  color: var(--text-inverse);
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.92rem;
-  letter-spacing: 0.01em;
-  box-shadow: var(--shadow-sm);
-}
-
-.brandCaption {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  line-height: 1.25;
-  letter-spacing: 0.01em;
-}
-
+/* ── Kicker + heading ───────────────────────────────────── */
 .kicker {
   margin: 0;
-  color: color-mix(in srgb, var(--accent-primary) 72%, var(--text-primary));
-  font-size: 0.74rem;
-  font-family: var(--font-body);
-  font-weight: 600;
-  letter-spacing: 0.1em;
+  color: var(--color-signal);
+  font-size: var(--text-micro);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .card h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(1.85rem, 4.6vw, 2.15rem);
-  line-height: 1.12;
+  font-size: clamp(1.65rem, 4.2vw, 1.95rem);
+  line-height: 1.14;
   letter-spacing: -0.02em;
-  max-inline-size: 18ch;
+  max-inline-size: 22ch;
   text-wrap: balance;
 }
 
 .description {
   margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.98rem;
+  color: var(--color-ink-secondary);
+  font-size: 0.9375rem;
   line-height: 1.5;
   max-inline-size: 40ch;
 }
 
 .error {
   margin: 0;
-  color: var(--coral);
+  color: var(--color-danger);
+  font-size: 0.9rem;
 }
 
-.primaryBtn,
-.secondaryBtn {
-  min-height: 44px;
-  border-radius: var(--radius-md);
-  border: 1px solid transparent;
-  font-weight: 650;
-  transition:
-    transform var(--dur-base) var(--ease-standard),
-    box-shadow var(--dur-base) var(--ease-standard),
-    background-color var(--dur-base) var(--ease-standard);
-}
-
-.primaryBtn {
-  background-color: var(--color-primary, #2d72d2);
-  color: var(--text-inverse);
-  border-color: color-mix(in srgb, var(--color-primary-strong, #1f5fbf) 70%, #ffffff 30%);
-  box-shadow: var(--shadow-sm);
-}
-
-.primaryBtn:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
-}
-
-.primaryBtn:focus-visible,
-.secondaryBtn:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent-primary) 78%, white);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 18%, transparent);
-}
-
-.primaryLink {
+/* ── Step pane — animated on entry ─────────────────────── */
+.stepPane {
   display: grid;
-  place-items: center;
-  text-decoration: none;
+  gap: var(--space-4);
+  animation: qm-arrival var(--motion-arrival) var(--ease-emphasized) both;
 }
 
-.primaryBtn:disabled,
-.secondaryBtn:disabled {
-  opacity: 0.72;
-  cursor: not-allowed;
-  transform: none;
+/* ── Field group: tight label + input pairing ───────────── */
+.fieldGroup {
+  display: grid;
+  gap: var(--space-1);
 }
 
-.secondaryBtn {
-  background: color-mix(in srgb, var(--bg-surface-muted) 78%, #ffffff);
-  color: var(--text-primary);
-  border-color: var(--border-default);
+.fieldLabel {
+  font-size: var(--text-ui);
+  font-weight: 600;
+  color: var(--color-ink-primary);
+  letter-spacing: 0.005em;
 }
 
-.secondaryBtn:hover {
-  background: var(--bg-hover);
-}
-
+/* ── Inputs ─────────────────────────────────────────────── */
 .input {
   display: block;
   width: 100%;
   min-height: 44px;
   padding: 0 var(--space-3);
   border-radius: var(--radius-md);
-  border: 1px solid var(--border-default);
-  background: var(--bg-surface);
-  color: var(--text-primary);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-ink-primary);
   font-size: 1rem;
   transition:
-    border-color var(--dur-base) var(--ease-standard),
-    box-shadow var(--dur-base) var(--ease-standard);
+    border-color var(--motion-affordance) var(--ease-standard),
+    box-shadow   var(--motion-affordance) var(--ease-standard);
 }
 
 .input:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent-primary) 74%, white);
-  outline-offset: 2px;
-  border-color: color-mix(in srgb, var(--accent-primary) 45%, var(--border-default));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 18%, transparent);
+  outline: none;
+  border-color: color-mix(in srgb, var(--color-signal) 55%, var(--color-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-signal) 18%, transparent);
 }
 
+/* ── Form ───────────────────────────────────────────────── */
 .form {
   display: grid;
   gap: var(--space-3);
 }
 
-.form .primaryBtn,
-.form .secondaryBtn {
+/* ── Buttons ────────────────────────────────────────────── */
+.primaryBtn,
+.secondaryBtn {
   width: 100%;
+  min-height: 44px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    transform        var(--motion-affordance) var(--ease-standard),
+    box-shadow       var(--motion-affordance) var(--ease-standard),
+    background-color var(--motion-affordance) var(--ease-standard);
 }
 
-.divider {
-  margin: var(--space-3) 0;
-  border: 0;
-  border-top: 1px solid color-mix(in srgb, var(--border-default) 85%, transparent);
+.primaryBtn {
+  background-color: var(--color-signal);
+  color: var(--color-signal-on);
+  border-color: var(--color-signal-active);
+  box-shadow: var(--elevation-02);
 }
 
+.primaryBtn:hover {
+  background-color: var(--color-signal-hover);
+  box-shadow: var(--elevation-signal);
+  transform: translateY(-1px);
+}
+
+.primaryBtn:active {
+  background-color: var(--color-signal-active);
+  box-shadow: var(--elevation-01);
+  transform: translateY(0);
+}
+
+.primaryBtn:focus-visible,
+.secondaryBtn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-signal) 78%, white);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-signal) 18%, transparent);
+}
+
+.primaryBtn:disabled,
+.secondaryBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.secondaryBtn {
+  background: color-mix(in srgb, var(--color-surface-muted) 78%, #ffffff);
+  color: var(--color-ink-primary);
+  border-color: var(--color-border);
+}
+
+.secondaryBtn:hover {
+  background: var(--bg-hover);
+  border-color: var(--color-border-strong);
+}
+
+/* ── "or" divider row ───────────────────────────────────── */
+.dividerRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.dividerLine {
+  flex: 1;
+  height: 1px;
+  background: var(--color-border-muted);
+}
+
+.dividerLabel {
+  font-size: 0.8125rem;
+  color: var(--color-ink-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+
+/* ── Legal / terms text ─────────────────────────────────── */
+.legalText {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--color-ink-secondary);
+  text-align: center;
+  max-inline-size: none;
+}
+
+.legalText a {
+  color: var(--color-ink-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.legalText a:hover {
+  color: var(--color-ink-primary);
+}
+
+/* ── OAuth button (outlined, provider-branded) ──────────── */
+.oauthBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-ink-primary);
+  font-family: var(--font-body);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-affordance) var(--ease-standard),
+    border-color     var(--motion-affordance) var(--ease-standard),
+    transform        var(--motion-affordance) var(--ease-standard),
+    box-shadow       var(--motion-affordance) var(--ease-standard);
+}
+
+.oauthBtn:hover {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border-strong);
+  transform: translateY(-1px);
+  box-shadow: var(--elevation-02);
+}
+
+.oauthBtn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.oauthBtn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-signal) 78%, white);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-signal) 18%, transparent);
+}
+
+.oauthBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ── Email chip (step 2 locked-in email display) ────────── */
+.emailChip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.emailChipText {
+  font-size: 0.9375rem;
+  color: var(--color-ink-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editEmailBtn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-signal);
+  font-size: var(--text-ui);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color var(--motion-affordance) var(--ease-standard);
+}
+
+.editEmailBtn:hover {
+  color: var(--color-signal-hover);
+}
+
+.editEmailBtn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-signal) 78%, white);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* ── Meta links ─────────────────────────────────────────── */
 .metaLinks {
-  margin: var(--space-2) 0 0;
+  margin: 0;
   font-size: 0.875rem;
   line-height: 1.45;
   text-align: center;
-  color: var(--text-secondary);
+  color: var(--color-ink-secondary);
+  max-inline-size: none;
 }
 
+/* ── Responsive ─────────────────────────────────────────── */
 @media (max-width: 440px) {
   .card {
     padding: var(--space-4);
+    border-radius: var(--radius-lg);
   }
 
   .card h1 {
-    font-size: clamp(1.65rem, 8vw, 1.95rem);
+    font-size: clamp(1.45rem, 8vw, 1.75rem);
   }
 }

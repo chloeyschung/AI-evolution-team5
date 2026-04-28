@@ -10,7 +10,10 @@ export default function Archive() {
 
   useEffect(() => {
     contentStore.updateFilters({ status: 'archived' });
-    void contentStore.loadContent(1);
+    // Reset to 'all' when leaving so Dashboard doesn't inherit the archived filter
+    return () => {
+      contentStore.updateFilters({ status: 'all', platform: null });
+    };
   }, []);
 
   const handleDelete = async (id: number) => {

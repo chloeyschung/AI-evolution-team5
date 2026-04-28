@@ -1,31 +1,34 @@
 .card {
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-panel);
-  background: color-mix(in srgb, var(--color-surface) 95%, var(--color-canvas) 5%);
-  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--color-border-muted);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--elevation-01);
   padding: var(--space-4);
   display: grid;
   gap: var(--space-2);
 }
 
+/* No colored left-borders — those are 2015 dashboard tropes.
+   Weight comes from the numeral, not a stripe. */
+
 .label {
-  font-size: var(--fs-small);
-  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: var(--text-ui);
+  color: var(--color-ink-muted);
 }
 
 .value {
+  font-family: var(--font-mono);
   font-size: 1.8rem;
   font-weight: 700;
   line-height: 1;
-  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--color-ink-primary);
 }
 
 .hint {
-  font-size: var(--fs-small);
-  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: var(--text-ui);
+  color: var(--color-ink-secondary);
 }
-
-.info { border-left: 4px solid var(--accent-info); }
-.success { border-left: 4px solid var(--accent-success); }
-.warning { border-left: 4px solid var(--color-primary-strong); }
-.default { border-left: 4px solid var(--color-primary); }

@@ -12,6 +12,10 @@ export default function Inbox() {
   useEffect(() => {
     contentStore.updateFilters({ status: 'inbox' });
     void contentStore.loadPlatforms();
+    // Reset to 'all' when leaving so Dashboard doesn't inherit the inbox filter
+    return () => {
+      contentStore.updateFilters({ status: 'all', platform: null });
+    };
   }, []);
 
   const handleSwipe = async (action: { content_id: number; action: 'keep' | 'discard' }) => {

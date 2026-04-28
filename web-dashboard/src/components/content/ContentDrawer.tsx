@@ -43,6 +43,15 @@ export default function ContentDrawer({ contentId, onClose }: ContentDrawerProps
       {isLoading ? <p>Loading detail…</p> : null}
       {detail ? (
         <>
+          {detail.thumbnail_url ? (
+            <img
+              src={detail.thumbnail_url}
+              alt=""
+              className={styles.hero}
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+            />
+          ) : null}
+
           <section className={styles.section}>
             <h3>Summary</h3>
             <p>{detail.summary || 'No summary is available yet for this item.'}</p>

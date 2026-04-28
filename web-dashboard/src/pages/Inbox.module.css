@@ -7,8 +7,8 @@
   display: grid;
   gap: 4px;
   padding: 18px 20px 14px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-panel);
+  border: 1px solid var(--color-border-muted);
+  border-radius: var(--radius-lg);
   background:
     linear-gradient(
       135deg,
@@ -20,21 +20,22 @@
 
 .hero h1 {
   margin-top: 0;
+  font-size: clamp(1.5rem, 3vw, 2rem);
 }
 
 .filterRow {
   display: flex;
   align-items: center;
   gap: 10px;
-  border: 1px solid var(--border);
-  background: var(--bg-surface);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
   border-radius: 14px;
   padding: 10px 14px;
 }
 
 .filterRow label,
 .message {
-  color: var(--text-secondary);
+  color: var(--color-ink-secondary);
 }
 
 .subtitle {
@@ -49,9 +50,9 @@
 .select {
   min-height: 44px;
   border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--bg-base);
-  color: var(--text-primary);
+  border: 1px solid var(--color-border);
+  background: var(--color-canvas);
+  color: var(--color-ink-primary);
   padding: 0 12px;
 }
 

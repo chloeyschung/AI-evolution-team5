@@ -25,7 +25,7 @@
 
 .head {
   padding: var(--space-4);
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--color-border-muted);
   display: flex;
   justify-content: space-between;
   align-items: start;
@@ -34,7 +34,7 @@
 
 .head p {
   margin-top: var(--space-1);
-  font-size: var(--fs-small);
+  font-size: var(--text-ui);
 }
 
 .content {

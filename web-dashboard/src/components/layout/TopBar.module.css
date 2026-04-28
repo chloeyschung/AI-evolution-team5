@@ -3,13 +3,8 @@
   top: 0;
   z-index: 10;
   min-height: var(--topbar-height);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--bg-surface) 96%, var(--accent-primary) 4%),
-      color-mix(in srgb, var(--bg-surface) 98%, var(--bg-canvas) 2%)
-    );
-  border-bottom: 1px solid color-mix(in srgb, var(--border-default) 86%, var(--accent-primary) 14%);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border-muted);
   backdrop-filter: blur(8px);
   display: grid;
   grid-template-columns: auto minmax(220px, 1fr) auto auto;
@@ -34,9 +29,9 @@
 
 .searchInput {
   min-height: 36px;
-  border-radius: 10px;
-  border-color: color-mix(in srgb, var(--border-default) 80%, var(--gold-line));
-  background: color-mix(in srgb, var(--bg-surface) 86%, white);
+  border-radius: var(--radius-md);
+  border-color: var(--color-border);
+  background: var(--color-surface);
 }
 
 @media (max-width: 980px) {
