@@ -4,6 +4,8 @@ import ErrorBoundary from './components/ErrorBoundary';
 import AppShell from './components/layout/AppShell';
 import styles from './App.module.css';
 import { setNavigator } from './utils/navigation';
+import { registerAuthExpiredHandler } from './api/client';
+import { useAuthStore } from './stores/useAuthStore';
 
 const AUTH_PAGES = [
   '/login',
@@ -21,6 +23,7 @@ function App() {
 
   useEffect(() => {
     setNavigator((path, options) => reactNavigate(path, options));
+    registerAuthExpiredHandler(() => useAuthStore.getState().clearAuth());
   }, [reactNavigate]);
 
   const handleError = (error: Error) => {

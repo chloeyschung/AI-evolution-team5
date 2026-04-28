@@ -15,7 +15,7 @@ interface AuthState {
   loginWithEmail: (email: string, password: string) => Promise<void>;
   performLogout: () => Promise<void>;
   clearAuth: () => void;
-  saveTokens: (accessToken: string, refreshToken: string) => void;
+  saveTokens: (accessToken: string, refreshToken: string, expiresAt?: string) => void;
 
   // Getters
   getUserEmail: () => string;
@@ -75,7 +75,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   loginWithEmail: async (email: string, password: string) => {
     const data = await loginWithEmailPassword(email, password);
-    get().saveTokens(data.access_token, data.refresh_token);
+    get().saveTokens(data.access_token, data.refresh_token, data.expires_at);
     set({
       user: { id: data.user_id, email: data.email },
       isAuthenticated: true,
@@ -114,10 +114,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     });
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.removeItem('briefly_expires_at');
   },
 
-  saveTokens: (accessToken: string, refreshToken: string) => {
+  saveTokens: (accessToken: string, refreshToken: string, expiresAt?: string) => {
     localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
     localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    if (expiresAt) {
+      localStorage.setItem('briefly_expires_at', String(new Date(expiresAt).getTime()));
+    }
   },
 }));

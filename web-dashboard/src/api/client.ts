@@ -2,6 +2,12 @@ import axios, { type AxiosRequestConfig, type AxiosResponse, type AxiosError, ty
 import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from '../types';
 import { navigate } from '../utils/navigation';
 
+// Registered by App.tsx to avoid circular import (client → store → endpoints → client)
+let _onAuthExpired: (() => void) | null = null;
+export function registerAuthExpiredHandler(fn: () => void): void {
+  _onAuthExpired = fn;
+}
+
 let apiClient: ReturnType<typeof axios.create> | null = null;
 let refreshPromise: Promise<void> | null = null;
 let currentAbortController: AbortController | null = null;
@@ -27,18 +33,35 @@ export function setAbortController(controller: AbortController | null): void {
 }
 
 function getApiBaseUrl(): string {
+  // 1. Build-time env var wins (CI / Docker deployments)
   const explicitBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
-  if (explicitBaseUrl) {
-    return explicitBaseUrl;
+  if (explicitBaseUrl) return explicitBaseUrl;
+
+  // 2. User-set override in Settings (allows pointing at a different backend at runtime)
+  try {
+    const raw = localStorage.getItem('briefly_settings');
+    if (raw) {
+      const stored = JSON.parse(raw).apiBaseUrl as string | undefined;
+      if (stored && stored.trim()) return stored.trim();
+    }
+  } catch {
+    // ignore corrupt localStorage
   }
 
-  // In local dev, keep requests same-origin and let Vite proxy /api -> backend.
-  if (import.meta.env.DEV) {
-    return '';
-  }
+  // 3. Local dev: empty string → Vite proxy forwards /api to backend
+  if (import.meta.env.DEV) return '';
 
-  // In prod, default to same origin unless explicitly overridden.
+  // 4. Production: same origin
   return window.location.origin;
+}
+
+/**
+ * Reset the cached API client instance.
+ * Call this after updating apiBaseUrl in localStorage so the next request
+ * picks up the new base URL.
+ */
+export function resetApiClient(): void {
+  apiClient = null;
 }
 
 export function getApiClient(): ReturnType<typeof axios.create> {
@@ -88,8 +111,11 @@ export function getApiClient(): ReturnType<typeof axios.create> {
             await refreshPromise;
           } catch {
             refreshPromise = null;
+            // Clear tokens AND update Zustand store so ProtectedRoute redirects immediately
             localStorage.removeItem(ACCESS_TOKEN_KEY);
             localStorage.removeItem(REFRESH_TOKEN_KEY);
+            localStorage.removeItem('briefly_expires_at');
+            _onAuthExpired?.();
             if (window.location.pathname !== '/login') {
               navigate('/login', { replace: true });
             }
@@ -129,9 +155,12 @@ export async function refreshAccessToken(): Promise<void> {
         `${getApiBaseUrl()}/api/v1/auth/refresh`,
         { refresh_token: refreshToken }
       );
-      const { access_token, refresh_token } = response.data;
+      const { access_token, refresh_token, expires_at } = response.data;
       localStorage.setItem(ACCESS_TOKEN_KEY, access_token);
       localStorage.setItem(REFRESH_TOKEN_KEY, refresh_token);
+      if (expires_at) {
+        localStorage.setItem('briefly_expires_at', String(new Date(expires_at).getTime()));
+      }
     } finally {
       refreshPromise = null;
     }
