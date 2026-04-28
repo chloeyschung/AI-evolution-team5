@@ -4,7 +4,7 @@ from datetime import timedelta
 from secrets import token_urlsafe
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...constants import ACCOUNT_DELETION_BLOCK_DAYS, ErrorCode
@@ -21,7 +21,7 @@ from ...data.models import (
     UserProfile,
     utc_now,
 )
-from ...data.repository import AccountDeletionRepository, AuditRepository
+from ...data.repository import AccountDeletionRepository, AuditRepository, UserProfileRepository
 from ..dependencies import get_current_user
 from ..schemas import (
     AccountDeleteRequest,
@@ -72,8 +72,8 @@ async def delete_account(
     ip = http_request.client.host if http_request.client else None
 
     # Get user profile
-    result = await db.execute(select(UserProfile).where(UserProfile.id == user_id))
-    user = result.scalar_one_or_none()
+    user_repo = UserProfileRepository(db)
+    user = await user_repo.get_by_id(UserProfile, user_id)
 
     if not user:
         raise HTTPException(status_code=404, detail={"error": ErrorCode.USER_NOT_FOUND, "message": "User not found."})

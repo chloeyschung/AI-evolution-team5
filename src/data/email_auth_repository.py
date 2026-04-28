@@ -4,7 +4,7 @@ Handles CRUD for user_auth_methods, email_verification_tokens,
 and password_reset_tokens.
 
 Commit boundary policy:
-  - create_* methods commit internally (callers depend on it for generated IDs).
+  - create_* methods flush (not commit); callers own the commit boundary.
   - consume_*, mark_email_verified, update_password do NOT commit; callers
     must commit to keep these mutations atomic with surrounding operations.
 """
@@ -41,7 +41,7 @@ class EmailAuthRepository:
             email_verified=False,
         )
         self._db.add(method)
-        await self._db.commit()
+        await self._db.flush()
         await self._db.refresh(method)
         return method
 
@@ -61,6 +61,16 @@ class EmailAuthRepository:
             select(UserAuthMethod).where(UserAuthMethod.user_id == user_id)
         )
         return list(result.scalars().all())
+
+    async def get_email_auth_method(self, user_id: int) -> UserAuthMethod | None:
+        """Get the EMAIL_PASSWORD auth method for a user. Returns None if not found."""
+        result = await self._db.execute(
+            select(UserAuthMethod).where(
+                UserAuthMethod.user_id == user_id,
+                UserAuthMethod.provider == AuthProvider.EMAIL_PASSWORD,
+            )
+        )
+        return result.scalar_one_or_none()
 
     async def mark_email_verified(self, method_id: int) -> UserAuthMethod:
         """Mark auth method as email-verified. Caller must commit."""
@@ -88,7 +98,7 @@ class EmailAuthRepository:
     ) -> EmailVerificationToken:
         token = EmailVerificationToken(user_id=user_id, token_hash=token_hash, expires_at=expires_at)
         self._db.add(token)
-        await self._db.commit()
+        await self._db.flush()
         await self._db.refresh(token)
         return token
 
@@ -129,7 +139,7 @@ class EmailAuthRepository:
     ) -> PasswordResetToken:
         token = PasswordResetToken(user_id=user_id, token_hash=token_hash, expires_at=expires_at)
         self._db.add(token)
-        await self._db.commit()
+        await self._db.flush()
         await self._db.refresh(token)
         return token
 

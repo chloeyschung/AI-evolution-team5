@@ -8,7 +8,6 @@ from dataclasses import dataclass, field
 
 from src.data.models import SwipeAction
 from src.data.repository import ContentRepository, SwipeRepository
-from .event_bus import ContentSwipedEvent, event_bus
 
 
 @dataclass
@@ -43,7 +42,6 @@ class SwipeService:
         """
         self._content_repo = ContentRepository(db_session)
         self._swipe_repo = SwipeRepository(db_session)
-        self._event_bus = event_bus
 
     async def _assert_content_owned(self, content_id: int, user_id: int) -> None:
         """Ensure the referenced content exists and belongs to the actor."""
@@ -70,15 +68,6 @@ class SwipeService:
         await self._assert_content_owned(content_id, user_id)
         history = await self._swipe_repo.record_swipe(content_id, action, user_id)
 
-        # Publish event for side effects (achievement checking, analytics, etc.)
-        await self._event_bus.publish(
-            ContentSwipedEvent(
-                content_id=content_id,
-                user_id=user_id,
-                action=action.value,
-            )
-        )
-
         return SwipeResult(
             id=history.id,
             content_id=history.content_id,
@@ -104,16 +93,6 @@ class SwipeService:
         for content_id, _action in actions:
             await self._assert_content_owned(content_id, user_id)
         histories = await self._swipe_repo.record_swipes_batch(actions, user_id)
-
-        # Publish events for each swipe (for side effects)
-        for history in histories:
-            await self._event_bus.publish(
-                ContentSwipedEvent(
-                    content_id=history.content_id,
-                    user_id=user_id,
-                    action=history.action.value,
-                )
-            )
 
         results = [
             SwipeResult(

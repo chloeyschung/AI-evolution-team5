@@ -4,7 +4,6 @@ import logging
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...constants import AuthProvider, ErrorCode
@@ -584,6 +583,7 @@ async def register(
 
         existing.password_hash = hash_password(data.password)
         raw_token = await _rotate_verification_token(email_repo, existing.user_id)
+        await db.commit()
         _send_verification_email_safely(normalized_email, raw_token)
         return RegisterResponse(message="Verification email sent. Please check your inbox.")
 
@@ -614,6 +614,7 @@ async def register(
 
     raw_token = await _rotate_verification_token(email_repo, user.id)
 
+    await db.commit()
     _send_verification_email_safely(normalized_email, raw_token)
 
     return RegisterResponse(message="Verification email sent. Please check your inbox.")
@@ -633,13 +634,7 @@ async def verify_email(
             detail={"error": "invalid_or_expired_token", "message": "Verification token is invalid or has expired."},
         )
 
-    result = await db.execute(
-        select(UserAuthMethod).where(
-            UserAuthMethod.user_id == token_rec.user_id,
-            UserAuthMethod.provider == AuthProvider.EMAIL_PASSWORD,
-        )
-    )
-    method = result.scalar_one_or_none()
+    method = await email_repo.get_email_auth_method(token_rec.user_id)
     if method:
         method.email_verified = True
         method.verified_at = utc_now()
@@ -660,6 +655,7 @@ async def resend_verification_email(
 
     if method and not method.email_verified:
         raw_token = await _rotate_verification_token(email_repo, method.user_id)
+        await db.commit()
         _send_verification_email_safely(normalized_email, raw_token)
 
     return ResendVerificationResponse(message=_VERIFICATION_EMAIL_SENT_MESSAGE)
@@ -767,6 +763,7 @@ async def password_reset_request(
             token_hash=token_hash,
             expires_at=utc_now() + timedelta(hours=1),
         )
+        await db.commit()
         try:
             EmailService().send_password_reset_email(normalized_email, raw_token)
         except Exception:
@@ -791,13 +788,7 @@ async def password_reset_confirm(
             detail={"error": "invalid_or_expired_token", "message": "Password reset token is invalid or has expired."},
         )
 
-    result = await db.execute(
-        select(UserAuthMethod).where(
-            UserAuthMethod.user_id == token_rec.user_id,
-            UserAuthMethod.provider == AuthProvider.EMAIL_PASSWORD,
-        )
-    )
-    method = result.scalar_one_or_none()
+    method = await email_repo.get_email_auth_method(token_rec.user_id)
     if method is None:
         raise HTTPException(
             status_code=400,
@@ -838,6 +829,7 @@ async def link_account(
         password_hash=hash_password(request.password),
         email_encrypted=encrypt_email(request.email),
     )
+    await db.commit()
 
     return LinkAccountResponse(message="Email/password identity linked. Verify your email to activate it.")
 
