@@ -6,6 +6,7 @@ TODO #6 (2026-04-14): Fix timezone handling inconsistencies in get_statistics me
 """
 
 from datetime import date, datetime, timedelta
+import unicodedata
 from typing import Optional
 
 from sqlalchemy import case, delete, func, or_, select, update
@@ -130,6 +131,24 @@ class ContentRepository(BaseRepository[Content]):
             .values(summary=summary, updated_at=utc_now())
         )
         await self.session.commit()
+
+    async def update_title(self, content_id: int, user_id: int, title: str) -> None:
+        """Persist an improved title for a content row the user owns."""
+        await self.session.execute(
+            update(Content)
+            .where(Content.id == content_id, Content.user_id == user_id)
+            .values(title=title, updated_at=utc_now())
+        )
+        await self.session.commit()
+
+    @staticmethod
+    def _normalize_search_text(value: str | None) -> str:
+        if not value:
+            return ""
+        # NFKC folds compatibility glyphs (e.g. mathematical bold letters) into plain forms.
+        normalized = unicodedata.normalize("NFKC", value)
+        normalized = " ".join(normalized.split())
+        return normalized.casefold()
 
     async def get_all(
         self,
@@ -413,6 +432,7 @@ class ContentRepository(BaseRepository[Content]):
         Returns:
             List of matching Content objects, sorted by recency.
         """
+        normalized_query = self._normalize_search_text(query)
         # Build search query with OR conditions for title, author, and tags
         query_pattern = f"%{query}%"
 
@@ -439,9 +459,39 @@ class ContentRepository(BaseRepository[Content]):
             query_stmt = query_stmt.offset(offset)
         query_stmt = query_stmt.limit(limit)
 
-        # Execute search
+        # Execute raw SQL search first.
         result = await self.session.execute(query_stmt)
         results = list(result.scalars().unique().all())
+
+        if results or not normalized_query:
+            return results
+
+        # Fallback for Unicode-styled titles (e.g., LinkedIn mathematical bold glyphs)
+        # that don't match plain query text under SQLite ILIKE.
+        candidate_stmt = (
+            select(Content)
+            .where(Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
+            .order_by(Content.created_at.desc(), Content.id.desc())
+            .limit(250)
+        )
+        candidate_rows = await self.session.execute(candidate_stmt)
+        candidates = list(candidate_rows.scalars().all())
+        matched: list[Content] = []
+        for content in candidates:
+            haystack = " ".join(
+                [
+                    self._normalize_search_text(content.title),
+                    self._normalize_search_text(content.url),
+                    self._normalize_search_text(content.author),
+                ]
+            )
+            if normalized_query in haystack:
+                matched.append(content)
+                if len(matched) >= limit:
+                    break
+        if offset:
+            matched = matched[offset:]
+        return matched[:limit]
 
         return results
 

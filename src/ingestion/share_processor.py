@@ -2,6 +2,7 @@
 
 import logging
 import re
+import unicodedata
 from abc import ABC, abstractmethod
 
 from src.ai.metadata_extractor import ContentMetadata, MetadataExtractor
@@ -87,8 +88,12 @@ class URLShareProcessor(BaseShareProcessor):
         hinted_author = hints.get("author")
         hinted_content_type = _parse_content_type(hints.get("content_type"))
 
-        if hinted_title and isinstance(hinted_title, str):
-            metadata.title = hinted_title.strip() or metadata.title
+        # Prefer extracted page title (og:title/<title>) when available.
+        # Use extension-provided tab title only as fallback.
+        if (not metadata.title or not metadata.title.strip()) and hinted_title and isinstance(hinted_title, str):
+            metadata.title = _normalize_title(hinted_title) or metadata.title
+        elif metadata.title:
+            metadata.title = _normalize_title(metadata.title)
         if hinted_author and isinstance(hinted_author, str):
             metadata.author = hinted_author.strip() or metadata.author
         if hinted_content_type:
@@ -260,3 +265,11 @@ def _parse_content_type(value: object) -> ContentType | None:
         return ContentType(normalized)
     except ValueError:
         return None
+
+
+def _normalize_title(value: str | None) -> str | None:
+    if not value:
+        return value
+    text = unicodedata.normalize("NFKC", value)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text or None
