@@ -92,6 +92,13 @@ class Settings:
     # Bundle ID as registered in App Store Connect (e.g. "com.briefly.app")
     APPLE_BUNDLE_ID: str = os.getenv("APPLE_BUNDLE_ID", "com.briefly.app")
 
+    # App lifecycle / force-update / maintenance settings
+    MIN_APP_VERSION: str = os.getenv("MIN_APP_VERSION", "1.0.0")
+    MIN_IOS_VERSION: str = os.getenv("MIN_IOS_VERSION", "16.0")
+    MAINTENANCE_MODE: bool = os.getenv("MAINTENANCE_MODE", "false").lower() == "true"
+    MAINTENANCE_MESSAGE: str = os.getenv("MAINTENANCE_MESSAGE", "")
+    STORE_URL: str = os.getenv("STORE_URL", "")
+
     # Content Settings
     MAX_SUMMARY_LENGTH: int = 300  # Maximum characters for AI summary
 

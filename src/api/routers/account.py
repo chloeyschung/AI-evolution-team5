@@ -116,7 +116,7 @@ async def delete_account(
 
         return AccountDeleteResponse(
             message="Confirmation token generated. Submit this token to confirm deletion.",
-            block_expires_at=block_expires_at.isoformat() + "Z",
+            block_expires_at=serialize_datetime(block_expires_at),
             confirmation_token=confirmation_token,
         )
 

@@ -758,7 +758,7 @@ async def share_content(
 
     # Save content immediately (no summary yet)
     repo = ContentRepository(db)
-    content = await repo.save(metadata, user_id=user_id, allow_duplicate_url=True)
+    content = await repo.save(metadata, user_id=user_id)
 
     # Schedule summarization to run after the response is sent
     if auto_summarize and share_handler._summarizer and data.content:

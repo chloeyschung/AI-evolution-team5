@@ -149,8 +149,8 @@ async def get_user_statistics(
         total_discarded=stats["total_discarded"],
         retention_rate=stats["retention_rate"],
         streak_days=stats["streak_days"],
-        first_swipe_at=stats["first_swipe_at"].isoformat() + "Z" if stats["first_swipe_at"] else None,
-        last_swipe_at=stats["last_swipe_at"].isoformat() + "Z" if stats["last_swipe_at"] else None,
+        first_swipe_at=serialize_datetime(stats["first_swipe_at"]),
+        last_swipe_at=serialize_datetime(stats["last_swipe_at"]),
     )
 
 

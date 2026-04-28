@@ -24,7 +24,7 @@ from ..config import settings
 from ..middleware.rate_limiter import limiter, rate_limit_exceeded_handler
 from ..middleware.security_headers import security_headers_middleware
 from ..utils.http_client import HttpClientPool
-from .routers import auth, content, swipe, user, integrations, ai, account, well_known
+from .routers import auth, content, swipe, user, integrations, ai, account, well_known, config
 from .routers.integrations import _background_tasks
 
 
@@ -223,6 +223,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(SlowAPIMiddleware)
 
 app.include_router(well_known.router,   prefix="",        tags=[])
+app.include_router(config.router,       prefix="/api/v1", tags=["config"])
 app.include_router(auth.router,         prefix="/api/v1", tags=["auth"])
 app.include_router(account.router,      prefix="/api/v1", tags=["account"])
 app.include_router(swipe.router,        prefix="/api/v1", tags=["swipe"])

@@ -41,6 +41,15 @@ from src.data.models import (
 from src.data import database as db_module
 
 
+@pytest.fixture(autouse=True)
+def reset_rate_limiter():
+    """Reset in-process rate limiter state between tests to prevent 429 contamination."""
+    from src.middleware.rate_limiter import limiter
+    limiter.reset()
+    yield
+    limiter.reset()
+
+
 # ============================================================================
 # Shared Test Database Setup (for API integration tests only)
 # ============================================================================

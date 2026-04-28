@@ -849,3 +849,11 @@ class ReminderRespondResponse(BaseModel):
 
     success: bool
     message: str
+
+
+class AppConfigResponse(BaseModel):
+    min_version: str
+    min_ios_version: str
+    is_maintenance: bool
+    maintenance_message: str | None
+    store_url: str | None
