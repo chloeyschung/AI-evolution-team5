@@ -14,19 +14,11 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Navigation Security', () => {
   test('should not navigate to external URL when malicious redirect is provided', async ({ page }) => {
-    // Track if we ever navigate away from localhost
-    let navigatedAway = false;
-
-    page.on('request', (request) => {
-      const url = request.url();
-      // Check if request is going to an external domain (not just localhost with params)
-      try {
-        const urlObj = new URL(url);
-        if (urlObj.hostname !== 'localhost' && !url.startsWith('http://localhost')) {
-          navigatedAway = true;
-        }
-      } catch {
-        // Invalid URL, ignore
+    // Track only top-level navigations (ignore external static assets like Google Fonts).
+    const mainFrameNavigations: string[] = [];
+    page.on('framenavigated', (frame) => {
+      if (frame === page.mainFrame()) {
+        mainFrameNavigations.push(frame.url());
       }
     });
 
@@ -36,12 +28,19 @@ test.describe('Navigation Security', () => {
     // Wait for component to process and attempt redirect
     await page.waitForTimeout(2000);
 
-    // Verify no external navigation occurred
-    expect(navigatedAway).toBe(false);
-
+    // Verify no external main-frame navigation occurred
+    const navigatedToExternalMainFrame = mainFrameNavigations.some((url) => {
+      try {
+        return new URL(url).hostname !== 'localhost';
+      } catch {
+        return false;
+      }
+    });
+    expect(navigatedToExternalMainFrame).toBe(false);
     // Final URL should still be on localhost
     const finalUrl = page.url();
     expect(finalUrl).toContain('localhost:3001');
+    expect(finalUrl.startsWith('https://evil.com')).toBe(false);
   });
 
   test('should not execute data URL in redirect parameter', async ({ page }) => {

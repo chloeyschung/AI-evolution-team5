@@ -51,7 +51,12 @@ test.describe('Authentication Flow', () => {
   });
 
   test('verify-email failure page allows resend by email', async ({ page }) => {
-    await page.route('**/api/v1/auth/verify-email?token=*', async (route) => {
+    // verify-email is POST with token in body (changed from GET+query-param in commit 8df1b88)
+    await page.route('**/api/v1/auth/verify-email', async (route) => {
+      if (route.request().method() !== 'POST') {
+        await route.continue();
+        return;
+      }
       await route.fulfill({
         status: 400,
         contentType: 'application/json',
