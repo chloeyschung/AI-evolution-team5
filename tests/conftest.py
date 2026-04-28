@@ -33,6 +33,7 @@ from src.data.models import (
     ReminderLog,
     UserActivityPattern,
     AuthenticationToken,
+    DeviceToken,
     UserAuthMethod,
     EmailVerificationToken,
     PasswordResetToken,
@@ -90,6 +91,7 @@ async def _clear_all_test_data(session: AsyncSession) -> None:
     await session.execute(delete(IntegrationSyncLog))
     await session.execute(delete(IntegrationSyncConfig))
     await session.execute(delete(IntegrationTokens))
+    await session.execute(delete(DeviceToken))
     await session.execute(delete(AuthenticationToken))
     await session.execute(delete(PasswordResetToken))
     await session.execute(delete(EmailVerificationToken))
@@ -202,7 +204,7 @@ async def test_user(db, db_session: AsyncSession):
     auth_token = AuthenticationToken(
         user_id=user.id,
         access_token=hash_access_token(access_token),
-        refresh_token=refresh_token,
+        refresh_token=hash_access_token(refresh_token),
         expires_at=expires_at,
     )
     db_session.add(auth_token)

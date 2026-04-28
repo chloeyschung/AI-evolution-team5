@@ -21,6 +21,7 @@ from ...utils.token_hashing import hash_access_token as _hash_token
 from ..dependencies import get_current_user
 from ...middleware.rate_limiter import limiter
 from ..schemas import (
+    AppleLoginRequest,
     AuthStatusResponse,
     GoogleLoginRequest,
     GoogleLoginResponse,
@@ -174,6 +175,115 @@ async def refresh_auth_token(
 
 
 # AUTH-002: Google OAuth endpoint
+
+
+@router.post("/auth/apple", status_code=200, response_model=GoogleLoginResponse)
+@limiter.limit("5/minute")
+async def apple_login(
+    request: Request,
+    data: AppleLoginRequest,
+    db: AsyncSession = Depends(get_db),
+) -> GoogleLoginResponse:
+    """Authenticate with Sign in with Apple and issue Briefly tokens."""
+    from src.auth.apple_oauth import AppleTokenVerificationError, verify_apple_identity_token
+    from src.config import settings
+    from src.data.repository import AccountDeletionRepository
+
+    try:
+        claims = await verify_apple_identity_token(data.identity_token, settings.APPLE_BUNDLE_ID)
+    except AppleTokenVerificationError as exc:
+        raise HTTPException(
+            status_code=401,
+            detail={"error": "invalid_apple_token", "message": str(exc)},
+        ) from exc
+
+    apple_sub = str(claims["sub"])
+    email = (data.email or claims.get("email") or "").strip().lower()
+    display_name = data.full_name
+
+    email_auth_repo = EmailAuthRepository(db)
+    existing_method = await email_auth_repo.get_auth_method_by_provider(AuthProvider.APPLE, apple_sub)
+
+    user_repo = UserProfileRepository(db)
+    is_new_user = False
+
+    if existing_method is not None:
+        existing_user = await db.get(UserProfile, existing_method.user_id)
+        if existing_user is None:
+            raise HTTPException(
+                status_code=401,
+                detail={"error": "invalid_apple_token", "message": "Apple account is not linked to a valid user."},
+            )
+        await user_repo.update_last_login(existing_user.id)
+    else:
+        if not email:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "apple_email_required",
+                    "message": "Apple email is required on first sign-in.",
+                },
+            )
+
+        deletion_repo = AccountDeletionRepository(db)
+        is_blocked, block_expires_at = await deletion_repo.is_account_blocked(email=email)
+        if is_blocked:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": "account_restriction",
+                    "message": "Account recently deleted. Please wait 30 days before re-registering.",
+                    "available_at": serialize_datetime(block_expires_at),
+                },
+            )
+
+        existing_user = await user_repo.get_user_by_email(email)
+        if existing_user:
+            await user_repo.update_last_login(existing_user.id)
+        else:
+            existing_user = await user_repo.create_user(
+                email=email,
+                google_sub=None,
+                display_name=display_name,
+            )
+            is_new_user = True
+
+        method = await email_auth_repo.create_auth_method(
+            user_id=existing_user.id,
+            provider=AuthProvider.APPLE,
+            provider_id=apple_sub,
+        )
+        await email_auth_repo.mark_email_verified(method.id)
+
+    auth_repo = AuthenticationRepository(db)
+    token_record, access_token, raw_refresh_token = await auth_repo.create_tokens(existing_user.id)
+
+    ip = request.client.host if request.client else None
+    audit = AuditRepository(db)
+    await audit.log_event(
+        AuditEventType.LOGIN_SUCCESS,
+        user_id=existing_user.id,
+        ip_address=ip,
+        metadata={"provider": "apple"},
+    )
+    await db.commit()
+
+    return GoogleLoginResponse(
+        access_token=access_token,
+        refresh_token=raw_refresh_token,
+        expires_at=serialize_datetime(token_record.expires_at),
+        user=UserProfileResponse(
+            id=existing_user.id,
+            email=existing_user.email,
+            display_name=existing_user.display_name,
+            avatar_url=existing_user.avatar_url,
+            bio=existing_user.bio,
+            timezone=existing_user.timezone or "UTC",
+            created_at=serialize_datetime(existing_user.created_at),
+            updated_at=serialize_datetime(existing_user.updated_at),
+        ),
+        is_new_user=is_new_user,
+    )
 
 
 @router.post("/auth/google", status_code=200, response_model=GoogleLoginResponse)
@@ -341,13 +451,16 @@ async def google_login_with_code(
             detail={"error": "oauth_code_required", "message": "OAuth code is required."},
         )
 
-    # Exchange code for tokens (backend has client_secret)
+    # Exchange code for tokens (backend has client_secret).
+    # Chrome extension flows use a chromiumapp.org redirect_uri that must match
+    # what was sent in the initial auth request — accept it from the client when provided.
+    effective_redirect_uri = data.redirect_uri or settings.GOOGLE_REDIRECT_URI
     try:
         id_token, google_user_info = await exchange_auth_code_for_tokens(
             code=data.code,
             client_id=settings.GOOGLE_CLIENT_ID,
             client_secret=settings.GOOGLE_CLIENT_SECRET,
-            redirect_uri=settings.GOOGLE_REDIRECT_URI,
+            redirect_uri=effective_redirect_uri,
         )
     except GoogleTokenVerificationError as e:
         raise HTTPException(

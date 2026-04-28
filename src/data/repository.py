@@ -75,6 +75,7 @@ class ContentRepository(BaseRepository[Content]):
         metadata: ContentMetadata,
         user_id: int,
         status: ContentStatus = ContentStatus.INBOX,
+        allow_duplicate_url: bool = False,
     ) -> Content:
         """Save or update content from metadata.
 
@@ -89,10 +90,12 @@ class ContentRepository(BaseRepository[Content]):
         # TODO #3 (2026-04-14): Filter by both url and user_id to prevent content leakage
         duplicate_group_key = self._build_duplicate_group_key(metadata.url)
 
-        result = await self.session.execute(
-            select(Content).where(Content.url == metadata.url, Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
-        )
-        existing = result.scalar_one_or_none()
+        existing = None
+        if not allow_duplicate_url:
+            result = await self.session.execute(
+                select(Content).where(Content.url == metadata.url, Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
+            )
+            existing = result.scalar_one_or_none()
 
         if existing:
             # Update existing
@@ -463,7 +466,7 @@ class ContentRepository(BaseRepository[Content]):
         # TODO #4 (2026-04-14): Build query without limit first, apply conditionally
         base_query = (
             select(Content, SwipeHistory.swiped_at.label("cursor_swiped_at"))
-            .where(Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
+            .where(Content.user_id == user_id)
             .join(SwipeHistory, Content.id == SwipeHistory.content_id)
             .where(SwipeHistory.action == SwipeAction.DISCARD)
             .order_by(SwipeHistory.swiped_at.desc(), Content.id.desc())
@@ -722,7 +725,7 @@ class ContentRepository(BaseRepository[Content]):
         stmt = (
             select(func.count())
             .select_from(Content)
-            .where(Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
+            .where(Content.user_id == user_id)
             .join(SwipeHistory, Content.id == SwipeHistory.content_id)
             .where(SwipeHistory.action == SwipeAction.DISCARD)
         )
@@ -949,6 +952,15 @@ class ContentRepository(BaseRepository[Content]):
         )
         return list(result.scalars().all())
 
+    async def count_trash(self, user_id: int) -> int:
+        """Count all soft-deleted content rows for a user."""
+        result = await self.session.execute(
+            select(func.count())
+            .select_from(Content)
+            .where(Content.user_id == user_id, Content.is_deleted == True)  # noqa: E712
+        )
+        return result.scalar_one()
+
     async def clear_trash(self, user_id: int) -> int:
         """Permanently delete all soft-deleted content for a user.
 
@@ -990,6 +1002,22 @@ class SwipeRepository(BaseRepository[SwipeHistory]):
         Returns:
             The created or pre-existing SwipeHistory object.
         """
+        result = await self.session.execute(
+            select(SwipeHistory).where(
+                SwipeHistory.user_id == user_id,
+                SwipeHistory.content_id == content_id,
+            )
+        )
+        existing_history = result.scalar_one_or_none()
+        if existing_history is not None:
+            if action == SwipeAction.KEEP:
+                await self._update_content_status(content_id, user_id, ContentStatus.ARCHIVED)
+                await self.session.commit()
+            elif action == SwipeAction.DISCARD:
+                await self._soft_delete_content(content_id, user_id)
+                await self.session.commit()
+            return existing_history
+
         history = SwipeHistory(
             content_id=content_id,
             action=action,
@@ -1120,11 +1148,11 @@ class SwipeRepository(BaseRepository[SwipeHistory]):
         stmt = sqlite_insert(SwipeHistory).values(rows).on_conflict_do_nothing()
         await self.session.execute(stmt)
 
-        # Mirror single-swipe logic: archive content for every DISCARD action.
+        # Mirror single-swipe logic: DISCARD soft-deletes content into trash.
         # Run unconditionally so retried DISCARDs remain idempotent.
         for content_id, action in actions:
             if action == SwipeAction.DISCARD:
-                await self._update_content_status(content_id, user_id, ContentStatus.ARCHIVED)
+                await self._soft_delete_content(content_id, user_id)
 
         await self.session.commit()
 
@@ -1455,7 +1483,7 @@ class UserProfileRepository(BaseRepository[UserProfile]):
     async def create_user(
         self,
         email: str,
-        google_sub: str,
+        google_sub: str | None,
         display_name: str | None = None,
         avatar_url: str | None = None,
     ) -> UserProfile:

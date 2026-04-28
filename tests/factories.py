@@ -46,7 +46,7 @@ async def make_user(
     auth_token = AuthenticationToken(
         user_id=user.id,
         access_token=hash_access_token(access_token),
-        refresh_token=refresh_token,
+        refresh_token=hash_access_token(refresh_token),
         expires_at=utc_now() + timedelta(hours=1),
     )
     session.add(auth_token)

@@ -23,7 +23,7 @@ class TestBatchSwipeEndpoints:
 
         # Record batch swipe
         response = await authenticated_client.post(
-            "/api/v1/swipe",
+            "/api/v1/swipe/batch",
             json={
                 "actions": [
                     {"content_id": content_ids[0], "action": "keep"},
@@ -43,6 +43,29 @@ class TestBatchSwipeEndpoints:
         assert actions[content_ids[0]] == "keep"
         assert actions[content_ids[1]] == "discard"
         assert actions[content_ids[2]] == "keep"
+
+    async def test_batch_discard_soft_deletes_like_single_discard(self, authenticated_client):
+        """Batch DISCARD must move content to trash, matching single DISCARD semantics."""
+        response = await authenticated_client.post(
+            "/api/v1/content",
+            json={
+                "platform": "Test",
+                "content_type": "article",
+                "url": "https://example.com/batch-discard-trash",
+            },
+        )
+        content_id = response.json()["id"]
+
+        response = await authenticated_client.post(
+            "/api/v1/swipe/batch",
+            json={"actions": [{"content_id": content_id, "action": "discard"}]},
+        )
+        assert response.status_code == 201
+
+        trash_response = await authenticated_client.get("/api/v1/content/trash")
+        assert trash_response.status_code == 200
+        trash_ids = [item["id"] for item in trash_response.json()["items"]]
+        assert content_id in trash_ids
 
     async def test_record_single_swipe_still_works(self, authenticated_client):
         """Test backward compatibility with single swipe API."""

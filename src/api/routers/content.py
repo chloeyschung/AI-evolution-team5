@@ -2,9 +2,11 @@
 
 import logging
 import os
+import hashlib
+import json
 from datetime import timedelta
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response
 from fastapi import Request as FastAPIRequest
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -54,6 +56,11 @@ def _invalid_cursor_http_exception() -> HTTPException:
     )
 
 
+def _etag_for_payload(payload: dict) -> str:
+    serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return f'"{hashlib.sha256(serialized.encode()).hexdigest()}"'
+
+
 @router.post("/content", status_code=201, response_model=ContentResponse)
 async def create_content(
     data: ContentCreate,
@@ -79,6 +86,8 @@ async def create_content(
 
 @router.get("/content", response_model=PaginatedContentResponse)
 async def list_content(
+    request: Request,
+    response: Response,
     limit: int = Query(50, gt=0, le=100),
     offset: int = Query(0, ge=0),
     cursor: str | None = Query(None),
@@ -148,14 +157,22 @@ async def list_content(
     if is_cursor_mode:
         next_offset = None
 
-    return PaginatedContentResponse(
-        items=[ContentResponse.from_content(c) for c in contents],
-        has_more=has_more,
-        total=total,
-        pagination_mode="cursor" if is_cursor_mode else "offset",
-        next_offset=next_offset,
-        next_cursor=next_cursor,
-    )
+    payload = {
+        "items": [ContentResponse.from_content(c).model_dump(mode="json") for c in contents],
+        "has_more": has_more,
+        "total": total,
+        "pagination_mode": "cursor" if is_cursor_mode else "offset",
+        "next_offset": next_offset,
+        "next_cursor": next_cursor,
+    }
+    etag = _etag_for_payload(payload)
+    cache_control = "private, max-age=0, must-revalidate"
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers={"ETag": etag, "Cache-Control": cache_control})
+
+    response.headers["ETag"] = etag
+    response.headers["Cache-Control"] = cache_control
+    return PaginatedContentResponse(**payload)
 
 
 # ADV-001: Personalized Trend Feed endpoints
@@ -236,8 +253,8 @@ async def list_trash(
     """List soft-deleted content for the authenticated user (trash can view)."""
     content_repo = ContentRepository(db)
     items = await content_repo.get_trash(user_id, limit=limit, offset=offset)
-    total = len(items)
-    has_more = len(items) == limit
+    total = await content_repo.count_trash(user_id)
+    has_more = offset + len(items) < total
     return PaginatedContentResponse(
         items=[ContentResponse.from_content(c) for c in items],
         has_more=has_more,
@@ -668,20 +685,18 @@ async def _background_summarize(
     """Fetch page text and summarize it, then persist the result — runs after response is sent."""
     import re
 
-    def _needs_title_improvement(current_title: str | None) -> bool:
-        if not current_title:
-            return True
-        t = " ".join(current_title.split()).strip()
-        if len(t) < 12:
-            return True
-        # Common LinkedIn feed-title noise signals.
-        noisy_tokens = [" | ", " comments", " likes", "shares", "feed/update"]
-        return any(token in t.lower() for token in noisy_tokens)
-
     def _clean_generated_title(raw: str) -> str:
         title = " ".join(raw.split()).strip()
         title = re.sub(r"\s+\|\s+linkedin.*$", "", title, flags=re.IGNORECASE)
+        title = re.sub(r"https?://\S+", "", title, flags=re.IGNORECASE).strip(" -|:")
         return title[:220]
+
+    def _prepare_text_for_title(raw_text: str) -> str:
+        # Strip raw URLs and noisy social counters that derail title generation.
+        text = re.sub(r"https?://\S+", " ", raw_text, flags=re.IGNORECASE)
+        text = re.sub(r"\b\d+\s+(likes?|comments?|reposts?|shares?)\b", " ", text, flags=re.IGNORECASE)
+        text = re.sub(r"\s+", " ", text).strip()
+        return text[:6000]
 
     try:
         _, text_content = await content_extractor.fetch_html_and_text(url)
@@ -699,9 +714,9 @@ async def _background_summarize(
             summary = await summarizer.summarize(text_content, max_retries=1)
             await repo.update_summary(content_id, user_id, summary)
             content = await repo.get_by_id(content_id)
-            if content and not bool(getattr(content, "is_ai_titled", False)) and _needs_title_improvement(content.title):
+            if content and not bool(getattr(content, "is_ai_titled", False)):
                 try:
-                    generated_title = await summarizer.generate_title(text_content, max_retries=1)
+                    generated_title = await summarizer.generate_title(_prepare_text_for_title(text_content), max_retries=1)
                     cleaned = _clean_generated_title(generated_title)
                     if cleaned:
                         await repo.update_title(content_id, user_id, cleaned)
@@ -743,7 +758,7 @@ async def share_content(
 
     # Save content immediately (no summary yet)
     repo = ContentRepository(db)
-    content = await repo.save(metadata, user_id=user_id)
+    content = await repo.save(metadata, user_id=user_id, allow_duplicate_url=True)
 
     # Schedule summarization to run after the response is sent
     if auto_summarize and share_handler._summarizer and data.content:

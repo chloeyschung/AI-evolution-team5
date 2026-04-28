@@ -5,19 +5,31 @@ import { PageMetadata, SaveRequest, SaveResult, Notification } from '../shared/t
 // Initialize auth on startup
 authManager.initialize();
 
-// Create context menu on installation
-chrome.runtime.onInstalled.addListener(() => {
+async function setupContextMenus(): Promise<void> {
+  await chrome.contextMenus.removeAll();
   chrome.contextMenus.create({
     id: 'save-to-briefly',
     title: 'Save to Briefly',
     contexts: ['page'],
   });
-
+  chrome.contextMenus.create({
+    id: 'save-link-to-briefly',
+    title: 'Save link to Briefly',
+    contexts: ['link'],
+  });
   chrome.contextMenus.create({
     id: 'save-selection-to-briefly',
     title: 'Save Selection to Briefly',
     contexts: ['selection'],
   });
+}
+
+// Recreate context menus whenever the worker lifecycle restarts.
+chrome.runtime.onInstalled.addListener(() => {
+  setupContextMenus().catch((error) => console.error('Failed to initialize context menus:', error));
+});
+chrome.runtime.onStartup.addListener(() => {
+  setupContextMenus().catch((error) => console.error('Failed to initialize context menus:', error));
 });
 
 // Handle context menu clicks
@@ -38,7 +50,17 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     let metadata: PageMetadata;
     let selectedText: string | undefined;
 
-    if (info.menuItemId === 'save-selection-to-briefly') {
+    if (info.menuItemId === 'save-link-to-briefly') {
+      // Save the specific link URL, not the current page
+      const linkUrl = info.linkUrl || '';
+      metadata = {
+        url: linkUrl,
+        title: null,
+        author: null,
+        description: null,
+        type: 'article',
+      };
+    } else if (info.menuItemId === 'save-selection-to-briefly') {
       selectedText = info.selectionText;
       metadata = {
         url: tab?.url || '',
@@ -48,9 +70,26 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         type: 'text',
       };
     } else {
-      // Get metadata from content script
-      const response = await chrome.tabs.sendMessage(tabId, { action: 'getMetadata' });
-      metadata = response.metadata;
+      // Try content script first; fall back to tab URL/title if not injected
+      try {
+        const response = await chrome.tabs.sendMessage(tabId, { action: 'getMetadata' });
+        const liveTab = await chrome.tabs.get(tabId);
+        const liveUrl = liveTab.pendingUrl || liveTab.url || tab?.url || '';
+        metadata = {
+          ...(response.metadata as PageMetadata),
+          // Ensure final save uses current tab URL (not stale cached metadata URL).
+          url: liveUrl,
+          title: (response.metadata as PageMetadata)?.title ?? liveTab.title ?? tab?.title ?? null,
+        };
+      } catch {
+        metadata = {
+          url: tab?.url || '',
+          title: tab?.title ?? null,
+          author: null,
+          description: null,
+          type: 'unknown',
+        };
+      }
     }
 
     const result = await apiClient.shareContent(metadata, selectedText);
@@ -63,7 +102,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     console.error('Error saving content:', error);
     showNotification({
       type: 'error',
-      message: 'Failed to save content. Please try again.',
+      message: error instanceof Error ? error.message : 'Failed to save content. Please try again.',
     });
   }
 });

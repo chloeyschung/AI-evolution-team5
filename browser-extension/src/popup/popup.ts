@@ -16,12 +16,14 @@ const emailLoginBtn = document.getElementById('email-login-btn') as HTMLButtonEl
 const emailInput = document.getElementById('email-input') as HTMLInputElement;
 const passwordInput = document.getElementById('password-input') as HTMLInputElement;
 const saveCurrentPageBtn = document.getElementById('save-current-page') as HTMLButtonElement;
+const openDashboardBtn = document.getElementById('open-dashboard') as HTMLButtonElement;
+const recentListEl = document.getElementById('recent-list') as HTMLUListElement;
 const logoutBtn = document.getElementById('logout-btn') as HTMLButtonElement;
 const retryBtn = document.getElementById('retry-btn') as HTMLButtonElement;
 const userEmailEl = document.getElementById('user-email') as HTMLSpanElement;
-const autoSummarizeEl = document.getElementById('auto-summarize') as HTMLInputElement;
 const apiUrlEl = document.getElementById('api-url') as HTMLInputElement;
 const apiUrlSettingEl = document.getElementById('api-url-setting') as HTMLDivElement;
+const settingsEl = document.querySelector('.settings') as HTMLDivElement;
 
 let currentTab: chrome.tabs.Tab | null = null;
 
@@ -68,6 +70,7 @@ function showLoggedIn(authStatus: AuthStatus): void {
 
   userEmailEl.textContent = authStatus.email || 'Signed in';
   void loadSettings();
+  void loadRecentContent();
 }
 
 function showError(message: string): void {
@@ -80,12 +83,63 @@ function showError(message: string): void {
 
 async function loadSettings(): Promise<void> {
   const settings = await storageManager.getSettings();
-  autoSummarizeEl.checked = settings.autoSummarize;
   apiUrlEl.value = settings.apiBaseUrl;
-  apiUrlSettingEl.style.display = getRuntimeConfig().SHOW_API_URL_SETTING ? 'block' : 'none';
+  const showApiSetting = getRuntimeConfig().SHOW_API_URL_SETTING;
+  apiUrlSettingEl.style.display = showApiSetting ? 'block' : 'none';
+  settingsEl.style.display = showApiSetting ? 'grid' : 'none';
 }
 
-// Google login
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+async function loadRecentContent(): Promise<void> {
+  try {
+    const items = await apiClient.getRecentContent(5);
+    if (!items.length) {
+      recentListEl.innerHTML = '<li class="recent-empty">No recent saves yet.</li>';
+      return;
+    }
+
+    recentListEl.innerHTML = items
+      .map((item) => {
+        const title = escapeHtml(item.title || item.url || 'Untitled');
+        const url = escapeHtml(item.url);
+        const meta = escapeHtml(item.platform || 'web');
+        return `<li><a class="recent-item" href="${url}" target="_blank" rel="noopener noreferrer"><span class="recent-item-title">${title}</span><span class="recent-item-meta">${meta}</span></a></li>`;
+      })
+      .join('');
+  } catch {
+    recentListEl.innerHTML = '<li class="recent-empty">Could not load recent saves.</li>';
+  }
+}
+
+function deriveDashboardUrl(apiBaseUrl: string): string {
+  const fallback = 'http://localhost:3001';
+  const configured = apiBaseUrl.trim();
+  if (!configured) return fallback;
+
+  try {
+    const parsed = new URL(configured);
+    if (parsed.port === '8000') parsed.port = '3001';
+    if (parsed.hostname === '127.0.0.1' && !parsed.port) parsed.port = '3001';
+    if (parsed.hostname === 'localhost' && !parsed.port) parsed.port = '3001';
+    parsed.pathname = '';
+    parsed.search = '';
+    parsed.hash = '';
+    return parsed.toString().replace(/\/$/, '');
+  } catch {
+    return fallback;
+  }
+}
+
+// Google login — uses chromiumapp.org redirect (Chrome intercepts it automatically,
+// no Google Cloud Console registration required for this URI pattern).
 loginBtn.addEventListener('click', async () => {
   try {
     const clientId = getRuntimeConfig().GOOGLE_CLIENT_ID || '';
@@ -95,52 +149,55 @@ loginBtn.addEventListener('click', async () => {
       return;
     }
 
+    // Chrome intercepts redirects to https://<ext-id>.chromiumapp.org/ in
+    // launchWebAuthFlow — no Console registration needed.
+    const redirectUri = `https://${chrome.runtime.id}.chromiumapp.org/`;
+
     const authUrl =
       `https://accounts.google.com/o/oauth2/v2/auth?` +
       `client_id=${clientId}&` +
-      `redirect_uri=${encodeURIComponent(chrome.runtime.getURL('login/login.html'))}&` +
+      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
       `response_type=code&` +
       `scope=openid%20email%20profile&` +
       `include_granted_scopes=true&` +
       `access_type=offline&` +
       `prompt=consent`;
 
-    const loginCompletePromise = new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        chrome.runtime.onMessage.removeListener(loginListener);
-        reject(new Error('Login timeout'));
-      }, 10000);
-
-      const loginListener = (message: { action?: string }) => {
-        if (message.action === 'loginComplete') {
-          clearTimeout(timeout);
-          chrome.runtime.onMessage.removeListener(loginListener);
-          resolve();
-        }
-      };
-
-      chrome.runtime.onMessage.addListener(loginListener);
-    });
-
-    await chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true }).catch((error) => {
-      if (error && error.message !== 'User closed the window') {
-        throw new Error('Login cancelled or failed');
+    let redirectedUrl: string;
+    try {
+      const result = await chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true });
+      if (!result) {
+        throw new Error('No redirect URL received from Google.');
       }
-    });
-
-    await loginCompletePromise.catch((error) => {
-      console.warn('Login signal timeout, fallback to token check:', error);
-    });
-
-    await authManager.initialize();
-    const tokens = await storageManager.getTokens();
-
-    if (tokens && Date.now() < tokens.expires_at) {
-      const authStatus = await authManager.getAuthStatus();
-      if (authStatus?.is_authenticated) {
-        showLoggedIn(authStatus);
+      redirectedUrl = result;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // User dismissed the window — treat as silent cancellation
+      if (
+        msg.includes('closed') ||
+        msg.includes('did not approve') ||
+        msg.includes('cancelled') ||
+        msg.includes('canceled')
+      ) {
         return;
       }
+      throw new Error(`Google sign-in failed: ${msg}`);
+    }
+
+    // Extract auth code from the redirect URL Chrome resolved with
+    const codeUrl = new URL(redirectedUrl);
+    const code = codeUrl.searchParams.get('code');
+    if (!code) {
+      throw new Error('No authorization code received from Google.');
+    }
+
+    // Exchange code for Briefly tokens via backend
+    await authManager.loginWithGoogleCode(code, redirectUri);
+
+    const authStatus = await authManager.getAuthStatus();
+    if (authStatus?.is_authenticated) {
+      showLoggedIn(authStatus);
+      return;
     }
 
     throw new Error('Login did not complete. Please try again.');
@@ -184,6 +241,9 @@ emailLoginForm.addEventListener('submit', async (e: Event) => {
 });
 
 async function getActiveTabMetadata(): Promise<PageMetadata> {
+  const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  currentTab = activeTab ?? null;
+
   if (!currentTab?.id || !currentTab.url) {
     throw new Error('No active page to save.');
   }
@@ -193,15 +253,29 @@ async function getActiveTabMetadata(): Promise<PageMetadata> {
     throw new Error('Cannot save browser internal pages.');
   }
 
+  const liveTab = await chrome.tabs.get(currentTab.id);
+  const liveUrl = liveTab.pendingUrl || liveTab.url || currentTab.url;
+  if (!liveUrl) {
+    throw new Error('No active page URL to save.');
+  }
+
   try {
     const response = await chrome.tabs.sendMessage(currentTab.id, { action: 'getMetadata' });
-    if (response?.metadata) return response.metadata as PageMetadata;
+    if (response?.metadata) {
+      const metadata = response.metadata as PageMetadata;
+      return {
+        ...metadata,
+        // Use live tab URL at save-time to avoid stale SPA metadata URL.
+        url: liveUrl,
+        title: metadata.title ?? liveTab.title ?? currentTab.title ?? null,
+      };
+    }
     throw new Error('No metadata from content script.');
   } catch {
     // Content script not yet injected — fall back to tab info
     return {
-      url: currentTab.url,
-      title: currentTab.title ?? null,
+      url: liveUrl,
+      title: liveTab.title ?? currentTab.title ?? null,
       author: null,
       description: null,
       type: 'unknown',
@@ -224,10 +298,11 @@ saveCurrentPageBtn.addEventListener('click', async () => {
     await apiClient.shareContent(metadata);
 
     saveCurrentPageBtn.textContent = 'Saved';
+    saveCurrentPageBtn.disabled = false;
+    void loadRecentContent();
     setTimeout(() => {
       saveCurrentPageBtn.textContent = 'Save current page';
-      saveCurrentPageBtn.disabled = false;
-    }, 1600);
+    }, 450);
   } catch (error) {
     console.error('Save error:', error);
     showError(error instanceof Error ? error.message : 'Failed to save content. Check API URL and retry.');
@@ -247,16 +322,18 @@ logoutBtn.addEventListener('click', async () => {
   }
 });
 
+openDashboardBtn.addEventListener('click', async () => {
+  const settings = await storageManager.getSettings();
+  const dashboardUrl = deriveDashboardUrl(settings.apiBaseUrl);
+  await chrome.tabs.create({ url: dashboardUrl });
+});
+
 // Retry
 retryBtn.addEventListener('click', () => {
   void init();
 });
 
 // Settings
-autoSummarizeEl.addEventListener('change', async () => {
-  await storageManager.updateSettings({ autoSummarize: autoSummarizeEl.checked });
-});
-
 apiUrlEl.addEventListener('blur', async () => {
   const url = apiUrlEl.value.trim();
   if (url) {

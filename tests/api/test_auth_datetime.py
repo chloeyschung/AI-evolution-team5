@@ -7,8 +7,6 @@ not "+00:00". They are written BEFORE the fix and should FAIL initially.
 from datetime import timedelta
 from unittest.mock import patch, AsyncMock
 
-from sqlalchemy import select
-
 from tests.conftest import AsyncTestingSessionLocal
 from tests.factories import make_user
 from src.auth.tokens import create_access_token, create_refresh_token
@@ -45,7 +43,7 @@ async def test_auth_status_token_expires_at_has_z_suffix(async_client, db):
         token = AuthenticationToken(
             user_id=user.id,
             access_token=hash_access_token(access_token),
-            refresh_token=create_refresh_token(),
+            refresh_token=hash_access_token(create_refresh_token()),
             expires_at=utc_now() + timedelta(hours=1),
         )
         session.add(token)
@@ -69,11 +67,14 @@ async def test_auth_status_token_expires_at_has_z_suffix(async_client, db):
 async def test_token_refresh_expires_at_has_z_suffix(async_client, db):
     """expires_at in POST /auth/refresh response must end with Z."""
     async with AsyncTestingSessionLocal() as session:
-        user, _access_token = await make_user(session, email="refresh@example.com")
-        row = (await session.execute(
-            select(AuthenticationToken).where(AuthenticationToken.user_id == user.id)
-        )).scalar_one()
-        refresh_token = row.refresh_token
+        await make_user(session, email="refresh@example.com", password="SecurePass123!")
+
+    login_resp = await async_client.post(
+        "/api/v1/auth/login",
+        json={"email": "refresh@example.com", "password": "SecurePass123!"},
+    )
+    assert login_resp.status_code == 200, login_resp.json()
+    refresh_token = login_resp.json()["refresh_token"]
 
     resp = await async_client.post(
         "/api/v1/auth/refresh",

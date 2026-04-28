@@ -4,7 +4,7 @@ TODO #10 (2026-04-14): Removed Optional import - using | None syntax instead.
 """
 
 from asyncio import Lock
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,8 +19,10 @@ from src.utils.token_hashing import hash_access_token
 class AuthenticationRepository(BaseRepository[AuthenticationToken]):
     """Repository for authentication token management."""
     REFRESH_TOKEN_TTL_SECONDS = 604800  # 7 days
+    REFRESH_REPLAY_GRACE_SECONDS = 5
     _refresh_locks: dict[str, Lock] = {}
     _refresh_locks_guard: Lock = Lock()
+    _refresh_replay_cache: dict[str, tuple[int, int, str, str, datetime]] = {}
 
     def __init__(self, db: AsyncSession):
         super().__init__(db)
@@ -165,6 +167,23 @@ class AuthenticationRepository(BaseRepository[AuthenticationToken]):
         hashed_refresh_token = hash_access_token(refresh_token)
         refresh_lock = await self._get_refresh_lock(hashed_refresh_token)
         async with refresh_lock:
+            now = utc_now()
+            replay = self._refresh_replay_cache.get(hashed_refresh_token)
+            if replay is not None:
+                token_id, user_id, access_token, rotated_refresh_token, replay_until = replay
+                if replay_until > now:
+                    result = await self.db.execute(
+                        select(AuthenticationToken)
+                        .where(AuthenticationToken.id == token_id)
+                        .where(AuthenticationToken.user_id == user_id)
+                        .where(AuthenticationToken.revoked_at.is_(None))
+                    )
+                    replay_token = result.scalar_one_or_none()
+                    if replay_token is not None:
+                        return replay_token, access_token, rotated_refresh_token
+
+                self._refresh_replay_cache.pop(hashed_refresh_token, None)
+
             result = await self.db.execute(
                 select(AuthenticationToken)
                 .where(AuthenticationToken.refresh_token == hashed_refresh_token)
@@ -193,6 +212,13 @@ class AuthenticationRepository(BaseRepository[AuthenticationToken]):
 
             await self.db.commit()
             await self.db.refresh(existing_token)
+            self._refresh_replay_cache[hashed_refresh_token] = (
+                existing_token.id,
+                existing_token.user_id,
+                new_access_token,
+                new_refresh_token,
+                now + timedelta(seconds=self.REFRESH_REPLAY_GRACE_SECONDS),
+            )
             return existing_token, new_access_token, new_refresh_token  # hashed record + plaintext JWT + plaintext refresh token
 
     async def revoke_token_by_user_id(self, user_id: int) -> bool:

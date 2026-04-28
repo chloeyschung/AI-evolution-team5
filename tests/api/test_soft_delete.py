@@ -134,6 +134,26 @@ async def test_deleted_content_returns_404_on_get(authenticated_client: AsyncCli
     assert detail_resp.status_code == 404
 
 
+@pytest.mark.asyncio
+async def test_trash_total_counts_all_matching_rows_not_page_length(authenticated_client: AsyncClient):
+    """GET /content/trash total reports all deleted rows, not just current page size."""
+    for index in range(3):
+        content = await _create_content(
+            authenticated_client,
+            url=f"https://example.com/trash-total-{index}",
+        )
+        resp = await authenticated_client.delete(f"/api/v1/content/{content['id']}")
+        assert resp.status_code == 200
+
+    page = await authenticated_client.get("/api/v1/content/trash?limit=2&offset=0")
+    assert page.status_code == 200
+    body = page.json()
+    assert len(body["items"]) == 2
+    assert body["total"] == 3
+    assert body["has_more"] is True
+    assert body["next_offset"] == 2
+
+
 # ---------------------------------------------------------------------------
 # Restore — within window
 # ---------------------------------------------------------------------------

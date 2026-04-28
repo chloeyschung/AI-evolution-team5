@@ -1,7 +1,8 @@
-import { ShareData, ShareResponse, PageMetadata } from './types';
+import { ShareData, ShareResponse, PageMetadata, RecentContentItem } from './types';
 import { authManager } from './auth';
 import { storageManager } from './storage';
 import { resolveApiBaseUrl } from './runtime-config';
+import { parseApiErrorResponse } from './api-errors';
 
 export class APIError extends Error {
   constructor(
@@ -15,7 +16,7 @@ export class APIError extends Error {
 }
 
 export class APIClient {
-  private readonly TIMEOUT_MS = 10000; // 10 second timeout
+  private readonly TIMEOUT_MS = 60000; // 60 second timeout — LLM summarization can take 10-30 s
 
   private readonly errorMessages: Record<number, string> = {
     401: 'Session expired. Please login again.',
@@ -72,10 +73,9 @@ export class APIClient {
       }
 
       if (!response.ok) {
-        const errorText = await response.text();
-        const errorMessage = this.errorMessages[response.status] || errorText || `Request failed with status ${response.status}`;
-        const errorMatch = errorText.match(/"detail":"([^"]+)"/);
-        throw new APIError(errorMessage, response.status, errorMatch?.[1]);
+        const fallback = this.errorMessages[response.status] || `Request failed with status ${response.status}`;
+        const parsed = await parseApiErrorResponse(response, fallback);
+        throw new APIError(parsed.message, response.status, parsed.code);
       }
 
       return response.json();
@@ -92,6 +92,47 @@ export class APIClient {
 
       throw error;
     }
+  }
+
+  async getRecentContent(limit = 5): Promise<RecentContentItem[]> {
+    let token: string;
+    try {
+      token = await authManager.getAccessToken();
+    } catch {
+      throw new APIError('Authentication required. Please login again.', 401, 'AUTH_REQUIRED');
+    }
+
+    const settings = await storageManager.getSettings();
+    const apiBaseUrl = resolveApiBaseUrl(settings.apiBaseUrl);
+
+    const response = await fetch(`${apiBaseUrl}/api/v1/content?limit=${Math.max(1, Math.min(limit, 10))}&offset=0`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (response.status === 401) {
+      await storageManager.clearTokens();
+      throw new APIError(this.errorMessages[401], 401, 'SESSION_EXPIRED');
+    }
+
+    if (!response.ok) {
+      const fallback = this.errorMessages[response.status] || `Request failed with status ${response.status}`;
+      const parsed = await parseApiErrorResponse(response, fallback);
+      throw new APIError(parsed.message, response.status, parsed.code);
+    }
+
+    const data = await response.json() as { items?: Array<Record<string, unknown>> };
+    const items = Array.isArray(data.items) ? data.items : [];
+    return items.map((item) => ({
+      id: Number(item.id),
+      title: typeof item.title === 'string' ? item.title : null,
+      url: typeof item.url === 'string' ? item.url : '',
+      platform: typeof item.platform === 'string' ? item.platform : 'web',
+      created_at: typeof item.created_at === 'string' ? item.created_at : '',
+    }));
   }
 
   private detectPlatform(url: string): string {

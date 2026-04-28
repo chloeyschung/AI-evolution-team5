@@ -1,5 +1,6 @@
 import { storageManager } from '../shared/storage';
 import { getRuntimeConfig, resolveApiBaseUrl } from '../shared/runtime-config';
+import { parseApiErrorResponse } from '../shared/api-errors';
 
 interface GoogleTokenResponse {
   access_token: string;
@@ -105,8 +106,8 @@ async function handleLogin(): Promise<void> {
     });
 
     if (!backendResponse.ok) {
-      const errorData = await backendResponse.json().catch(() => ({}));
-      throw new Error(errorData.detail || 'Login failed');
+      const parsed = await parseApiErrorResponse(backendResponse, 'Login failed');
+      throw new Error(parsed.message);
     }
 
     const backendData: BackendLoginResponse = await backendResponse.json();

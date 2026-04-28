@@ -8,6 +8,7 @@ import {
 } from './types';
 import { storageManager } from './storage';
 import { resolveApiBaseUrl } from './runtime-config';
+import { parseApiErrorResponse } from './api-errors';
 
 const ACCESS_TOKEN_EXPIRY_BUFFER = 5 * 60 * 1000; // 5 minutes buffer
 
@@ -112,7 +113,8 @@ export class AuthManager {
             await storageManager.clearTokens();
             this.tokens = null;
           }
-          throw new Error('Token refresh failed');
+          const parsed = await parseApiErrorResponse(response, 'Token refresh failed');
+          throw new Error(parsed.message);
         }
 
         const data = await response.json();
@@ -139,6 +141,27 @@ export class AuthManager {
     return this.refreshPromise;
   }
 
+  async loginWithGoogleCode(code: string, redirectUri: string): Promise<void> {
+    const apiBaseUrl = await this.getApiBaseUrl();
+    const response = await fetch(`${apiBaseUrl}/api/v1/auth/google/code`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, redirect_uri: redirectUri }),
+    });
+    if (!response.ok) {
+      const parsed = await parseApiErrorResponse(response, 'Google login failed');
+      throw new Error(parsed.message);
+    }
+    const data = await response.json() as { access_token: string; refresh_token: string; expires_at: string };
+    const tokens: AuthTokens = {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      expires_at: new Date(data.expires_at).getTime(),
+    };
+    await storageManager.storeTokens(tokens);
+    this.tokens = tokens;
+  }
+
   async loginWithGoogle(idToken: string, userInfo: GoogleLoginRequest['google_user_info']): Promise<void> {
     const apiBaseUrl = await this.getApiBaseUrl();
 
@@ -153,7 +176,8 @@ export class AuthManager {
       });
 
       if (!response.ok) {
-        throw new Error('Login failed');
+        const parsed = await parseApiErrorResponse(response, 'Login failed');
+        throw new Error(parsed.message);
       }
 
       const data: GoogleLoginResponse = await response.json();
@@ -182,8 +206,8 @@ export class AuthManager {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || 'Login failed');
+        const parsed = await parseApiErrorResponse(response, 'Login failed');
+        throw new Error(parsed.message);
       }
 
       const data: EmailPasswordLoginResponse = await response.json();

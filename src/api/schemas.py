@@ -302,6 +302,22 @@ class UserStatisticsResponse(BaseModel):
     last_swipe_at: str | None = None
 
 
+class DeviceTokenRequest(BaseModel):
+    """Schema for registering/deactivating a push device token."""
+
+    device_token: str = Field(..., min_length=1, max_length=512)
+    platform: Literal["ios"] = "ios"
+
+
+class DeviceTokenResponse(BaseModel):
+    """Schema for push device-token lifecycle response."""
+
+    device_token: str
+    platform: str
+    is_active: bool
+    last_seen_at: str
+
+
 class InterestTagRequest(BaseModel):
     """Schema for adding an interest tag."""
 
@@ -451,6 +467,14 @@ class GoogleOAuthCodeRequest(BaseModel):
 
     code: str
     redirect_uri: str | None = None
+
+
+class AppleLoginRequest(BaseModel):
+    """Schema for Sign in with Apple identity-token login."""
+
+    identity_token: str
+    full_name: str | None = None
+    email: str | None = None
 
 
 class GoogleLoginResponse(BaseModel):

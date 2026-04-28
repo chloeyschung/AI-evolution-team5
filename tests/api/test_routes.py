@@ -54,6 +54,29 @@ class TestContentEndpoints:
         assert isinstance(data["items"], list)
         assert isinstance(data["has_more"], bool)
 
+    async def test_list_content_supports_etag_revalidation(self, authenticated_client):
+        """GET /content returns ETag and supports If-None-Match revalidation."""
+        await authenticated_client.post(
+            "/api/v1/content",
+            json={
+                "platform": "Web",
+                "content_type": "article",
+                "url": "https://example.com/cache-validator",
+            },
+        )
+
+        response = await authenticated_client.get("/api/v1/content")
+        assert response.status_code == 200
+        etag = response.headers.get("etag")
+        assert etag
+        assert response.headers.get("cache-control") == "private, max-age=0, must-revalidate"
+
+        revalidated = await authenticated_client.get(
+            "/api/v1/content",
+            headers={"If-None-Match": etag},
+        )
+        assert revalidated.status_code == 304
+
     async def test_list_content_with_limit(self, authenticated_client):
         """Test listing content with limit parameter returns pagination wrapper."""
         response = await authenticated_client.get("/api/v1/content?limit=10")

@@ -39,6 +39,7 @@ class AuthProvider(StrEnum):
     """Authentication providers for user_auth_methods table (AUTH-005)."""
 
     GOOGLE = "google"
+    APPLE = "apple"
     EMAIL_PASSWORD = "email_password"
     KAKAO = "kakao"
     NAVER = "naver"

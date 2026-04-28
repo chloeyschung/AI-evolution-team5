@@ -1,13 +1,17 @@
 """User domain router — /profile, /preferences, /user/statistics, /interests."""
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...data.database import get_db
+from ...data.models import DeviceToken, utc_now
 from ...data.repository import UserProfileRepository
 from ...utils.datetime_utils import serialize_datetime
 from ..dependencies import get_current_user
 from ..schemas import (
+    DeviceTokenRequest,
+    DeviceTokenResponse,
     InterestTagRequest,
     InterestTagResponse,
     UserPreferencesResponse,
@@ -147,6 +151,87 @@ async def get_user_statistics(
         streak_days=stats["streak_days"],
         first_swipe_at=stats["first_swipe_at"].isoformat() + "Z" if stats["first_swipe_at"] else None,
         last_swipe_at=stats["last_swipe_at"].isoformat() + "Z" if stats["last_swipe_at"] else None,
+    )
+
+
+@router.post("/user/device-token", response_model=DeviceTokenResponse)
+async def register_device_token(
+    data: DeviceTokenRequest,
+    user_id: int = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> DeviceTokenResponse:
+    """Register or reactivate an APNs device token for the authenticated user."""
+    now = utc_now()
+    result = await db.execute(
+        select(DeviceToken).where(
+            DeviceToken.user_id == user_id,
+            DeviceToken.device_token == data.device_token,
+        )
+    )
+    token = result.scalar_one_or_none()
+    if token is None:
+        token = DeviceToken(
+            user_id=user_id,
+            device_token=data.device_token,
+            platform=data.platform,
+            is_active=True,
+            last_seen_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(token)
+    else:
+        token.platform = data.platform
+        token.is_active = True
+        token.last_seen_at = now
+        token.updated_at = now
+    await db.commit()
+    await db.refresh(token)
+    return DeviceTokenResponse(
+        device_token=token.device_token,
+        platform=token.platform,
+        is_active=bool(token.is_active),
+        last_seen_at=serialize_datetime(token.last_seen_at),
+    )
+
+
+@router.delete("/user/device-token", response_model=DeviceTokenResponse)
+async def deactivate_device_token(
+    data: DeviceTokenRequest,
+    user_id: int = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> DeviceTokenResponse:
+    """Deactivate an APNs device token for the authenticated user."""
+    now = utc_now()
+    result = await db.execute(
+        select(DeviceToken).where(
+            DeviceToken.user_id == user_id,
+            DeviceToken.device_token == data.device_token,
+        )
+    )
+    token = result.scalar_one_or_none()
+    if token is None:
+        token = DeviceToken(
+            user_id=user_id,
+            device_token=data.device_token,
+            platform=data.platform,
+            is_active=False,
+            last_seen_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(token)
+    else:
+        token.platform = data.platform
+        token.is_active = False
+        token.updated_at = now
+    await db.commit()
+    await db.refresh(token)
+    return DeviceTokenResponse(
+        device_token=token.device_token,
+        platform=token.platform,
+        is_active=bool(token.is_active),
+        last_seen_at=serialize_datetime(token.last_seen_at),
     )
 
 

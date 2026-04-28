@@ -84,10 +84,8 @@ class Content(Base):
     user = relationship("UserProfile", back_populates="content")
 
     # TODO #17 (2026-04-14): Added compound index for common query pattern (user_id + created_at)
-    # Unique constraint for user_id + url combination
     __table_args__ = (
         sqlalchemy.Index("ix_content_user_created", "user_id", "created_at"),
-        sqlalchemy.UniqueConstraint("user_id", "url", name="unique_user_content_url"),
     )
 
 
@@ -337,6 +335,25 @@ class OAuthState(Base):
     state_token = Column(String(64), nullable=False, unique=True, index=True)
     expires_at = Column(DateTime, nullable=False, index=True)
     created_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+class DeviceToken(Base):
+    """APNs/FCM device token registration for push delivery lifecycle."""
+
+    __tablename__ = "device_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("user_profile.id"), nullable=False, index=True)
+    device_token = Column(String(512), nullable=False, index=True)
+    platform = Column(String(20), nullable=False, default="ios", index=True)
+    is_active = Column(Boolean, nullable=False, default=True, index=True)
+    last_seen_at = Column(DateTime, default=utc_now, nullable=False, index=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+    __table_args__ = (
+        sqlalchemy.UniqueConstraint("user_id", "device_token", name="uq_device_token_user_token"),
+    )
 
 
 # ADV-002: Gamified Achievement System models
