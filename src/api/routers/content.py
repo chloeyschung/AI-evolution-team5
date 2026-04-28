@@ -666,6 +666,23 @@ async def _background_summarize(
     summarizer,
 ) -> None:
     """Fetch page text and summarize it, then persist the result — runs after response is sent."""
+    import re
+
+    def _needs_title_improvement(current_title: str | None) -> bool:
+        if not current_title:
+            return True
+        t = " ".join(current_title.split()).strip()
+        if len(t) < 12:
+            return True
+        # Common LinkedIn feed-title noise signals.
+        noisy_tokens = [" | ", " comments", " likes", "shares", "feed/update"]
+        return any(token in t.lower() for token in noisy_tokens)
+
+    def _clean_generated_title(raw: str) -> str:
+        title = " ".join(raw.split()).strip()
+        title = re.sub(r"\s+\|\s+linkedin.*$", "", title, flags=re.IGNORECASE)
+        return title[:220]
+
     try:
         _, text_content = await content_extractor.fetch_html_and_text(url)
         if not text_content:
@@ -674,6 +691,15 @@ async def _background_summarize(
         async with AsyncSessionLocal() as db:
             repo = ContentRepository(db)
             await repo.update_summary(content_id, user_id, summary)
+            content = await repo.get_by_id(content_id)
+            if content and _needs_title_improvement(content.title):
+                try:
+                    generated_title = await summarizer.generate_title(text_content)
+                    cleaned = _clean_generated_title(generated_title)
+                    if cleaned:
+                        await repo.update_title(content_id, user_id, cleaned)
+                except Exception as exc:  # noqa: BLE001
+                    logging.warning("Background title generation failed for content %s: %s", content_id, exc)
     except Exception as exc:
         logging.warning("Background summarization failed for content %s: %s", content_id, exc)
 

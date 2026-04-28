@@ -145,6 +145,19 @@ class Summarizer:
             f"CONTENT:\n{content}"
         )
 
+    @staticmethod
+    def _build_title_prompt(content: str) -> str:
+        return (
+            "Create one concise, searchable title for the content below.\n"
+            "Rules:\n"
+            "- 8 to 16 words\n"
+            "- Plain ASCII-friendly wording\n"
+            "- No emoji, no hashtags, no trailing site suffixes\n"
+            "- Preserve key entities and topic\n"
+            "- Output ONLY the title line\n\n"
+            f"CONTENT:\n{content}"
+        )
+
     async def summarize(self, content: str, max_lines: int = 3, max_retries: int = 3) -> str:
         """
         Generates a concise summary of the provided content.
@@ -215,6 +228,51 @@ class Summarizer:
 
                 except (APIConnectionError, InvalidResponseError):
                     # Don't retry domain-specific errors, raise immediately
+                    raise
+                except httpx.RequestError as exc:
+                    last_error = exc
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(2**attempt)
+                        continue
+                    raise APIConnectionError(f"Request failed: {exc}") from exc
+                except Exception as e:
+                    last_error = e
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(2**attempt)
+                        continue
+                    raise SummarizationError(f"Unexpected error: {e}") from e
+
+        raise SummarizationError(f"All {max_retries} retry attempts failed. Last error: {last_error}")
+
+    async def generate_title(self, content: str, max_retries: int = 3) -> str:
+        if not content or not content.strip():
+            raise SummarizationError("Input content is empty.")
+
+        prompt = self._build_title_prompt(content)
+        request_url, headers, payload, provider = self._build_request(prompt)
+        payload["max_tokens"] = 80
+        last_error = None
+
+        async with async_client_context() as client:
+            for attempt in range(max_retries):
+                try:
+                    response = await client.post(
+                        request_url,
+                        headers=headers,
+                        json=payload,
+                        timeout=self.DEFAULT_TIMEOUT,
+                    )
+                    if response.status_code >= 500 and attempt < max_retries - 1:
+                        await asyncio.sleep(2**attempt)
+                        continue
+                    if response.status_code != 200:
+                        raise APIConnectionError(
+                            f"API request failed with status {response.status_code}: {response.text}"
+                        )
+                    data = response.json()
+                    title = self._extract_summary(data, provider)
+                    return " ".join(title.split()).strip()[:220]
+                except (APIConnectionError, InvalidResponseError):
                     raise
                 except httpx.RequestError as exc:
                     last_error = exc
