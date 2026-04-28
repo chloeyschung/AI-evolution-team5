@@ -171,6 +171,64 @@ h2 {
 /* Full-width */
 .block { width: 100%; }
 
+.quick-actions {
+  display: grid;
+  gap: var(--briefly-s2);
+}
+
+.section-title {
+  margin: 0;
+  font-size: 11px;
+  color: var(--briefly-ink-muted);
+  font-family: var(--briefly-font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.recent-panel {
+  display: grid;
+  gap: var(--briefly-s2);
+}
+
+.recent-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--briefly-s2);
+}
+
+.recent-item {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--briefly-border);
+  border-radius: var(--briefly-r-md);
+  background: var(--briefly-surface);
+  text-decoration: none;
+  color: var(--briefly-ink);
+}
+
+.recent-item-title {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-item-meta {
+  font-size: 11px;
+  color: var(--briefly-ink-muted);
+  text-transform: capitalize;
+}
+
+.recent-empty {
+  font-size: 12px;
+  color: var(--briefly-ink-muted);
+  padding: 8px 2px;
+}
+
 /* ── §9  Settings panel ──────────────────────────────────── */
 .settings {
   display: grid;

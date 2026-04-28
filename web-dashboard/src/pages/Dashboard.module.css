@@ -44,11 +44,66 @@
 }
 
 .workLane {
+  position: relative;
   border: 1px solid var(--color-border-muted);
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--color-surface) 96%, var(--color-canvas) 4%);
   padding: 16px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.actionStrip {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%) translateY(10px);
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--color-border-muted) 80%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface-muted) 90%, var(--color-surface));
+  color: var(--color-ink-secondary);
+  padding: 5px 8px;
+  font-size: 0.76rem;
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: saturate(0.9);
+  opacity: 0;
+  animation: stripIn 180ms var(--ease-standard) forwards;
+}
+
+.actionStripButtons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.actionStripBtn {
+  min-height: 22px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-ink-secondary);
+  border-radius: var(--radius-sm);
+  padding: 0 8px;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.actionStripBtn:hover {
+  border-color: color-mix(in srgb, var(--color-signal) 30%, var(--color-border));
+  color: var(--color-ink-primary);
+}
+
+@keyframes stripIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 .grid {

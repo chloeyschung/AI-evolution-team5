@@ -21,6 +21,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 const Dashboard = lazyLoad(() => import('../pages/Dashboard'));
 const Inbox = lazyLoad(() => import('../pages/Inbox'));
 const Archive = lazyLoad(() => import('../pages/Archive'));
+const Trash = lazyLoad(() => import('../pages/Trash'));
 const Analytics = lazyLoad(() => import('../pages/Analytics'));
 const Settings = lazyLoad(() => import('../pages/Settings'));
 const SignIn = lazyLoad(() => import('../pages/SignIn'));
@@ -98,6 +99,14 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <Archive />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'trash',
+        element: (
+          <ProtectedRoute>
+            <Trash />
           </ProtectedRoute>
         ),
       },

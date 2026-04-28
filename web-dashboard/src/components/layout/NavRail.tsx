@@ -31,6 +31,14 @@ function IconArchive() {
   );
 }
 
+function IconTrash() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M2.5 4.5h11M6.5 4.5V3h3v1.5M6 4.5v7.5M10 4.5v7.5M3.5 4.5l.75 8.25A1 1 0 0 0 5.24 14h5.52a1 1 0 0 0 .99-.75L12.5 4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function IconAnalytics() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -57,8 +65,9 @@ function IconSettings() {
 
 const navItems = [
   { label: 'Dashboard', to: '/dashboard', icon: <IconDashboard /> },
-  { label: 'Inbox',     to: '/inbox',     icon: <IconInbox />     },
+  { label: 'Library',   to: '/inbox',     icon: <IconInbox />     },
   { label: 'Archive',   to: '/archive',   icon: <IconArchive />   },
+  { label: 'Trash',     to: '/trash',     icon: <IconTrash />     },
   { label: 'Analytics', to: '/analytics', icon: <IconAnalytics /> },
   { label: 'Settings',  to: '/settings',  icon: <IconSettings />  },
 ];

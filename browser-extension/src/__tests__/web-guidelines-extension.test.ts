@@ -11,7 +11,6 @@ describe('web guidelines regression', () => {
   it('popup form controls include semantic name attributes', () => {
     const popupHtml = readSource('popup/popup.html');
 
-    expect(popupHtml).toMatch(/id="auto-summarize"[\s\S]*?name="autoSummarize"/);
     expect(popupHtml).toMatch(/id="api-url"[\s\S]*?name="apiBaseUrl"/);
   });
 

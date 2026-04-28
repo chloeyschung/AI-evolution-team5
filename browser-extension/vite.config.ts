@@ -94,7 +94,6 @@ function extensionBuilderPlugin() {
       // Update content scripts - add type: "module" for ES module support
       if (manifest.content_scripts) {
         manifest.content_scripts.forEach((script: any) => {
-          script.type = 'module'; // Enable ES modules for content scripts
           if (script.js) {
             script.js = script.js.map((file: string) =>
               file.replace('src/', '').replace('.ts', '.js')

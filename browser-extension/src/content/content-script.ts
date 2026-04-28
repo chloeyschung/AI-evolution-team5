@@ -1,8 +1,6 @@
 import { pageExtractor } from '../utils/extractor';
 import { PageMetadata } from '../shared/types';
 
-let metadataCache: PageMetadata | null = null;
-
 // Listen for messages from background script or popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'getMetadata') {
@@ -13,16 +11,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function handleGetMetadata(): Promise<{ metadata: PageMetadata }> {
-  if (!metadataCache) {
-    metadataCache = await pageExtractor.extractMetadata();
-  }
-  return { metadata: metadataCache };
+  // Always read live DOM + location to avoid stale metadata across SPA transitions.
+  const metadata = await pageExtractor.extractMetadata();
+  return { metadata };
 }
-
-// Refresh metadata cache on page navigation
-window.addEventListener('popstate', () => {
-  metadataCache = null;
-});
 
 // ─── Auth sync bridge ─────────────────────────────────────────────────────
 // Bridges chrome.storage.local (extension) ↔ localStorage (web dashboard).
@@ -85,41 +77,9 @@ async function syncPageToExtension(): Promise<void> {
   });
 }
 
-// Initial sync on page load
-syncExtensionToPage();
-syncPageToExtension();
-
-// extension storage → page: watch for login/logout in the extension
-chrome.storage.local.onChanged.addListener((changes) => {
-  const access = changes[AUTH_KEYS.ACCESS_TOKEN];
-  const refresh = changes[AUTH_KEYS.REFRESH_TOKEN];
-  const expires = changes[AUTH_KEYS.EXPIRES_AT];
-
-  if (access) {
-    if (access.newValue) {
-      localStorage.setItem(AUTH_KEYS.ACCESS_TOKEN, access.newValue as string);
-    } else {
-      localStorage.removeItem(AUTH_KEYS.ACCESS_TOKEN);
-    }
-  }
-  if (refresh) {
-    if (refresh.newValue) {
-      localStorage.setItem(AUTH_KEYS.REFRESH_TOKEN, refresh.newValue as string);
-    } else {
-      localStorage.removeItem(AUTH_KEYS.REFRESH_TOKEN);
-    }
-  }
-  if (expires) {
-    if (expires.newValue) {
-      localStorage.setItem(AUTH_KEYS.EXPIRES_AT, String(expires.newValue));
-    } else {
-      localStorage.removeItem(AUTH_KEYS.EXPIRES_AT);
-    }
-  }
-});
-
 // page localStorage → extension: intercept setItem/removeItem since the
 // `storage` event only fires in OTHER tabs, not in the writing tab itself.
+// Capture originals FIRST — the onChanged handler uses these to avoid re-entrancy.
 const _setItem = localStorage.setItem.bind(localStorage);
 const _removeItem = localStorage.removeItem.bind(localStorage);
 
@@ -141,7 +101,6 @@ localStorage.setItem = function (key: string, value: string): void {
     }
   }
   if (key === AUTH_KEYS.EXPIRES_AT) {
-    // Update extension storage with new expiry if we already have tokens
     chrome.storage.local.get(AUTH_KEYS.ACCESS_TOKEN).then((stored) => {
       if (stored[AUTH_KEYS.ACCESS_TOKEN]) {
         chrome.storage.local.set({ [AUTH_KEYS.EXPIRES_AT]: parseInt(value, 10) });
@@ -160,3 +119,39 @@ localStorage.removeItem = function (key: string): void {
     ]);
   }
 };
+
+// Initial sync on page load
+syncExtensionToPage();
+syncPageToExtension();
+
+// extension storage → page: watch for login/logout in the extension.
+// Uses _setItem/_removeItem (originals, captured above) — NOT the monkey-patched
+// versions — to prevent re-entrancy: patched setItem → chrome.storage.set →
+// onChanged → patched setItem → ... infinite loop + 429 rate-limit cascade.
+chrome.storage.local.onChanged.addListener((changes) => {
+  const access = changes[AUTH_KEYS.ACCESS_TOKEN];
+  const refresh = changes[AUTH_KEYS.REFRESH_TOKEN];
+  const expires = changes[AUTH_KEYS.EXPIRES_AT];
+
+  if (access) {
+    if (access.newValue) {
+      _setItem(AUTH_KEYS.ACCESS_TOKEN, access.newValue as string);
+    } else {
+      _removeItem(AUTH_KEYS.ACCESS_TOKEN);
+    }
+  }
+  if (refresh) {
+    if (refresh.newValue) {
+      _setItem(AUTH_KEYS.REFRESH_TOKEN, refresh.newValue as string);
+    } else {
+      _removeItem(AUTH_KEYS.REFRESH_TOKEN);
+    }
+  }
+  if (expires) {
+    if (expires.newValue) {
+      _setItem(AUTH_KEYS.EXPIRES_AT, String(expires.newValue));
+    } else {
+      _removeItem(AUTH_KEYS.EXPIRES_AT);
+    }
+  }
+});

@@ -40,6 +40,13 @@
   padding: 0 2px;
 }
 
+.bulkActions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .selectAllTextBtn {
   border: 0;
   background: transparent;

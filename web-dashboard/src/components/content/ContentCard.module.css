@@ -1,20 +1,24 @@
+/* Lock every card to the SAME row template so a grid row aligns:
+   meta · thumb · body(stretches) · footer · actions
+   The 1fr on body absorbs height differences instead of the thumb growing. */
 .card {
-  border: 1px solid var(--color-border-muted);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 14px;
   background: var(--color-surface);
   box-shadow: var(--elevation-01);
   display: grid;
+  grid-template-rows: auto auto 1fr auto auto;
   gap: 12px;
+  min-height: 360px; /* anchors empty cards so rows don't collapse */
   transition:
-    border-color var(--motion-affordance) var(--ease-standard),
-    box-shadow   var(--motion-affordance) var(--ease-standard),
-    transform    var(--motion-affordance) var(--ease-standard);
-  transition-duration: 140ms;
+    border-color 140ms var(--ease-standard),
+    box-shadow   140ms var(--ease-standard),
+    transform    140ms var(--ease-standard);
 }
 
 .card:hover {
-  border-color: var(--color-border);
+  border-color: color-mix(in srgb, var(--color-ink-muted) 40%, var(--color-border));
   box-shadow: var(--elevation-02);
   transform: translateY(-1px);
 }
@@ -26,37 +30,53 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-width: 0;
 }
 
 .platformPill {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  max-width: 72%;
   font-size: 0.78rem;
+  line-height: 1;
   border-radius: 999px;
   border: 1px solid var(--color-border);
   padding: 4px 10px;
   text-transform: capitalize;
   color: var(--color-ink-secondary);
+  background: var(--color-surface);
+  cursor: pointer;
 }
 
-.platformMark {
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  background: var(--color-surface-muted);
-  display: grid;
-  place-items: center;
-  font-size: 0.7rem;
-  font-weight: 700;
+.platformPill:hover {
+  border-color: var(--color-signal);
   color: var(--color-ink-primary);
 }
+
+.platformPill:focus-visible,
+.thumbButton:focus-visible,
+.openLink:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-signal) 70%, white);
+  outline-offset: 2px;
+}
+
+.thumbButton {
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+}
+
 
 .statusPill {
   font-size: 0.72rem;
   padding: 5px 10px;
   border-radius: 999px;
   border: 1px solid transparent;
+  flex-shrink: 0;
 }
 
 .inbox {
@@ -73,27 +93,92 @@
 
 .body {
   display: grid;
-  gap: 6px;
+  grid-template-rows: auto auto auto 1fr; /* thumb · title · author · summary  */
+  gap: 8px;
   min-width: 0;
+  min-height: 0;
+}
+
+/* Thumb: locked aspect ratio so EVERY card has the same image footprint,
+   plus a bottom-fade overlay so titles/text below always have edge contrast
+   even when the source is a screenshot full of small text. */
+.thumbButton {
+  position: relative;
+  width: 100%;
+  display: block;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-surface-muted);
+}
+
+.thumbButton::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 38%;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--color-surface) 0%, transparent) 0%,
+    color-mix(in srgb, var(--color-surface) 92%, transparent) 100%
+  );
+  pointer-events: none;
 }
 
 .thumb {
   width: 100%;
-  height: 120px;
+  aspect-ratio: 16 / 9;
+  height: auto;
   object-fit: cover;
-  border-radius: var(--radius-md);
   display: block;
+  filter: saturate(0.92);
+  transition: filter 180ms var(--ease-standard), transform 220ms var(--ease-standard);
+}
+
+.card:hover .thumb {
+  filter: saturate(1);
+  transform: scale(1.015);
+}
+
+.thumbPlaceholder {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-surface-muted) 82%, var(--color-surface) 18%) 0%,
+      color-mix(in srgb, var(--color-surface-muted) 92%, var(--color-surface) 8%) 100%
+    );
+  border: 1px solid color-mix(in srgb, var(--color-border-muted) 75%, transparent);
+}
+
+.thumbFallbackLogo {
+  width: clamp(40px, 20%, 64px);
+  height: auto;
+  opacity: 0.45;
+  filter: grayscale(1) saturate(0) contrast(0.9);
 }
 
 .title {
   font-family: var(--font-display);
-  font-weight: 500;
-  font-size: 1.04rem;
-  line-height: 1.35;
-  letter-spacing: -0.01em;
+  font-weight: 600;
+  font-size: 1.06rem;
+  line-height: 1.32;
+  letter-spacing: -0.012em;
   margin: 0;
-  overflow-wrap: anywhere;
   color: var(--color-ink-primary);
+  /* Always exactly 2 lines so card heights match across the row. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  /* Reserve 2 lines worth so single-line titles still align with neighbors. */
+  min-height: calc(1.06rem * 1.32 * 2);
 }
 
 .author,
@@ -106,51 +191,150 @@
 
 .summary {
   line-height: 1.5;
+  font-size: 0.86rem;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  overflow-wrap: anywhere;
+  /* Match .summaryList so non-bullet summaries reserve the same vertical space. */
+  min-height: calc(1.5em * 3 + 8px);
+  max-height: calc(1.5em * 3 + 8px);
+}
+
+.summaryList {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  color: var(--color-ink-secondary);
+  font-size: 0.86rem;
+  list-style: none;
+  /* Reserve exactly 3 lines worth so bulleted and prose summaries
+     occupy identical space — keeps footer rows aligned across cards. */
+  min-height: calc(1.5em * 3 + 8px);
+  max-height: calc(1.5em * 3 + 8px);
+  overflow: hidden;
+}
+
+.summaryItem {
+  display: grid;
+  grid-template-columns: 6px 1fr;
+  align-items: start;
+  column-gap: 8px;
+  line-height: 1.5;
+  /* Allow wrap to 2 lines per bullet, then clip cleanly. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.summaryItem::before {
+  content: '•';
+  color: var(--color-ink-muted);
+  margin-right: 6px;
+  display: inline;
 }
 
 .openLink {
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
   font-size: var(--text-micro);
   color: var(--color-ink-muted);
+  cursor: pointer;
+  text-decoration: none;
 }
 
 .openLink:hover {
   color: var(--color-signal);
+  text-decoration: underline;
+}
+
+.openLinkSuccess,
+.openLinkSuccess:hover {
+  color: var(--color-success);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--color-success) 28%, transparent);
+  text-decoration: none;
+}
+
+.copyArea {
+  display: inline-grid;
+  justify-items: end;
+  grid-template-rows: auto 1.1em;
+  row-gap: 2px;
+  min-width: 0;
+}
+
+.copyFeedback {
+  font-size: var(--text-micro);
+  color: var(--color-ink-muted);
+  line-height: 1.1;
+  text-align: right;
+  white-space: nowrap;
+  opacity: 0;
+  text-shadow: 0 1px 0 color-mix(in srgb, var(--color-surface) 85%, transparent);
+  transition: opacity 180ms var(--ease-standard);
+  pointer-events: none;
+}
+
+.copyFeedbackVisible {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .copyFeedback {
+    transition: none;
+  }
+}
+
+.platformName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .actions {
   justify-content: flex-start;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
 }
 
 .actionBtn {
-  min-height: 32px;
+  min-height: 34px;
   border-radius: 8px;
-  padding: 0 12px;
+  padding: 0 14px;
   font-size: 0.82rem;
+  font-weight: 500;
   border: 1px solid var(--color-border);
-  color: var(--color-ink-primary);
+  color: var(--color-ink-secondary);
   background: var(--color-surface);
   transition:
-    box-shadow    140ms var(--ease-standard),
-    transform     140ms var(--ease-standard),
+    background    140ms var(--ease-standard),
+    color         140ms var(--ease-standard),
     border-color  140ms var(--ease-standard);
 }
 
 .actionBtn:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
+  color: var(--color-ink-primary);
+  border-color: color-mix(in srgb, var(--color-ink-muted) 40%, var(--color-border));
 }
 
 .keepBtn {
-  border-color: color-mix(in srgb, var(--color-success) 30%, var(--color-border));
+  background: var(--color-signal);
+  color: var(--color-signal-on);
+  border-color: var(--color-signal);
 }
 
 .keepBtn:hover {
-  background: var(--color-success-subtle);
+  background: var(--color-signal);
+  border-color: var(--color-signal);
+  color: var(--color-signal-on);
 }
 
 .discardBtn {
@@ -158,11 +342,22 @@
 }
 
 .deleteBtn {
-  border-color: color-mix(in srgb, var(--color-danger) 18%, var(--color-border));
+  border-color: var(--color-border);
   color: var(--color-ink-secondary);
 }
 
 .deleteBtn:hover {
-  background: var(--color-danger-subtle);
-  color: var(--color-danger);
+  background: var(--color-surface);
+  color: var(--color-ink-primary);
+}
+
+.footerRow {
+  padding-bottom: 2px;
+}
+
+.date {
+  font-size: 0.8rem;
+  color: var(--color-ink-muted);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
