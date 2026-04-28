@@ -3,6 +3,7 @@
 TODO #10 (2026-04-14): Removed Optional import - using | None syntax instead.
 """
 
+from asyncio import Lock
 from datetime import timedelta
 
 from sqlalchemy import delete, select
@@ -18,10 +19,22 @@ from src.utils.token_hashing import hash_access_token
 class AuthenticationRepository(BaseRepository[AuthenticationToken]):
     """Repository for authentication token management."""
     REFRESH_TOKEN_TTL_SECONDS = 604800  # 7 days
+    _refresh_locks: dict[str, Lock] = {}
+    _refresh_locks_guard: Lock = Lock()
 
     def __init__(self, db: AsyncSession):
         super().__init__(db)
         self.db = db  # Keep for backward compatibility
+
+    @classmethod
+    async def _get_refresh_lock(cls, lock_key: str) -> Lock:
+        """Get (or create) a per-refresh-token rotation lock."""
+        async with cls._refresh_locks_guard:
+            lock = cls._refresh_locks.get(lock_key)
+            if lock is None:
+                lock = Lock()
+                cls._refresh_locks[lock_key] = lock
+            return lock
 
     async def create_tokens(
         self,
@@ -52,11 +65,11 @@ class AuthenticationRepository(BaseRepository[AuthenticationToken]):
         # Check if tokens already exist and revoke them (token rotation)
         await self._revoke_existing_tokens(user_id)
 
-        # Create new token record with hashed access token
+        # Create new token record with hashed access and refresh tokens
         token = AuthenticationToken(
             user_id=user_id,
             access_token=hash_access_token(access_token),  # Hash for secure storage
-            refresh_token=refresh_token,
+            refresh_token=hash_access_token(refresh_token),  # Hash for secure storage
             expires_at=expires_at,
         )
 
@@ -64,7 +77,7 @@ class AuthenticationRepository(BaseRepository[AuthenticationToken]):
         await self.db.commit()
         await self.db.refresh(token)
 
-        return token, access_token  # Return both hashed record and plaintext JWT
+        return token, access_token, refresh_token  # hashed record + plaintext JWT + plaintext refresh token
 
     async def get_token_by_user_id(self, user_id: int) -> AuthenticationToken | None:
         """Get authentication token by user ID.
@@ -121,9 +134,12 @@ class AuthenticationRepository(BaseRepository[AuthenticationToken]):
         Returns:
             AuthenticationToken if found and not revoked, None otherwise
         """
+        # Hash the refresh token for comparison
+        hashed_refresh_token = hash_access_token(refresh_token)
+
         result = await self.db.execute(
             select(AuthenticationToken)
-            .where(AuthenticationToken.refresh_token == refresh_token)
+            .where(AuthenticationToken.refresh_token == hashed_refresh_token)
             .where(AuthenticationToken.revoked_at.is_(None))
             .with_for_update()  # prevents concurrent rotation race condition
         )
@@ -133,7 +149,7 @@ class AuthenticationRepository(BaseRepository[AuthenticationToken]):
         self,
         refresh_token: str,
         access_expires_in: int = 3600,
-    ) -> tuple[AuthenticationToken, str] | None:
+    ) -> tuple[AuthenticationToken, str, str] | None:
         """Refresh access token using refresh token.
 
         Implements token rotation: issues new refresh token on each refresh.
@@ -145,13 +161,14 @@ class AuthenticationRepository(BaseRepository[AuthenticationToken]):
         Returns:
             Tuple of (Updated AuthenticationToken, plaintext JWT access token) or None if refresh failed
         """
-        async with self.db.begin():
-            # Lock row and rotate inside one transaction to avoid race windows.
+        # SQLite ignores FOR UPDATE. Serialize by refresh token hash.
+        hashed_refresh_token = hash_access_token(refresh_token)
+        refresh_lock = await self._get_refresh_lock(hashed_refresh_token)
+        async with refresh_lock:
             result = await self.db.execute(
                 select(AuthenticationToken)
-                .where(AuthenticationToken.refresh_token == refresh_token)
+                .where(AuthenticationToken.refresh_token == hashed_refresh_token)
                 .where(AuthenticationToken.revoked_at.is_(None))
-                .with_for_update()
             )
             existing_token = result.scalar_one_or_none()
             if not existing_token:
@@ -169,13 +186,14 @@ class AuthenticationRepository(BaseRepository[AuthenticationToken]):
             new_refresh_token = token_utils.create_refresh_token()
             new_expires_at = utc_now() + timedelta(seconds=access_expires_in)
 
-            # Update token record with hashed access token
+            # Update token record with hashed access and refresh tokens
             existing_token.access_token = hash_access_token(new_access_token)
-            existing_token.refresh_token = new_refresh_token
+            existing_token.refresh_token = hash_access_token(new_refresh_token)  # Hash for secure storage
             existing_token.expires_at = new_expires_at
 
-        await self.db.refresh(existing_token)
-        return existing_token, new_access_token  # Return both record and plaintext JWT
+            await self.db.commit()
+            await self.db.refresh(existing_token)
+            return existing_token, new_access_token, new_refresh_token  # hashed record + plaintext JWT + plaintext refresh token
 
     async def revoke_token_by_user_id(self, user_id: int) -> bool:
         """Revoke all tokens for a user (logout or account delete).

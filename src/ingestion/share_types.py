@@ -21,3 +21,4 @@ class ShareData:
     content: str
     metadata: dict | None = None
     source_platform: str | None = None
+    options: dict | None = None

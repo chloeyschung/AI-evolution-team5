@@ -64,20 +64,10 @@ def _get_fernet_instance() -> Fernet:
         raise TokenEncryptionError(f"Invalid ENCRYPTION_KEY format: {e}") from e
 
 
-# Create module-level Fernet instance (lazy initialization)
-_fernet: Fernet | None = None
-
-
-def _get_or_create_fernet() -> Fernet:
-    """Get or create the Fernet instance.
-
-    Returns:
-        Fernet instance.
-    """
-    global _fernet
-    if _fernet is None:
-        _fernet = _get_fernet_instance()
-    return _fernet
+# Create module-level Fernet instance eagerly at import time.
+# ENCRYPTION_KEY is guaranteed valid by Settings at startup, so this is safe
+# and eliminates any async-concurrency race on first use.
+_fernet: Fernet = _get_fernet_instance()
 
 
 def encrypt_token(plaintext: str) -> str:
@@ -93,8 +83,7 @@ def encrypt_token(plaintext: str) -> str:
         TokenEncryptionError: If encryption fails.
     """
     try:
-        fernet = _get_or_create_fernet()
-        encrypted = fernet.encrypt(plaintext.encode())
+        encrypted = _fernet.encrypt(plaintext.encode())
         return encrypted.decode()
     except Exception as e:
         raise TokenEncryptionError(f"Failed to encrypt token: {e}") from e
@@ -113,8 +102,7 @@ def decrypt_token(encrypted: str) -> str:
         TokenEncryptionError: If decryption fails.
     """
     try:
-        fernet = _get_or_create_fernet()
-        decrypted = fernet.decrypt(encrypted.encode())
+        decrypted = _fernet.decrypt(encrypted.encode())
         return decrypted.decode()
     except InvalidToken as e:
         raise TokenEncryptionError(f"Invalid token format - possibly corrupted: {e}") from e

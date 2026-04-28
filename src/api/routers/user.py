@@ -45,6 +45,7 @@ async def get_profile(
 
     return UserProfileResponse(
         id=profile.id,
+        email=profile.email,
         display_name=profile.display_name,
         avatar_url=profile.avatar_url,
         bio=profile.bio,
@@ -72,6 +73,7 @@ async def update_profile(
 
     return UserProfileResponse(
         id=profile.id,
+        email=profile.email,
         display_name=profile.display_name,
         avatar_url=profile.avatar_url,
         bio=profile.bio,

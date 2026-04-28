@@ -93,7 +93,7 @@ async def test_reminder_log_repository_mark_action_taken(db_session):
         message="Test message",
     )
 
-    success = await repo.mark_action_taken(log.id)
+    success = await repo.mark_action_taken(log.user_id, log.id)
 
     assert success is True
 
@@ -117,7 +117,7 @@ async def test_reminder_log_repository_mark_dismissed(db_session):
         message="Don't break your streak",
     )
 
-    success = await repo.mark_dismissed(log.id)
+    success = await repo.mark_dismissed(log.user_id, log.id)
 
     assert success is True
 
@@ -325,7 +325,7 @@ async def test_log_action_taken(db_session):
         message="Test",
     )
 
-    success = await engine.log_action_taken(log.id)
+    success = await engine.log_action_taken(log.user_id, log.id)
 
     assert success is True
 
@@ -574,7 +574,7 @@ async def test_full_reminder_flow(db_session):
     assert log_id > 0
 
     # Step 3: User takes action
-    success = await engine.log_action_taken(log_id)
+    success = await engine.log_action_taken(user_id=1, log_id=log_id)
     assert success is True
 
     # Verify

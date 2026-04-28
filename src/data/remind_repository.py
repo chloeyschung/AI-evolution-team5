@@ -31,7 +31,7 @@ class ReminderPreferenceRepository(BaseRepository[ReminderPreference]):
         """Create reminder preferences for user."""
         preference = ReminderPreference(user_id=user_id, **kwargs)
         self.session.add(preference)
-        await self.session.flush()
+        await self.session.commit()
         return preference
 
     async def update(self, user_id: int, **kwargs) -> ReminderPreference | None:
@@ -44,7 +44,7 @@ class ReminderPreferenceRepository(BaseRepository[ReminderPreference]):
             if hasattr(preference, key):
                 setattr(preference, key, value)
 
-        await self.session.flush()
+        await self.session.commit()
         return preference
 
     async def get_or_create(self, user_id: int) -> ReminderPreference:
@@ -85,13 +85,16 @@ class ReminderLogRepository(BaseRepository[ReminderLog]):
             sent_at=sent_at or utc_now(),
         )
         self.session.add(log)
-        await self.session.flush()
+        await self.session.commit()
         return log
 
-    async def mark_action_taken(self, log_id: int, action_at: datetime | None = None) -> bool:
+    async def mark_action_taken(self, user_id: int, log_id: int, action_at: datetime | None = None) -> bool:
         """Mark that user took action on reminder."""
         result = await self.session.execute(
-            select(ReminderLog).where(ReminderLog.id == log_id).where(~ReminderLog.action_taken)
+            select(ReminderLog)
+            .where(ReminderLog.id == log_id)
+            .where(ReminderLog.user_id == user_id)
+            .where(~ReminderLog.action_taken)
         )
         log = result.scalar_one_or_none()
         if not log:
@@ -99,18 +102,22 @@ class ReminderLogRepository(BaseRepository[ReminderLog]):
 
         log.action_taken = True
         log.action_taken_at = action_at or utc_now()
-        await self.session.flush()
+        await self.session.commit()
         return True
 
-    async def mark_dismissed(self, log_id: int, dismissed_at: datetime | None = None) -> bool:
+    async def mark_dismissed(self, user_id: int, log_id: int, dismissed_at: datetime | None = None) -> bool:
         """Mark that user dismissed the reminder."""
-        result = await self.session.execute(select(ReminderLog).where(ReminderLog.id == log_id))
+        result = await self.session.execute(
+            select(ReminderLog)
+            .where(ReminderLog.id == log_id)
+            .where(ReminderLog.user_id == user_id)
+        )
         log = result.scalar_one_or_none()
         if not log:
             return False
 
         log.dismissed_at = dismissed_at or utc_now()
-        await self.session.flush()
+        await self.session.commit()
         return True
 
     async def get_last_reminder(self, user_id: int, reminder_type: str | None = None) -> ReminderLog | None:
@@ -169,7 +176,7 @@ class UserActivityPatternRepository(BaseRepository[UserActivityPattern]):
         """Create activity pattern for user."""
         pattern = UserActivityPattern(user_id=user_id, **kwargs)
         self.session.add(pattern)
-        await self.session.flush()
+        await self.session.commit()
         return pattern
 
     async def update(self, user_id: int, **kwargs) -> UserActivityPattern | None:
@@ -182,7 +189,7 @@ class UserActivityPatternRepository(BaseRepository[UserActivityPattern]):
             if hasattr(pattern, key):
                 setattr(pattern, key, value)
 
-        await self.session.flush()
+        await self.session.commit()
         return pattern
 
     async def get_or_create(self, user_id: int) -> UserActivityPattern:

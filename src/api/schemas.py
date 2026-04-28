@@ -1,7 +1,7 @@
 """Pydantic schemas for API request/response validation."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_serializer, field_validator
 
@@ -10,6 +10,7 @@ from src.constants import (
     ContentType,
     DefaultSort,
     SwipeAction,
+    SyncFrequency,
     Theme,
 )
 from src.data.models import utc_now
@@ -60,7 +61,8 @@ class ContentResponse(BaseModel):
             ContentResponse instance
         """
         created_at = serialize_datetime(content.created_at)
-        assert created_at is not None
+        if created_at is None:
+            raise ValueError(f"Content {content.id} has no created_at timestamp")
 
         return cls(
             id=content.id,
@@ -87,7 +89,8 @@ class ContentResponse(BaseModel):
             ContentResponse instance
         """
         created_at = serialize_datetime(utc_now())
-        assert created_at is not None
+        if created_at is None:
+            raise ValueError("serialize_datetime(utc_now()) returned None unexpectedly")
 
         return cls(
             id=metadata.id if hasattr(metadata, "id") else 0,
@@ -140,12 +143,18 @@ class SwipeBatchResponse(BaseModel):
 
 
 class PaginatedContentResponse(BaseModel):
-    """Paginated content list response (DAT-001 FR-6)."""
+    """Paginated content list response (DAT-001 FR-6).
+
+    ``pagination_mode`` is the authoritative discriminator:
+    - ``"cursor"``  → ``next_cursor`` carries the continuation token; ``next_offset`` is always None.
+    - ``"offset"``  → ``next_offset`` carries the next integer offset; ``next_cursor`` is always None.
+    """
 
     items: list[ContentResponse]
     has_more: bool
     total: int
-    next_offset: int | None
+    pagination_mode: Literal["cursor", "offset"]
+    next_offset: int | None = None
     next_cursor: str | None = None
 
 
@@ -163,6 +172,7 @@ class ShareRequest(BaseModel):
     content: str = Field(..., min_length=1, description="Content to share (URL, text, etc.)")
     platform: str | None = None
     metadata: dict[str, Any] | None = None
+    options: dict[str, Any] | None = None
 
 
 class ShareResponse(BaseModel):
@@ -228,6 +238,7 @@ class UserProfileResponse(BaseModel):
     model_config = {"from_attributes": True}
 
     id: int
+    email: str | None = None
     display_name: str | None = None
     avatar_url: str | None = None
     bio: str | None = None
@@ -554,7 +565,7 @@ class YouTubeSyncConfigResponse(BaseModel):
 
     playlist_id: str
     playlist_name: str
-    sync_frequency: str
+    sync_frequency: SyncFrequency
     is_active: bool
     last_sync_at: str | None = None
 
@@ -612,7 +623,7 @@ class LinkedInSyncConfigResponse(BaseModel):
 
     resource_id: str
     resource_name: str
-    sync_frequency: str
+    sync_frequency: SyncFrequency
     is_active: bool
     last_sync_at: str | None = None
 

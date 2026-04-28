@@ -160,20 +160,19 @@ class ContentExtractor:
 
         return False
 
-    async def extract_text(self, url: str) -> str:
-        """
-        Fetches a URL and extracts its primary text content.
+    async def fetch_html_and_text(self, url: str) -> tuple[str, str]:
+        """Fetch a URL once and return both the raw HTML and the extracted plain text.
 
         Args:
-            url: The URL to extract content from.
+            url: The URL to fetch.
 
         Returns:
-            A cleaned string of the main text content.
+            A (raw_html, plain_text) tuple. raw_html is the full page source;
+            plain_text is the cleaned body text for summarisation.
 
         Raises:
             ExtractionError: If the URL is invalid, unreachable, or contains no text.
         """
-        # Validate URL format first
         self._validate_url(url)
 
         try:
@@ -187,38 +186,35 @@ class ContentExtractor:
         except Exception as e:
             raise ExtractionError(f"An unexpected error occurred during fetch: {e}") from e
 
-        html_content = response.text
+        raw_html = response.text
 
-        # Check content size
-        if len(html_content) > self.MAX_CONTENT_SIZE:
+        if len(raw_html) > self.MAX_CONTENT_SIZE:
             raise ExtractionError(f"Content exceeds maximum size limit of {self.MAX_CONTENT_SIZE} bytes.")
-
-        if not html_content:
+        if not raw_html:
             raise ExtractionError("Received empty HTML content from the URL.")
 
         try:
-            soup = BeautifulSoup(html_content, "html.parser")
-
-            # Remove non-content tags
+            soup = BeautifulSoup(raw_html, "html.parser")
             for tag in soup(self.TAGS_TO_REMOVE):
                 tag.decompose()
-
-            # Identify the main content container
             main_content = soup.find(["article", "main", "body"])
-
             if not main_content:
                 raise ExtractionError("Could not find any meaningful content container.")
-
-            # Extract text
             text = main_content.get_text(separator=" ")
-
-            # Clean the text: remove excessive whitespace, normalize line breaks
             clean_text = "\n".join(line.strip() for line in text.splitlines() if line.strip())
-
             if not clean_text:
                 raise ExtractionError("Extracted text is empty.")
-
-            return clean_text
-
+            return raw_html, clean_text
+        except ExtractionError:
+            raise
         except Exception as e:
             raise ExtractionError(f"An error occurred during parsing: {e}") from e
+
+    async def extract_text(self, url: str) -> str:
+        """Fetch a URL and return its extracted plain text (backwards-compat wrapper).
+
+        Prefer fetch_html_and_text() when you also need the raw HTML for
+        metadata extraction — it avoids a second HTTP round-trip.
+        """
+        _, text = await self.fetch_html_and_text(url)
+        return text

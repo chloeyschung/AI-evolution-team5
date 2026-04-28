@@ -10,12 +10,14 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from ..ai.summarizer import Summarizer
-from ..data.database import init_db
+from ..data.database import init_db, AsyncSessionLocal
 from ..ingestion.extractor import ContentExtractor
 from ..ingestion.share_handler import ShareHandler
 from ..config import settings
@@ -99,10 +101,15 @@ async def lifespan(app: FastAPI):
     await init_db()
 
     # Initialize ShareHandler with dependencies (Task #11: DI pattern)
-    summarizer_api_key = os.getenv("ANTHROPIC_API_KEY")
+    summarizer_api_key = settings.SUMMARY_API_KEY or os.getenv("ANTHROPIC_API_KEY")
     summarizer: Summarizer | None = None
     if summarizer_api_key:
-        summarizer = Summarizer(api_key=summarizer_api_key)
+        summarizer = Summarizer(
+            api_key=summarizer_api_key,
+            base_url=settings.SUMMARY_BASE_URL or settings.ANTHROPIC_BASE_URL,
+            model=settings.SUMMARY_MODEL or settings.ANTHROPIC_MODEL,
+            provider=settings.SUMMARY_PROVIDER,
+        )
 
     content_extractor = ContentExtractor()
     app.state.share_handler = ShareHandler(
@@ -229,3 +236,19 @@ app.include_router(ai.router,           prefix="/api/v1", tags=["ai"])
 async def root():
     """Root endpoint for health check."""
     return {"status": "ok", "service": "briefly-api"}
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint that verifies DB connectivity.
+
+    Returns HTTP 200 with db=ok when the database is reachable,
+    or HTTP 503 with db=error when a DB failure is detected.
+    """
+    try:
+        async with AsyncSessionLocal() as db:
+            await db.execute(text("SELECT 1"))
+        return JSONResponse(status_code=200, content={"status": "ok", "db": "ok"})
+    except Exception:
+        logger.exception("Health check: DB connectivity failure")
+        return JSONResponse(status_code=503, content={"status": "degraded", "db": "error"})

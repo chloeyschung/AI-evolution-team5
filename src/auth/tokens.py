@@ -107,11 +107,11 @@ def verify_refresh_token(token: str) -> bool:
         True if token format is valid, False otherwise
     """
     try:
-        # URL-safe base64 tokens should be 43 characters (32 bytes encoded)
-        if len(token) != 43:
+        # token_urlsafe(32) → 43 chars; accept 43–44 to be robust to minor byte-count changes
+        if not (43 <= len(token) <= 44):
             return False
 
-        # Try to decode to verify it's valid base64
+        # Try to decode to verify it's valid base64url
         token.encode("ascii").decode("ascii")
         return True
     except (ValueError, UnicodeError):

@@ -23,6 +23,7 @@ from ...utils.cursor_pagination import (
     make_timestamp_cursor,
     parse_timestamp_cursor,
 )
+from ...utils.datetime_utils import serialize_datetime
 from ..dependencies import get_current_user
 from ..schemas import (
     ContentCreate,
@@ -80,16 +81,25 @@ async def list_content(
     limit: int = Query(50, gt=0, le=100),
     offset: int = Query(0, ge=0),
     cursor: str | None = Query(None),
+    status: str | None = Query(None, pattern="^(inbox|archived)$"),
+    platform: str | None = Query(None),
     user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> PaginatedContentResponse:
     """List all content for the authenticated user.
 
     Returns a pagination wrapper with items, has_more, total, and next_offset (DAT-001 FR-6).
+    Supports filtering by status (inbox/archived) and platform.
     has_more is True when len(items) == limit, indicating there may be more pages.
     next_offset is offset + len(items) when has_more is True, else None.
     """
     repo = ContentRepository(db)
+    status_filter: ContentStatus | None = None
+    if status == "inbox":
+        status_filter = ContentStatus.INBOX
+    elif status == "archived":
+        status_filter = ContentStatus.ARCHIVED
+
     is_cursor_mode = cursor is not None
     if is_cursor_mode:
         try:
@@ -105,12 +115,20 @@ async def list_content(
             limit=limit,
             cursor_created_at=cursor_created_at,
             cursor_id=cursor_id,
+            status=status_filter,
+            platform=platform,
         )
     else:
-        contents = await repo.get_all_ordered(user_id=user_id, limit=limit, offset=offset)
+        contents = await repo.get_all_ordered(
+            user_id=user_id,
+            limit=limit,
+            offset=offset,
+            status=status_filter,
+            platform=platform,
+        )
 
-    total = await repo.count_all(user_id=user_id)
-    has_more = len(contents) == limit if is_cursor_mode else len(contents) == limit
+    total = await repo.count_all(user_id=user_id, status=status_filter, platform=platform)
+    has_more = len(contents) == limit
     next_cursor = None
     next_offset = offset + len(contents) if has_more else None
     if has_more and contents:
@@ -127,8 +145,77 @@ async def list_content(
         items=[ContentResponse.from_content(c) for c in contents],
         has_more=has_more,
         total=total,
+        pagination_mode="cursor" if is_cursor_mode else "offset",
         next_offset=next_offset,
         next_cursor=next_cursor,
+    )
+
+
+# ADV-001: Personalized Trend Feed endpoints
+
+
+@router.get("/content/trend-feed", response_model=TrendFeedResponse)
+async def get_trend_feed(
+    limit: int = Query(20, gt=0, le=50, description="Maximum items to return"),
+    offset: int = Query(0, ge=0, description="Pagination offset"),
+    time_range: str = Query(
+        "all",
+        pattern="^(week|month|all)$",
+        description="Time range filter: week, month, or all",
+    ),
+    min_score: float = Query(0.1, ge=0, le=1, description="Minimum relevance score threshold"),
+    user_id: int = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> TrendFeedResponse:
+    """Get personalized trend feed for authenticated user.
+
+    Returns kept content ranked by relevance score based on:
+    - User's interest tags
+    - Content tag similarity with preferred tags
+    - Recency (when content was kept)
+    - Engagement (keep ratio for same tags)
+
+    Args:
+        limit: Maximum items to return (1-50)
+        offset: Pagination offset
+        time_range: Filter by week, month, or all time
+        min_score: Minimum relevance score threshold (0-1)
+        user_id: Current user ID (from auth)
+        db: Database session
+
+    Returns:
+        Trend feed response with ranked items and metadata
+
+    Raises:
+        401: Not authenticated
+    """
+    from src.ai.trend_analyzer import TrendAnalyzer
+
+    # Get trend feed
+    analyzer = TrendAnalyzer(db)
+    items, total = await analyzer.get_trend_feed(
+        user_id=user_id,
+        limit=limit,
+        offset=offset,
+        time_range=time_range,
+        min_score=min_score,
+    )
+
+    # Build response
+    response_items = [
+        TrendFeedItem(
+            content=ContentResponse.from_content(item.content),
+            relevance_score=item.relevance_score,
+            matched_interests=item.matched_interests,
+            top_tags=item.top_tags,
+        )
+        for item in items
+    ]
+
+    return TrendFeedResponse(
+        items=response_items,
+        total=total,
+        has_more=offset + limit < total,
     )
 
 
@@ -158,7 +245,7 @@ async def get_content_detail(
         latest = history[-1]
         swipe_history = SwipeHistoryResponse(
             action=latest.action.value,
-            swiped_at=latest.swiped_at.isoformat(),
+            swiped_at=serialize_datetime(latest.swiped_at),
         )
 
     return ContentDetailResponse(
@@ -171,8 +258,8 @@ async def get_content_detail(
         summary=content.summary,
         status=content.status,
         swipe_history=swipe_history,
-        created_at=content.created_at.isoformat(),
-        updated_at=content.updated_at.isoformat() if content.updated_at else None,
+        created_at=serialize_datetime(content.created_at),
+        updated_at=serialize_datetime(content.updated_at),
     )
 
 
@@ -495,6 +582,7 @@ async def search_content(
         items=[ContentResponse.from_content(c) for c in results],
         has_more=has_more,
         total=total,
+        pagination_mode="cursor" if is_cursor_mode else "offset",
         next_offset=next_offset,
         next_cursor=next_cursor,
     )
@@ -510,8 +598,8 @@ def get_share_handler(request: FastAPIRequest) -> ShareHandler:
     return share_handler
 
 
-@limiter.limit("10/minute")  # Rate limit: 10 requests per minute per IP
 @router.post("/share", status_code=201, response_model=ShareResponse)
+@limiter.limit("10/minute")  # Rate limit: 10 requests per minute per IP
 async def share_content(
     request: Request,
     data: ShareRequest,
@@ -530,6 +618,7 @@ async def share_content(
         "content": data.content,
         "platform": data.platform,
         "metadata": data.metadata,
+        "options": data.options,
     }
 
     metadata = await share_handler.process_share(raw_payload)
@@ -546,73 +635,5 @@ async def share_content(
         title=content.title,
         author=content.author,
         summary=content.summary,
-        created_at=content.created_at.isoformat(),
-    )
-
-
-# ADV-001: Personalized Trend Feed endpoints
-
-
-@router.get("/content/trend-feed", response_model=TrendFeedResponse)
-async def get_trend_feed(
-    limit: int = Query(20, gt=0, le=50, description="Maximum items to return"),
-    offset: int = Query(0, ge=0, description="Pagination offset"),
-    time_range: str = Query(
-        "all",
-        pattern="^(week|month|all)$",
-        description="Time range filter: week, month, or all",
-    ),
-    min_score: float = Query(0.1, ge=0, le=1, description="Minimum relevance score threshold"),
-    user_id: int = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> TrendFeedResponse:
-    """Get personalized trend feed for authenticated user.
-
-    Returns kept content ranked by relevance score based on:
-    - User's interest tags
-    - Content tag similarity with preferred tags
-    - Recency (when content was kept)
-    - Engagement (keep ratio for same tags)
-
-    Args:
-        limit: Maximum items to return (1-50)
-        offset: Pagination offset
-        time_range: Filter by week, month, or all time
-        min_score: Minimum relevance score threshold (0-1)
-        user_id: Current user ID (from auth)
-        db: Database session
-
-    Returns:
-        Trend feed response with ranked items and metadata
-
-    Raises:
-        401: Not authenticated
-    """
-    from src.ai.trend_analyzer import TrendAnalyzer
-
-    # Get trend feed
-    analyzer = TrendAnalyzer(db)
-    items, total = await analyzer.get_trend_feed(
-        user_id=user_id,
-        limit=limit,
-        offset=offset,
-        time_range=time_range,
-        min_score=min_score,
-    )
-
-    # Build response
-    response_items = [
-        TrendFeedItem(
-            content=ContentResponse.from_content(item.content),
-            relevance_score=item.relevance_score,
-            matched_interests=item.matched_interests,
-            top_tags=item.top_tags,
-        )
-        for item in items
-    ]
-
-    return TrendFeedResponse(
-        items=response_items,
-        total=total,
-        has_more=offset + limit < total,
+        created_at=serialize_datetime(content.created_at),
     )

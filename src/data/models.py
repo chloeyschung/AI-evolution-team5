@@ -153,7 +153,7 @@ class InterestTag(Base):
     __tablename__ = "interest_tags"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("user_profile.id", ondelete="CASCADE"), nullable=False, index=True)
     tag = Column(String(100), nullable=False)
     # DAT-003: Soft delete support
     is_deleted = Column(Boolean, default=False, nullable=False)
@@ -422,7 +422,7 @@ class ReminderLog(Base):
     reminder_type = Column(String(50), nullable=False, index=True)  # 'backlog', 'streak', 'time_based', 'reengagement'
     message = Column(Text, nullable=False)
     sent_at = Column(DateTime, default=utc_now, nullable=False, index=True)
-    action_taken = Column(Integer, nullable=False, default=0)  # SQLite boolean
+    action_taken = Column(Boolean, nullable=False, default=False)
     action_taken_at = Column(DateTime, nullable=True)
     dismissed_at = Column(DateTime, nullable=True)
 

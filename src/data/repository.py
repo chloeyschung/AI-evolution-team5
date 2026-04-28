@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta
 from typing import Optional
 
 from sqlalchemy import case, delete, func, or_, select, update
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -410,19 +411,17 @@ class ContentRepository(BaseRepository[Content]):
         # Build search query with OR conditions for title, author, and tags
         query_pattern = f"%{query}%"
 
-        # Search in title, author, and AI-generated tags (case-insensitive)
+        # Search in title, url, author, and AI-generated tags (case-insensitive)
         # F-016: Added ContentTag JOIN to enable tag-based search
         query_stmt = (
             select(Content)
             .where(Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
             .outerjoin(ContentTag, Content.id == ContentTag.content_id)
             .where(
-                (Content.title.isnot(None))  # Must have title
-                & (
-                    (Content.title.ilike(query_pattern))
-                    | (Content.author.ilike(query_pattern))
-                    | (ContentTag.tag.ilike(query_pattern))  # F-016: Tag search
-                )
+                (Content.title.ilike(query_pattern))
+                | (Content.url.ilike(query_pattern))
+                | (Content.author.ilike(query_pattern))
+                | (ContentTag.tag.ilike(query_pattern))  # F-016: Tag search
             )
             .order_by(Content.created_at.desc(), Content.id.desc())
         )
@@ -448,46 +447,73 @@ class ContentRepository(BaseRepository[Content]):
             user_id: Optional user ID to filter content by.
 
         Returns:
-            Dictionary with pending, kept, discarded counts.
+            Dictionary with pending (inbox items), kept (KEEP swipes), discarded (DISCARD swipes).
         """
-        # Build base query with optional user filter
-        content_query = select(Content).where(Content.is_deleted == False)  # noqa: E712
+        from src.constants import ContentStatus  # avoid circular at module level
+
+        # pending = items currently in inbox (domain-correct; not arithmetic subtraction
+        # which goes negative when test runs accumulate multiple swipes per item)
+        inbox_base = select(func.count()).select_from(
+            select(Content)
+            .where(Content.is_deleted == False, Content.status == ContentStatus.INBOX)  # noqa: E712
+        )
+        if user_id is not None:
+            inbox_base = select(func.count()).select_from(
+                select(Content)
+                .where(
+                    Content.is_deleted == False,  # noqa: E712
+                    Content.status == ContentStatus.INBOX,
+                    Content.user_id == user_id,
+                )
+                .subquery()
+            )
+        pending_count = (await self.session.execute(inbox_base)).scalar() or 0
+
+        # kept / discarded = lifetime swipe action counts (cumulative activity metrics)
         swipe_query = select(SwipeHistory)
         if user_id is not None:
-            content_query = content_query.where(Content.user_id == user_id)
             swipe_query = swipe_query.where(SwipeHistory.user_id == user_id)
 
-        all_count = (await self.session.execute(select(func.count()).select_from(content_query.subquery()))).scalar()
         kept_count = (
             await self.session.execute(
                 select(func.count()).select_from(swipe_query.where(SwipeHistory.action == SwipeAction.KEEP).subquery())
             )
-        ).scalar()
+        ).scalar() or 0
         discarded_count = (
             await self.session.execute(
                 select(func.count())
                 .select_from(swipe_query.where(SwipeHistory.action == SwipeAction.DISCARD).subquery())
             )
-        ).scalar()
+        ).scalar() or 0
 
         return {
-            "pending": all_count - kept_count - discarded_count,
+            "pending": pending_count,
             "kept": kept_count,
             "discarded": discarded_count,
         }
 
-    async def count_all(self, user_id: int) -> int:
+    async def count_all(
+        self,
+        user_id: int,
+        status: ContentStatus | None = None,
+        platform: str | None = None,
+    ) -> int:
         """Count total non-deleted content rows for a user.
 
         Args:
             user_id: User ID to count content for.
+            status: Optional status filter.
+            platform: Optional platform filter (case-insensitive).
 
         Returns:
             Total count of non-deleted content rows.
         """
-        result = await self.session.execute(
-            select(func.count()).where(Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
-        )
+        query = select(func.count()).where(Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
+        if status is not None:
+            query = query.where(Content.status == status)
+        if platform:
+            query = query.where(Content.platform.ilike(platform))
+        result = await self.session.execute(query)
         return result.scalar_one()
 
     async def count_pending(self, user_id: int) -> int:
@@ -568,12 +594,10 @@ class ContentRepository(BaseRepository[Content]):
                 .where(Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
                 .outerjoin(ContentTag, Content.id == ContentTag.content_id)
                 .where(
-                    (Content.title.isnot(None))
-                    & (
-                        (Content.title.ilike(query_pattern))
-                        | (Content.author.ilike(query_pattern))
-                        | (ContentTag.tag.ilike(query_pattern))
-                    )
+                    (Content.title.ilike(query_pattern))
+                    | (Content.url.ilike(query_pattern))
+                    | (Content.author.ilike(query_pattern))
+                    | (ContentTag.tag.ilike(query_pattern))
                 )
                 .distinct()
                 .subquery()
@@ -589,6 +613,8 @@ class ContentRepository(BaseRepository[Content]):
         offset: int = 0,
         cursor_created_at: datetime | None = None,
         cursor_id: int | None = None,
+        status: ContentStatus | None = None,
+        platform: str | None = None,
     ) -> list[Content]:
         """Get all content ordered by creation date (newest first).
 
@@ -596,6 +622,8 @@ class ContentRepository(BaseRepository[Content]):
             user_id: Optional user ID to filter content by.
             limit: Maximum number of results.
             offset: Pagination offset.
+            status: Optional status filter (INBOX, ARCHIVED).
+            platform: Optional platform filter (case-insensitive).
 
         Returns:
             List of Content objects ordered by created_at descending.
@@ -615,6 +643,10 @@ class ContentRepository(BaseRepository[Content]):
         query = query.limit(limit)
         if user_id is not None:
             query = query.where(Content.user_id == user_id)
+        if status is not None:
+            query = query.where(Content.status == status)
+        if platform:
+            query = query.where(Content.platform.ilike(platform))
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
@@ -861,24 +893,39 @@ class SwipeRepository(BaseRepository[SwipeHistory]):
             List of created SwipeHistory objects.
         """
         now = utc_now()
-        histories = [
-            SwipeHistory(
-                content_id=content_id,
-                action=action,
-                user_id=user_id,
-                swiped_at=now,
-            )
+
+        # Use INSERT OR IGNORE (on_conflict_do_nothing) so duplicate
+        # (user_id, content_id) rows from iOS retries are silently skipped
+        # instead of raising IntegrityError and rolling back the whole batch.
+        rows = [
+            {
+                "content_id": content_id,
+                "action": action,
+                "user_id": user_id,
+                "swiped_at": now,
+            }
             for content_id, action in actions
         ]
+        stmt = sqlite_insert(SwipeHistory).values(rows).on_conflict_do_nothing()
+        await self.session.execute(stmt)
 
-        self.session.add_all(histories)
+        # Mirror single-swipe logic: archive content for every DISCARD action.
+        # Run unconditionally so retried DISCARDs remain idempotent.
+        for content_id, action in actions:
+            if action == SwipeAction.DISCARD:
+                await self._update_content_status(content_id, user_id, ContentStatus.ARCHIVED)
+
         await self.session.commit()
 
-        # Refresh each object to populate IDs
-        for h in histories:
-            await self.session.refresh(h)
-
-        return histories
+        # Fetch the canonical rows (covers both newly inserted and pre-existing).
+        content_ids = [content_id for content_id, _ in actions]
+        result = await self.session.execute(
+            select(SwipeHistory).where(
+                SwipeHistory.user_id == user_id,
+                SwipeHistory.content_id.in_(content_ids),
+            )
+        )
+        return list(result.scalars().all())
 
 
 class UserProfileRepository(BaseRepository[UserProfile]):
@@ -1287,7 +1334,10 @@ class AccountDeletionRepository(BaseRepository[AccountDeletion]):
             return False, None
 
         # Check if block has expired
-        if deletion.block_expires_at < now:
+        # Normalise to naive UTC for comparison: SQLite stores naive datetimes;
+        # utc_now() returns timezone-aware. Strip tzinfo from now for comparison.
+        now_naive = now.replace(tzinfo=None)
+        if deletion.block_expires_at < now_naive:
             return False, None
 
         return True, deletion.block_expires_at

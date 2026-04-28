@@ -38,29 +38,52 @@ def _cursor_filter_context(platform: str | None, tags: list[str] | None) -> dict
     }
 
 
-@router.post("/swipe", status_code=201, response_model=SwipeResponse | SwipeBatchResponse)
-async def record_swipe(
-    data: SwipeCreate | SwipeBatchRequest,
+@router.post("/swipe/batch", status_code=201, response_model=SwipeBatchResponse)
+async def record_swipe_batch(
+    data: SwipeBatchRequest,
     user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> SwipeResponse | SwipeBatchResponse:
-    """Record a swipe action (single or batch)."""
+) -> SwipeBatchResponse:
+    """Record a batch of swipe actions."""
     service = SwipeService(db)
-
-    if isinstance(data, SwipeBatchRequest):
-        actions = [(a.content_id, a.action) for a in data.actions]
+    actions = [(a.content_id, a.action) for a in data.actions]
+    try:
         result = await service.record_swipes_batch(actions, user_id=user_id)
-        return SwipeBatchResponse(
-            recorded=result.recorded,
-            results=[SwipeResponse(id=r.id, content_id=r.content_id, action=r.action.value) for r in result.results],
-        )
-    else:
+    except ValueError as exc:
+        if str(exc) == "content_not_found":
+            raise HTTPException(
+                status_code=404,
+                detail={"error": "content_not_found", "message": "Content not found."},
+            ) from exc
+        raise
+    return SwipeBatchResponse(
+        recorded=result.recorded,
+        results=[SwipeResponse(id=r.id, content_id=r.content_id, action=r.action.value) for r in result.results],
+    )
+
+
+@router.post("/swipe", status_code=201, response_model=SwipeResponse)
+async def record_swipe(
+    data: SwipeCreate,
+    user_id: int = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> SwipeResponse:
+    """Record a single swipe action."""
+    service = SwipeService(db)
+    try:
         result = await service.record_swipe(data.content_id, data.action, user_id=user_id)
-        return SwipeResponse(
-            id=result.id,
-            content_id=result.content_id,
-            action=result.action.value,
-        )
+    except ValueError as exc:
+        if str(exc) == "content_not_found":
+            raise HTTPException(
+                status_code=404,
+                detail={"error": "content_not_found", "message": "Content not found."},
+            ) from exc
+        raise
+    return SwipeResponse(
+        id=result.id,
+        content_id=result.content_id,
+        action=result.action.value,
+    )
 
 
 @router.get("/content/pending", response_model=PaginatedContentResponse)
@@ -120,6 +143,7 @@ async def list_pending_content(
         items=[ContentResponse.from_content(c) for c in contents],
         has_more=has_more,
         total=total,
+        pagination_mode="cursor" if is_cursor_mode else "offset",
         next_offset=next_offset,
         next_cursor=next_cursor,
     )
@@ -184,6 +208,7 @@ async def list_kept_content(
         items=[ContentResponse.from_content(c) for c in contents],
         has_more=has_more,
         total=total,
+        pagination_mode="cursor" if is_cursor_mode else "offset",
         next_offset=next_offset,
         next_cursor=next_cursor,
     )
@@ -248,6 +273,7 @@ async def list_discarded_content(
         items=[ContentResponse.from_content(c) for c in contents],
         has_more=has_more,
         total=total,
+        pagination_mode="cursor" if is_cursor_mode else "offset",
         next_offset=next_offset,
         next_cursor=next_cursor,
     )

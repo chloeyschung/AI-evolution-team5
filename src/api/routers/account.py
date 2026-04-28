@@ -76,7 +76,7 @@ async def delete_account(
     user = result.scalar_one_or_none()
 
     if not user:
-        raise HTTPException(status_code=404, detail=ErrorCode.USER_NOT_FOUND)
+        raise HTTPException(status_code=404, detail={"error": ErrorCode.USER_NOT_FOUND, "message": "User not found."})
 
     # Two-step confirmation logic
     if not data.confirm:

@@ -289,13 +289,13 @@ class ReminderEngine:
         )
         return log.id
 
-    async def log_action_taken(self, log_id: int) -> bool:
+    async def log_action_taken(self, user_id: int, log_id: int) -> bool:
         """Log that user took action on a reminder."""
-        return await self._log_repo.mark_action_taken(log_id)
+        return await self._log_repo.mark_action_taken(user_id, log_id)
 
-    async def log_dismissed(self, log_id: int) -> bool:
+    async def log_dismissed(self, user_id: int, log_id: int) -> bool:
         """Log that user dismissed a reminder."""
-        return await self._log_repo.mark_dismissed(log_id)
+        return await self._log_repo.mark_dismissed(user_id, log_id)
 
 
 class ActivityPatternLearner:

@@ -184,10 +184,10 @@ async def get_reminder_preferences(
 
     return ReminderPreferencesResponse(
         is_enabled=bool(preference.is_enabled),
-        preferred_time=preference.preferred_time.isoformat() if preference.preferred_time else None,
+        preferred_time=preference.preferred_time.strftime("%H:%M:%S") if preference.preferred_time else None,
         frequency=preference.frequency,
-        quiet_hours_start=preference.quiet_hours_start.isoformat() if preference.quiet_hours_start else None,
-        quiet_hours_end=preference.quiet_hours_end.isoformat() if preference.quiet_hours_end else None,
+        quiet_hours_start=preference.quiet_hours_start.strftime("%H:%M:%S") if preference.quiet_hours_start else None,
+        quiet_hours_end=preference.quiet_hours_end.strftime("%H:%M:%S") if preference.quiet_hours_end else None,
         backlog_threshold=preference.backlog_threshold,
     )
 
@@ -257,10 +257,10 @@ async def update_reminder_preferences(
 
     return ReminderPreferencesResponse(
         is_enabled=bool(preference.is_enabled),
-        preferred_time=preference.preferred_time.isoformat() if preference.preferred_time else None,
+        preferred_time=preference.preferred_time.strftime("%H:%M:%S") if preference.preferred_time else None,
         frequency=preference.frequency,
-        quiet_hours_start=preference.quiet_hours_start.isoformat() if preference.quiet_hours_start else None,
-        quiet_hours_end=preference.quiet_hours_end.isoformat() if preference.quiet_hours_end else None,
+        quiet_hours_start=preference.quiet_hours_start.strftime("%H:%M:%S") if preference.quiet_hours_start else None,
+        quiet_hours_end=preference.quiet_hours_end.strftime("%H:%M:%S") if preference.quiet_hours_end else None,
         backlog_threshold=preference.backlog_threshold,
     )
 
@@ -317,11 +317,14 @@ async def respond_to_reminder(
     engine = ReminderEngine(db)
 
     if request.action == "acted":
-        success = await engine.log_action_taken(request.reminder_id)
+        success = await engine.log_action_taken(user_id, request.reminder_id)
     else:  # dismissed
-        success = await engine.log_dismissed(request.reminder_id)
+        success = await engine.log_dismissed(user_id, request.reminder_id)
 
     if success:
         return ReminderRespondResponse(success=True, message="Response recorded")
     else:
-        return ReminderRespondResponse(success=False, message="Reminder not found or already responded")
+        raise HTTPException(
+            status_code=404,
+            detail={"error": "reminder_not_found", "message": "Reminder not found."},
+        )

@@ -54,20 +54,47 @@ class URLShareProcessor(BaseShareProcessor):
 
     async def process(self, share_data: ShareData) -> ContentMetadata:
         url = validate_non_empty(share_data.content, "URL content is empty.")
+        metadata_hints = share_data.metadata or {}
+        options = share_data.options or {}
+        auto_summarize = options.get("auto_summarize", True)
 
-        text_content = None
+        raw_html: str | None = None
+        text_content: str | None = None
         try:
-            text_content = await self._content_extractor.extract_text(url)
+            raw_html, text_content = await self._content_extractor.fetch_html_and_text(url)
         except Exception as e:
-            logging.warning(f"Failed to extract text content from {url}: {e}")
+            logging.warning(f"Failed to extract content from {url}: {e}")
 
-        metadata = await self._metadata_extractor.extract_metadata(url, html_content=text_content)
+        # Pass raw HTML so MetadataExtractor can parse og:title, <title>, etc.
+        metadata = await self._metadata_extractor.extract_metadata(url, html_content=raw_html)
+        metadata = self._apply_extension_hints(metadata, metadata_hints, share_data.source_platform)
 
-        if self._summarizer and text_content:
+        if self._summarizer and text_content and auto_summarize:
             try:
                 metadata.summary = await self._summarizer.summarize(text_content)
             except Exception as e:
                 logging.warning(f"Failed to generate summary for {url}: {e}")
+
+        return metadata
+
+    def _apply_extension_hints(
+        self,
+        metadata: ContentMetadata,
+        hints: dict,
+        source_platform: str | None,
+    ) -> ContentMetadata:
+        hinted_title = hints.get("title")
+        hinted_author = hints.get("author")
+        hinted_content_type = _parse_content_type(hints.get("content_type"))
+
+        if hinted_title and isinstance(hinted_title, str):
+            metadata.title = hinted_title.strip() or metadata.title
+        if hinted_author and isinstance(hinted_author, str):
+            metadata.author = hinted_author.strip() or metadata.author
+        if hinted_content_type:
+            metadata.content_type = hinted_content_type
+        if source_platform and source_platform.lower() not in {"", "web"}:
+            metadata.platform = source_platform.capitalize()
 
         return metadata
 
@@ -81,22 +108,39 @@ class PlainTextProcessor(BaseShareProcessor):
 
     async def process(self, share_data: ShareData) -> ContentMetadata:
         text = validate_non_empty(share_data.content, "Plain text content is empty.")
+        hints = share_data.metadata or {}
+        hinted_url = hints.get("url")
+        hinted_title = hints.get("title")
+        hinted_author = hints.get("author")
+        hinted_content_type = _parse_content_type(hints.get("content_type")) or ContentType.ARTICLE
 
         # Check if text contains a URL
         url_match = URL_EXTRACTION_PATTERN.search(text)
         if url_match:
             return ContentMetadata(
                 platform="Web",
-                content_type=ContentType.ARTICLE,
+                content_type=hinted_content_type,
                 url=url_match.group(),
+                title=hinted_title if isinstance(hinted_title, str) else None,
+                author=hinted_author if isinstance(hinted_author, str) else None,
+            )
+
+        if isinstance(hinted_url, str) and hinted_url.strip() and is_http_url(hinted_url.strip()):
+            return ContentMetadata(
+                platform=share_data.source_platform or "web",
+                content_type=hinted_content_type,
+                url=hinted_url.strip(),
+                title=hinted_title if isinstance(hinted_title, str) else None,
+                author=hinted_author if isinstance(hinted_author, str) else None,
             )
 
         title = text[:100] if len(text) > 100 else text
         return ContentMetadata(
             platform="clipboard",
-            content_type=ContentType.ARTICLE,
+            content_type=hinted_content_type,
             url="",
-            title=title,
+            title=(hinted_title if isinstance(hinted_title, str) and hinted_title.strip() else title),
+            author=hinted_author if isinstance(hinted_author, str) else None,
         )
 
 
@@ -193,3 +237,26 @@ class ImageProcessor(BaseShareProcessor):
         if is_http_url(data):
             return True
         return any(data.endswith(ext) for ext in self.IMAGE_EXTENSIONS)
+
+
+def _parse_content_type(value: object) -> ContentType | None:
+    if not isinstance(value, str):
+        return None
+
+    normalized = value.strip().lower()
+    if not normalized:
+        return None
+
+    alias_map = {
+        "social": ContentType.SOCIAL_POST,
+        "text": ContentType.ARTICLE,
+        "unknown": ContentType.ARTICLE,
+    }
+    mapped = alias_map.get(normalized)
+    if mapped:
+        return mapped
+
+    try:
+        return ContentType(normalized)
+    except ValueError:
+        return None

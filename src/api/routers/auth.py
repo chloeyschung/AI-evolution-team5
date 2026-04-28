@@ -155,7 +155,7 @@ async def refresh_auth_token(
             detail={"error": ErrorCode.INVALID_REFRESH_TOKEN, "message": "Invalid or expired refresh token."},
         )
 
-    token_record, access_token = refresh_result
+    token_record, access_token, raw_refresh_token = refresh_result
 
     # Log refresh event — token_record already has user_id, commit happens inside refresh_access_token
     audit = AuditRepository(db)
@@ -168,7 +168,7 @@ async def refresh_auth_token(
 
     return TokenRefreshResponse(
         access_token=access_token,  # Plaintext JWT for client
-        refresh_token=token_record.refresh_token,  # Rotated refresh token
+        refresh_token=raw_refresh_token,  # Rotated refresh token (plaintext)
         expires_at=serialize_datetime(token_record.expires_at),
     )
 
@@ -267,8 +267,8 @@ async def google_login(
         )
         await email_auth_repo.mark_email_verified(method.id)
 
-    # Create authentication tokens (returns tuple of record and plaintext JWT)
-    token_record, access_token = await auth_repo.create_tokens(existing_user.id)
+    # Create authentication tokens (returns tuple of record, plaintext JWT, plaintext refresh token)
+    token_record, access_token, raw_refresh_token = await auth_repo.create_tokens(existing_user.id)
 
     ip = request.client.host if request.client else None
     audit = AuditRepository(db)
@@ -282,7 +282,7 @@ async def google_login(
 
     return GoogleLoginResponse(
         access_token=access_token,  # Plaintext JWT for client
-        refresh_token=token_record.refresh_token,
+        refresh_token=raw_refresh_token,
         expires_at=serialize_datetime(token_record.expires_at),
         user=UserProfileResponse(
             id=existing_user.id,
@@ -299,8 +299,9 @@ async def google_login(
 
 
 @router.post("/auth/google/code", status_code=200, response_model=GoogleLoginResponse)
+@limiter.limit("5/minute")
 async def google_login_with_code(
-    http_request: Request,
+    request: Request,
     data: GoogleOAuthCodeRequest,
     db: AsyncSession = Depends(get_db),
 ) -> GoogleLoginResponse:
@@ -415,10 +416,10 @@ async def google_login_with_code(
         )
         await email_auth_repo.mark_email_verified(method.id)
 
-    # Create authentication tokens (returns tuple of record and plaintext JWT)
-    token_record, access_token = await auth_repo.create_tokens(existing_user.id)
+    # Create authentication tokens (returns tuple of record, plaintext JWT, plaintext refresh token)
+    token_record, access_token, raw_refresh_token = await auth_repo.create_tokens(existing_user.id)
 
-    ip = http_request.client.host if http_request.client else None
+    ip = request.client.host if request.client else None
     audit = AuditRepository(db)
     await audit.log_event(
         AuditEventType.LOGIN_SUCCESS,
@@ -430,7 +431,7 @@ async def google_login_with_code(
 
     return GoogleLoginResponse(
         access_token=access_token,  # Plaintext JWT for client
-        refresh_token=token_record.refresh_token,
+        refresh_token=raw_refresh_token,
         expires_at=serialize_datetime(token_record.expires_at),
         user=UserProfileResponse(
             id=existing_user.id,
@@ -569,7 +570,7 @@ async def login_email(
         await audit.log_event(
             AuditEventType.LOGIN_FAILURE,
             ip_address=ip,
-            metadata={"reason": "user_not_found", "email": normalized_email},
+            metadata={"reason": "user_not_found", "email_hmac": provider_id},
         )
         await db.commit()
         raise HTTPException(
@@ -616,7 +617,7 @@ async def login_email(
     user_repo = UserProfileRepository(db)
     await user_repo.update_last_login(user.id)
     auth_repo = AuthenticationRepository(db)
-    token_record, access_token = await auth_repo.create_tokens(user.id)
+    token_record, access_token, raw_refresh_token = await auth_repo.create_tokens(user.id)
 
     await audit.log_event(
         AuditEventType.LOGIN_SUCCESS,
@@ -627,7 +628,7 @@ async def login_email(
 
     return LoginResponse(
         access_token=access_token,
-        refresh_token=token_record.refresh_token,
+        refresh_token=raw_refresh_token,
         expires_at=serialize_datetime(token_record.expires_at),
         user_id=user.id,
         email=user.email,
@@ -635,12 +636,14 @@ async def login_email(
 
 
 @router.post("/auth/password-reset/request", response_model=PasswordResetRequestResponse)
+@limiter.limit("3/minute")
 async def password_reset_request(
-    request: PasswordResetRequestSchema,
+    request: Request,
+    data: PasswordResetRequestSchema,
     db: AsyncSession = Depends(get_db),
 ) -> PasswordResetRequestResponse:
     email_repo = EmailAuthRepository(db)
-    normalized_email = _normalize_email(request.email)
+    normalized_email = _normalize_email(data.email)
     provider_id = hmac_email(normalized_email)
     method = await email_repo.get_auth_method_by_provider(AuthProvider.EMAIL_PASSWORD, provider_id)
 
@@ -660,12 +663,14 @@ async def password_reset_request(
 
 
 @router.post("/auth/password-reset/confirm", response_model=PasswordResetConfirmResponse)
+@limiter.limit("5/minute")
 async def password_reset_confirm(
-    request: PasswordResetConfirmSchema,
+    request: Request,
+    data: PasswordResetConfirmSchema,
     db: AsyncSession = Depends(get_db),
 ) -> PasswordResetConfirmResponse:
     email_repo = EmailAuthRepository(db)
-    token_hash = _hash_token(request.token)
+    token_hash = _hash_token(data.token)
     token_rec = await email_repo.consume_reset_token(token_hash)
     if token_rec is None:
         raise HTTPException(
@@ -686,7 +691,7 @@ async def password_reset_confirm(
             detail={"error": "invalid_or_expired_token", "message": "Password reset token is invalid or has expired."},
         )
 
-    method.password_hash = hash_password(request.new_password)
+    method.password_hash = hash_password(data.new_password)
     await db.commit()
     return PasswordResetConfirmResponse(message="Password updated. You can now sign in.")
 
@@ -728,7 +733,9 @@ async def link_account(
 
 
 @router.post("/auth/logout", response_model=LogoutResponse)
+@limiter.limit("10/minute")
 async def logout(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user_id: int = Depends(get_current_user),
 ) -> LogoutResponse:

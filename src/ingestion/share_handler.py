@@ -97,6 +97,7 @@ class ShareHandler:
             content=raw_data.get("content", ""),
             metadata=raw_data.get("metadata"),
             source_platform=raw_data.get("platform"),
+            options=raw_data.get("options"),
         )
 
         processor = self._route_to_processor(share_data)

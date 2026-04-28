@@ -60,6 +60,10 @@ async def verify_google_id_token(id_token: str, client_id: str | None = None) ->
 
             token_info = response.json()
 
+            # Assert audience matches expected client ID to prevent token substitution attacks
+            if client_id and token_info.get("aud") != client_id:
+                raise GoogleTokenVerificationError("Token audience does not match expected client ID.")
+
             # Check for error in response
             if "error" in token_info:
                 raise GoogleTokenVerificationError(f"Google token verification error: {token_info['error']}")

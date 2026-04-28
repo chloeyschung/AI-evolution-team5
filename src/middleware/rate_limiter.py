@@ -20,4 +20,8 @@ def rate_limit_exceeded_handler(request, exc: RateLimitExceeded):
     """
     from fastapi.responses import JSONResponse
 
-    return JSONResponse(status_code=429, content={"detail": "Rate limit exceeded. Please try again later."})
+    return JSONResponse(
+        status_code=429,
+        content={"error": "rate_limit_exceeded", "message": "Rate limit exceeded. Please try again later.", "code": 429, "details": None},
+        headers=getattr(exc, "headers", {}),
+    )

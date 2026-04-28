@@ -48,8 +48,11 @@ from src.data import database as db_module
 # File-based avoids issues with in-memory DB not persisting across connections
 import os
 
-# Use a fixed test database file in the project root
-TEST_DATABASE_PATH = "test_briefly.db"
+# Use a temp-dir SQLite file so tests don't depend on repo mount permissions.
+# Some environments mount the repo path as read-only for SQLite write/locking.
+import tempfile
+
+TEST_DATABASE_PATH = os.path.join(tempfile.gettempdir(), "briefly_test_briefly.db")
 TEST_DATABASE_URL = f"sqlite+aiosqlite:///{TEST_DATABASE_PATH}"
 
 test_async_engine = create_async_engine(

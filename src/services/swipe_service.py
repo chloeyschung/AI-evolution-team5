@@ -7,7 +7,7 @@ from the API layer and repository layer.
 from dataclasses import dataclass, field
 
 from src.data.models import SwipeAction
-from src.data.repository import SwipeRepository
+from src.data.repository import ContentRepository, SwipeRepository
 from .event_bus import ContentSwipedEvent, event_bus
 
 
@@ -41,8 +41,15 @@ class SwipeService:
         Args:
             db_session: Async database session.
         """
+        self._content_repo = ContentRepository(db_session)
         self._swipe_repo = SwipeRepository(db_session)
         self._event_bus = event_bus
+
+    async def _assert_content_owned(self, content_id: int, user_id: int) -> None:
+        """Ensure the referenced content exists and belongs to the actor."""
+        content = await self._content_repo.get_by_id(content_id)
+        if content is None or content.user_id != user_id:
+            raise ValueError("content_not_found")
 
     async def record_swipe(
         self,
@@ -60,6 +67,7 @@ class SwipeService:
         Returns:
             Swipe result with ID and action.
         """
+        await self._assert_content_owned(content_id, user_id)
         history = await self._swipe_repo.record_swipe(content_id, action, user_id)
 
         # Publish event for side effects (achievement checking, analytics, etc.)
@@ -91,6 +99,10 @@ class SwipeService:
         Returns:
             Batch swipe result with count and individual results.
         """
+        # Validate ownership for every content reference before mutating any rows.
+        # This keeps batch behavior atomic from an authorization perspective.
+        for content_id, _action in actions:
+            await self._assert_content_owned(content_id, user_id)
         histories = await self._swipe_repo.record_swipes_batch(actions, user_id)
 
         # Publish events for each swipe (for side effects)

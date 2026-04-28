@@ -13,6 +13,9 @@ from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
+# Increment this when making breaking API changes — iOS clients check X-API-Version to detect deploys
+_API_VERSION = "1"
+
 
 def _apply_security_headers(response: Response) -> Response:
     """Attach SEC-001 headers to a response object."""
@@ -32,6 +35,13 @@ def _apply_security_headers(response: Response) -> Response:
 
     # Block cross-domain policies (Flash, JavaApplets)
     response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
+
+    # Enforce HTTPS for 1 year, including subdomains
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
+    # Let iOS clients detect breaking API changes after OTA backend deploys
+    response.headers["X-API-Version"] = _API_VERSION
+
     return response
 
 

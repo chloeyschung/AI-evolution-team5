@@ -13,9 +13,10 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...constants import ErrorCode, Provider
-from ...data.database import get_db
+from ...data.database import AsyncSessionLocal, get_db
 from ...data.models import AuditEventType, IntegrationSyncConfig, utc_now
 from ...data.repository import AuditRepository, ContentRepository
+from ...utils.datetime_utils import serialize_datetime
 from ..dependencies import get_current_user
 from ..schemas import (
     LinkedInConnectionStatus,
@@ -84,7 +85,7 @@ async def get_youtube_connection_status(
 
     return YouTubeConnectionStatus(
         is_connected=True,
-        last_sync_at=last_sync_at.isoformat() if last_sync_at else None,
+        last_sync_at=serialize_datetime(last_sync_at),
     )
 
 
@@ -113,7 +114,7 @@ async def list_youtube_playlists(
     youtube_tokens = await repo.get_tokens(user_id, Provider.YOUTUBE.value)
 
     if not youtube_tokens:
-        raise HTTPException(status_code=401, detail=ErrorCode.NOT_CONNECTED_TO_YOUTUBE)
+        raise HTTPException(status_code=401, detail={"error": ErrorCode.NOT_CONNECTED_TO_YOUTUBE, "message": "YouTube account is not connected. Please link your YouTube account first."})
 
     # Create YouTube client and fetch playlists
     client = YouTubeClient(
@@ -127,7 +128,7 @@ async def list_youtube_playlists(
     except YouTubeAuthError:
         # Token expired, delete it
         await repo.delete_tokens(user_id, Provider.YOUTUBE.value)
-        raise HTTPException(status_code=401, detail=ErrorCode.YOUTUBE_AUTH_EXPIRED) from None
+        raise HTTPException(status_code=401, detail={"error": ErrorCode.YOUTUBE_AUTH_EXPIRED, "message": "YouTube session has expired. Please reconnect your YouTube account."}) from None
 
     return [
         YouTubePlaylistResponse(
@@ -169,7 +170,7 @@ async def create_youtube_sync_config(
     youtube_tokens = await repo.get_tokens(user_id, Provider.YOUTUBE.value)
 
     if not youtube_tokens:
-        raise HTTPException(status_code=401, detail=ErrorCode.NOT_CONNECTED_TO_YOUTUBE)
+        raise HTTPException(status_code=401, detail={"error": ErrorCode.NOT_CONNECTED_TO_YOUTUBE, "message": "YouTube account is not connected. Please link your YouTube account first."})
 
     # Create sync config
     config = await repo.save_sync_config(
@@ -194,7 +195,7 @@ async def create_youtube_sync_config(
         playlist_name=db_config.resource_name,
         sync_frequency=db_config.sync_frequency,
         is_active=bool(db_config.is_active),
-        last_sync_at=db_config.last_sync_at.isoformat() if db_config.last_sync_at else None,
+        last_sync_at=serialize_datetime(db_config.last_sync_at) if db_config.last_sync_at else None,
     )
 
 
@@ -240,7 +241,7 @@ async def list_youtube_sync_configs(
             sync_frequency=c.sync_frequency,
             is_active=c.is_active,
             last_sync_at=(
-                db_config_map[c.playlist_id].last_sync_at.isoformat()
+                serialize_datetime(db_config_map[c.playlist_id].last_sync_at)
                 if c.playlist_id in db_config_map and db_config_map[c.playlist_id].last_sync_at
                 else None
             ),
@@ -284,7 +285,7 @@ async def update_youtube_sync_config(
             break
 
     if not existing:
-        raise HTTPException(status_code=404, detail=ErrorCode.SYNC_CONFIG_NOT_FOUND)
+        raise HTTPException(status_code=404, detail={"error": ErrorCode.SYNC_CONFIG_NOT_FOUND, "message": "Sync configuration not found for this playlist."})
 
     # Update config
     new_name = data.playlist_name if data.playlist_name is not None else existing.playlist_name
@@ -315,7 +316,7 @@ async def update_youtube_sync_config(
         playlist_name=updated.resource_name,
         sync_frequency=updated.sync_frequency,
         is_active=bool(updated.is_active),
-        last_sync_at=db_config.last_sync_at.isoformat() if db_config and db_config.last_sync_at else None,
+        last_sync_at=serialize_datetime(db_config.last_sync_at) if db_config and db_config.last_sync_at else None,
     )
 
 
@@ -346,7 +347,7 @@ async def delete_youtube_sync_config(
     deleted = await repo.delete_sync_config(user_id, Provider.YOUTUBE.value, playlist_id)
 
     if not deleted:
-        raise HTTPException(status_code=404, detail=ErrorCode.SYNC_CONFIG_NOT_FOUND)
+        raise HTTPException(status_code=404, detail={"error": ErrorCode.SYNC_CONFIG_NOT_FOUND, "message": "Sync configuration not found for this playlist."})
 
     return {"message": "Sync configuration deleted successfully"}
 
@@ -386,7 +387,7 @@ async def list_youtube_sync_logs(
             ingested_count=log.ingested_count,
             skipped_count=log.skipped_count,
             error_message=log.error_message,
-            executed_at=log.executed_at.isoformat(),
+            executed_at=serialize_datetime(log.executed_at),
         )
         for log in logs
     ]
@@ -422,7 +423,7 @@ async def trigger_youtube_sync(
     youtube_tokens = await integration_repo.get_tokens(user_id, Provider.YOUTUBE.value)
 
     if not youtube_tokens:
-        raise HTTPException(status_code=401, detail=ErrorCode.NOT_CONNECTED_TO_YOUTUBE)
+        raise HTTPException(status_code=401, detail={"error": ErrorCode.NOT_CONNECTED_TO_YOUTUBE, "message": "YouTube account is not connected. Please link your YouTube account first."})
 
     # Create clients
     youtube_client = YouTubeClient(
@@ -447,12 +448,12 @@ async def trigger_youtube_sync(
     )
 
     # Trigger sync (run in background to avoid blocking)
-    async def do_sync():
+    async def do_sync(background_db, bg_integration_repo, bg_sync_service):
         try:
             if playlist_id:
-                result = await sync_service.sync_playlist(user_id, playlist_id)
+                result = await bg_sync_service.sync_playlist(user_id, playlist_id)
                 status = "success" if not result.errors else "partial"
-                await integration_repo.log_sync(
+                await bg_integration_repo.log_sync(
                     user_id=user_id,
                     provider=Provider.YOUTUBE.value,
                     resource_id=playlist_id,
@@ -461,12 +462,12 @@ async def trigger_youtube_sync(
                     skipped_count=result.skipped,
                     error_message=None if not result.errors else str(result.errors),
                 )
-                await db.commit()  # Ensure sync log is persisted
+                await background_db.commit()  # Ensure sync log is persisted
             else:
-                results = await sync_service.sync_all_playlists(user_id)
+                results = await bg_sync_service.sync_all_playlists(user_id)
                 for pid, result in results.items():
                     status = "success" if not result.errors else "partial"
-                    await integration_repo.log_sync(
+                    await bg_integration_repo.log_sync(
                         user_id=user_id,
                         provider=Provider.YOUTUBE.value,
                         resource_id=pid,
@@ -475,10 +476,10 @@ async def trigger_youtube_sync(
                         skipped_count=result.skipped,
                         error_message=None if not result.errors else str(result.errors),
                     )
-                    await db.commit()  # Ensure sync log is persisted
+                    await background_db.commit()  # Ensure sync log is persisted
         except Exception as e:
             resource = playlist_id or "all"
-            await integration_repo.log_sync(
+            await bg_integration_repo.log_sync(
                 user_id=user_id,
                 provider=Provider.YOUTUBE.value,
                 resource_id=resource,
@@ -487,18 +488,35 @@ async def trigger_youtube_sync(
                 skipped_count=0,
                 error_message=str(e),
             )
-            await db.commit()  # Ensure error log is persisted
+            await background_db.commit()  # Ensure error log is persisted
 
     # Schedule background task with exception handling and tracking
     async def background_task_wrapper():
         """Wrapper to ensure exceptions don't crash the process.
+
+        Opens a fresh DB session independent of the request-scoped session so
+        that the task continues to run safely after the HTTP response is returned
+        and get_db closes the request session.
 
         TODO #2 (2026-04-14): Uses _background_tasks_lock for thread-safe task management.
         """
         current_task = asyncio.current_task()
         try:
             logging.info("YouTube sync background task started")
-            await do_sync()
+            async with AsyncSessionLocal() as background_db:
+                from src.data.repository import ContentRepository
+                from src.integrations.repositories.integration import IntegrationRepository
+                from src.integrations.youtube.sync import YouTubeSyncService
+
+                bg_integration_repo = IntegrationRepository(background_db)
+                bg_content_repo = ContentRepository(background_db)
+                bg_sync_service = YouTubeSyncService(
+                    youtube_client=youtube_client,
+                    content_repo=bg_content_repo,
+                    integration_repo=bg_integration_repo,
+                    summarizer=summarizer,
+                )
+                await do_sync(background_db, bg_integration_repo, bg_sync_service)
             logging.info("YouTube sync background task completed")
         except Exception as e:
             # Log unhandled exceptions (should not happen due to do_sync try/except)
@@ -545,7 +563,7 @@ async def connect_youtube(
     # Get OAuth credentials
     client_id = os.getenv("YOUTUBE_CLIENT_ID")
     if not client_id:
-        raise HTTPException(status_code=500, detail=ErrorCode.YOUTUBE_OAUTH_NOT_CONFIGURED)
+        raise HTTPException(status_code=500, detail={"error": ErrorCode.YOUTUBE_OAUTH_NOT_CONFIGURED, "message": "YouTube OAuth is not configured on this server."})
 
     # Build OAuth URL
     scope = "https://www.googleapis.com/auth/youtube.readonly"
@@ -604,14 +622,14 @@ async def youtube_callback(
     repo = IntegrationRepository(db)
     user_id = await repo.get_and_consume_oauth_state(state, Provider.YOUTUBE.value)
     if user_id is None:
-        raise HTTPException(status_code=400, detail=ErrorCode.INVALID_STATE)
+        raise HTTPException(status_code=400, detail={"error": ErrorCode.INVALID_STATE, "message": "Invalid or expired OAuth state token. Please restart the connection flow."})
 
     # Get OAuth credentials
     client_id = os.getenv("YOUTUBE_CLIENT_ID")
     client_secret = os.getenv("YOUTUBE_CLIENT_SECRET")
 
     if not client_id or not client_secret:
-        raise HTTPException(status_code=500, detail=ErrorCode.YOUTUBE_OAUTH_NOT_CONFIGURED)
+        raise HTTPException(status_code=500, detail={"error": ErrorCode.YOUTUBE_OAUTH_NOT_CONFIGURED, "message": "YouTube OAuth is not configured on this server."})
 
     redirect_uri = os.getenv("YOUTUBE_REDIRECT_URI", "http://localhost:8000/api/v1/integrations/youtube/callback")
 
@@ -630,9 +648,21 @@ async def youtube_callback(
         )
 
     if response.status_code != 200:
-        raise HTTPException(status_code=400, detail=ErrorCode.YOUTUBE_AUTH_FAILED)
+        raise HTTPException(status_code=400, detail={"error": ErrorCode.YOUTUBE_AUTH_FAILED, "message": "Failed to authenticate with YouTube. Please try connecting again."})
 
     token_data = response.json()
+
+    # Google only sends refresh_token on first authorization; on re-consent it may be absent.
+    # Fall back to the existing stored token to avoid KeyError on re-consent.
+    new_refresh_token = token_data.get("refresh_token")
+    if new_refresh_token is None:
+        existing_tokens = await repo.get_tokens(user_id, Provider.YOUTUBE.value)
+        if existing_tokens is None:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": "missing_refresh_token", "message": "YouTube did not return a refresh token. Please disconnect and reconnect your account."},
+            )
+        new_refresh_token = existing_tokens.get_refresh_token()
 
     # Store tokens
     expires_at = utc_now() + timedelta(seconds=token_data.get("expires_in", 3600))
@@ -641,7 +671,7 @@ async def youtube_callback(
         user_id=user_id,
         provider=Provider.YOUTUBE.value,
         access_token=token_data["access_token"],
-        refresh_token=token_data["refresh_token"],
+        refresh_token=new_refresh_token,
         expires_at=expires_at,
     )
 
@@ -753,7 +783,7 @@ async def get_linkedin_status(
 
     return LinkedInConnectionStatus(
         is_connected=True,
-        last_sync_at=last_sync.isoformat() if last_sync else None,
+        last_sync_at=serialize_datetime(last_sync) if last_sync else None,
     )
 
 
@@ -840,7 +870,7 @@ async def get_linkedin_sync_logs(
             ingested_count=log.ingested_count,
             skipped_count=log.skipped_count,
             error_message=log.error_message,
-            executed_at=log.executed_at.isoformat(),
+            executed_at=serialize_datetime(log.executed_at),
         )
         for log in logs
     ]
@@ -887,12 +917,12 @@ async def import_linkedin_post(
     # Fetch the content for response
     content_id = result.get("content_id")
     if not content_id:
-        raise HTTPException(status_code=500, detail=ErrorCode.FAILED_TO_GET_CONTENT_ID)
+        raise HTTPException(status_code=500, detail={"error": ErrorCode.FAILED_TO_GET_CONTENT_ID, "message": "Content was imported but could not be retrieved. Please try again."})
 
     content_repo = ContentRepository(db)
     content = await content_repo.get_by_id(content_id)
     if not content:
-        raise HTTPException(status_code=404, detail=ErrorCode.CONTENT_NOT_FOUND)
+        raise HTTPException(status_code=404, detail={"error": ErrorCode.CONTENT_NOT_FOUND, "message": "Content not found."})
 
     return ShareResponse(
         id=content.id,
@@ -902,5 +932,5 @@ async def import_linkedin_post(
         title=content.title,
         author=content.author,
         summary=content.summary,
-        created_at=content.created_at.isoformat(),
+        created_at=serialize_datetime(content.created_at),
     )

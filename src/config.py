@@ -78,6 +78,19 @@ class Settings:
     # VLLM Settings (for AI summarization)
     VLLM_SERVER_URL: str = os.getenv("VLLM_SERVER_URL", "http://localhost:8000")
     VLLM_MODEL: str = os.getenv("VLLM_MODEL", "default-model")
+    ANTHROPIC_BASE_URL: str = os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1/messages")
+    ANTHROPIC_MODEL: str = os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20240620")
+    SUMMARY_PROVIDER: str = os.getenv("SUMMARY_PROVIDER", "auto")
+    SUMMARY_API_KEY: str = os.getenv("SUMMARY_API_KEY", "")
+    SUMMARY_BASE_URL: str = os.getenv("SUMMARY_BASE_URL", "")
+    SUMMARY_MODEL: str = os.getenv("SUMMARY_MODEL", "")
+
+    # iOS Universal Links — Apple App Site Association
+    # 10-character Team ID from developer.apple.com/account → Membership.
+    # Optional at startup; /.well-known/apple-app-site-association returns 503 until set.
+    APPLE_TEAM_ID: str | None = os.getenv("APPLE_TEAM_ID")
+    # Bundle ID as registered in App Store Connect (e.g. "com.briefly.app")
+    APPLE_BUNDLE_ID: str = os.getenv("APPLE_BUNDLE_ID", "com.briefly.app")
 
     # Content Settings
     MAX_SUMMARY_LENGTH: int = 300  # Maximum characters for AI summary

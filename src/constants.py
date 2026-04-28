@@ -3,6 +3,14 @@
 from enum import StrEnum
 
 
+class SyncFrequency(StrEnum):
+    """Sync frequency options for integration configs."""
+
+    HOURLY = "hourly"
+    DAILY = "daily"
+    WEEKLY = "weekly"
+
+
 class ReminderFrequency(StrEnum):
     """Reminder frequency options."""
 
