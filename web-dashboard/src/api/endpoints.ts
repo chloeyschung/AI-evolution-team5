@@ -149,6 +149,35 @@ export async function deleteContent(id: number): Promise<{ message: string }> {
   return response.data;
 }
 
+export async function updateContentStatus(
+  id: number,
+  status: 'inbox' | 'archived'
+): Promise<Content> {
+  const client = getApiClient();
+  const response = await client.patch<Content>(`/api/v1/content/${id}/status`, { status });
+  return response.data;
+}
+
+export async function getTrashContent(limit = 50, offset = 0): Promise<{ items: Content[]; hasMore: boolean }> {
+  const client = getApiClient();
+  const response = await client.get<{ items: Content[]; has_more: boolean }>('/api/v1/content/trash', {
+    params: { limit, offset },
+  });
+  return { items: response.data.items, hasMore: response.data.has_more };
+}
+
+export async function restoreContent(id: number): Promise<Content> {
+  const client = getApiClient();
+  const response = await client.post<Content>(`/api/v1/content/${id}/restore`);
+  return response.data;
+}
+
+export async function clearTrash(): Promise<{ message: string }> {
+  const client = getApiClient();
+  const response = await client.delete<{ message: string }>('/api/v1/content/trash');
+  return response.data;
+}
+
 // Swipe
 export async function recordSwipe(action: SwipeAction): Promise<{ id: number; content_id: number; action: string }> {
   const client = getApiClient();

@@ -15,6 +15,8 @@ import type {
 } from '../types';
 import { DEFAULT_PAGE_SIZE } from '../types';
 
+let latestLoadRequestId = 0;
+
 interface ContentState {
   // State
   items: Content[];
@@ -89,12 +91,14 @@ export const useContentStore = create<ContentState>((set, get) => ({
     const { page, filters } = get();
     if (newPage < page && !append) return;
 
+    const requestId = ++latestLoadRequestId;
     set({ isLoading: true, error: null });
 
     try {
       const { sort } = get();
       const result = await getContent(filters, sort, newPage, DEFAULT_PAGE_SIZE);
       const newItems = result.items;
+      if (requestId !== latestLoadRequestId) return;
 
       if (append) {
         const { items } = get();
@@ -113,11 +117,13 @@ export const useContentStore = create<ContentState>((set, get) => ({
         selectedIds: new Set(),
       });
     } catch (err) {
+      if (requestId !== latestLoadRequestId) return;
       set({
         error: err instanceof Error ? err.message : 'Failed to load content',
       });
       console.error('Load content error:', err);
     } finally {
+      if (requestId !== latestLoadRequestId) return;
       set({ isLoading: false });
     }
   },
@@ -219,8 +225,15 @@ export const useContentStore = create<ContentState>((set, get) => ({
     const hasChanged = Object.entries(newFiltersMerged).some(
       ([key, value]) => filters[key as keyof ContentFilters] !== value
     );
-    set({ filters: newFiltersMerged });
-    if (hasChanged) get().loadContent(1);
+    if (!hasChanged) return;
+    set({
+      filters: newFiltersMerged,
+      items: [],
+      page: 1,
+      hasMore: true,
+      selectedIds: new Set(),
+    });
+    get().loadContent(1);
   },
 
   updateSort: (newSort: Partial<ContentSort>) => {
@@ -229,7 +242,14 @@ export const useContentStore = create<ContentState>((set, get) => ({
     const hasChanged = Object.entries(newSortMerged).some(
       ([key, value]) => sort[key as keyof ContentSort] !== value
     );
-    set({ sort: newSortMerged });
-    if (hasChanged) get().loadContent(1);
+    if (!hasChanged) return;
+    set({
+      sort: newSortMerged,
+      items: [],
+      page: 1,
+      hasMore: true,
+      selectedIds: new Set(),
+    });
+    get().loadContent(1);
   },
 }));

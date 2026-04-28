@@ -122,6 +122,15 @@ class ContentRepository(BaseRepository[Content]):
         )
         return result.scalar_one_or_none()
 
+    async def update_summary(self, content_id: int, user_id: int, summary: str) -> None:
+        """Persist a generated summary for a content row the user owns."""
+        await self.session.execute(
+            update(Content)
+            .where(Content.id == content_id, Content.user_id == user_id)
+            .values(summary=summary, updated_at=utc_now())
+        )
+        await self.session.commit()
+
     async def get_all(
         self,
         user_id: int,
@@ -153,18 +162,17 @@ class ContentRepository(BaseRepository[Content]):
     async def update_status(
         self, content_id: int, new_status: ContentStatus, user_id: int | None = None
     ) -> Content:
-        """Update content status (INBOX → ARCHIVED transition).
+        """Update content status.
 
         Args:
             content_id: The content ID to update.
-            new_status: The new status (ARCHIVED only, one-way transition).
+            new_status: The new status.
             user_id: Optional user ID for ownership check.
 
         Returns:
             Updated Content object.
 
         Raises:
-            ValueError: If content is already ARCHIVED (one-way transition).
             RuntimeError: If content not found or ownership mismatch.
         """
         query = select(Content).where(Content.id == content_id, Content.is_deleted == False)  # noqa: E712
@@ -175,9 +183,6 @@ class ContentRepository(BaseRepository[Content]):
 
         if content is None:
             raise RuntimeError(f"Content with ID {content_id} not found")
-
-        if content.status == ContentStatus.ARCHIVED and new_status == ContentStatus.INBOX:
-            raise ValueError("Cannot transition from ARCHIVED to INBOX (one-way transition)")
 
         content.status = new_status
         content.updated_at = utc_now()
@@ -766,6 +771,41 @@ class ContentRepository(BaseRepository[Content]):
 
         return content
 
+    async def get_trash(self, user_id: int, limit: int = 50, offset: int = 0) -> list[Content]:
+        """List soft-deleted content for a user (trash can view).
+
+        Args:
+            user_id: The user's ID.
+            limit: Maximum rows to return.
+            offset: Pagination offset.
+
+        Returns:
+            List of soft-deleted Content objects, newest first.
+        """
+        result = await self.session.execute(
+            select(Content)
+            .where(Content.user_id == user_id, Content.is_deleted == True)  # noqa: E712
+            .order_by(Content.deleted_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        return list(result.scalars().all())
+
+    async def clear_trash(self, user_id: int) -> int:
+        """Permanently delete all soft-deleted content for a user.
+
+        Args:
+            user_id: The user's ID.
+
+        Returns:
+            Number of rows permanently deleted.
+        """
+        result = await self.session.execute(
+            delete(Content).where(Content.user_id == user_id, Content.is_deleted == True)  # noqa: E712
+        )
+        await self.session.commit()
+        return result.rowcount
+
 
 class SwipeRepository(BaseRepository[SwipeHistory]):
     """Repository for SwipeHistory operations."""
@@ -786,8 +826,8 @@ class SwipeRepository(BaseRepository[SwipeHistory]):
             content_id: The content ID.
             action: The swipe action (KEEP or DISCARD).
             user_id: User ID of the swipe actor.
-                - KEEP: Content remains INBOX
-                - DISCARD: Content status changes to ARCHIVED
+                - KEEP: Content moves to ARCHIVED (saved)
+                - DISCARD: Content soft-deleted → trash
 
         Returns:
             The created or pre-existing SwipeHistory object.
@@ -800,9 +840,11 @@ class SwipeRepository(BaseRepository[SwipeHistory]):
         )
         self.session.add(history)
 
-        # Auto-update status for DISCARD action
-        if action == SwipeAction.DISCARD:
+        # KEEP → archive (save it); DISCARD → soft-delete (trash it).
+        if action == SwipeAction.KEEP:
             await self._update_content_status(content_id, user_id, ContentStatus.ARCHIVED)
+        elif action == SwipeAction.DISCARD:
+            await self._soft_delete_content(content_id, user_id)
 
         try:
             await self.session.commit()
@@ -810,7 +852,6 @@ class SwipeRepository(BaseRepository[SwipeHistory]):
             return history
         except IntegrityError:
             # Duplicate (user_id, content_id) — iOS retry scenario.
-            # Roll back the failed insert and return the existing row.
             await self.session.rollback()
             result = await self.session.execute(
                 select(SwipeHistory).where(
@@ -820,9 +861,11 @@ class SwipeRepository(BaseRepository[SwipeHistory]):
             )
             existing_history = result.scalar_one()
 
-            # Retry path for DISCARD must preserve ARCHIVED status after rollback.
-            if action == SwipeAction.DISCARD:
+            if action == SwipeAction.KEEP:
                 await self._update_content_status(content_id, user_id, ContentStatus.ARCHIVED)
+                await self.session.commit()
+            elif action == SwipeAction.DISCARD:
+                await self._soft_delete_content(content_id, user_id)
                 await self.session.commit()
 
             return existing_history
@@ -839,6 +882,16 @@ class SwipeRepository(BaseRepository[SwipeHistory]):
             update(Content)
             .where(Content.id == content_id, Content.user_id == user_id)
             .values(status=new_status, updated_at=utc_now())
+        )
+        await self.session.execute(stmt)
+
+    async def _soft_delete_content(self, content_id: int, user_id: int) -> None:
+        now = utc_now()
+        now_naive = now.replace(tzinfo=None)
+        stmt = (
+            update(Content)
+            .where(Content.id == content_id, Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
+            .values(is_deleted=True, deleted_at=now_naive, updated_at=now_naive)
         )
         await self.session.execute(stmt)
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useContentStore } from '../stores/useContentStore';
 import ContentDrawer from '../components/content/ContentDrawer';
 import ContentTable from '../components/content/ContentTable';
+import { updateContentStatus } from '../api/endpoints';
 import styles from './Archive.module.css';
 
 export default function Archive() {
@@ -22,7 +23,11 @@ export default function Archive() {
 
   const handleRestore = async (id: number) => {
     if (!window.confirm('Restore this item to Library inbox?')) return;
-    await contentStore.performSwipe({ content_id: id, action: 'keep' });
+    await updateContentStatus(id, 'inbox');
+    useContentStore.setState((state) => ({
+      items: state.items.filter((item) => item.id !== id),
+      selectedIds: new Set(Array.from(state.selectedIds).filter((selectedId) => selectedId !== id)),
+    }));
   };
 
   return (
