@@ -65,6 +65,8 @@ class DefaultSort(StrEnum):
 
     RECENCY = "recency"
     PLATFORM = "platform"
+    TITLE = "title"
+    STATUS = "status"
 
 
 class ContentType(StrEnum):

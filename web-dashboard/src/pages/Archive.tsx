@@ -30,6 +30,14 @@ export default function Archive() {
     }));
   };
 
+  const handleSortChange = (option: 'recency' | 'platform' | 'title' | 'status') => {
+    const nextOrder =
+      contentStore.sort.option === option
+        ? (contentStore.sort.order === 'asc' ? 'desc' : 'asc')
+        : 'asc';
+    contentStore.updateSort({ option, order: nextOrder });
+  };
+
   return (
     <section className={styles.page} data-testid="archive-page">
       <header className={styles.hero}>
@@ -44,6 +52,8 @@ export default function Archive() {
         onOpen={setSelectedContentId}
         onDelete={handleDelete}
         onSwipe={async (action) => handleRestore(action.content_id)}
+        sort={contentStore.sort}
+        onSortChange={handleSortChange}
         keepActionLabel="Restore"
         keepActionTone="neutral"
         keepActionIcon="undo"

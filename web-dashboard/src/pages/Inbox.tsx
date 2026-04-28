@@ -31,6 +31,14 @@ export default function Inbox() {
     contentStore.updateFilters({ platform });
   };
 
+  const handleSortChange = (option: 'recency' | 'platform' | 'title' | 'status') => {
+    const nextOrder =
+      contentStore.sort.option === option
+        ? (contentStore.sort.order === 'asc' ? 'desc' : 'asc')
+        : 'asc';
+    contentStore.updateSort({ option, order: nextOrder });
+  };
+
   return (
     <section className={styles.page} data-testid="inbox-page">
       <header className={styles.hero}>
@@ -63,6 +71,8 @@ export default function Inbox() {
         onDelete={handleDelete}
         onSwipe={async (action) => handleKeep(action.content_id)}
         canSwipe={(item) => item.status !== 'archived'}
+        sort={contentStore.sort}
+        onSortChange={handleSortChange}
         keepActionLabel="Keep"
         keepActionTone="signal"
         keepActionIcon="archive"

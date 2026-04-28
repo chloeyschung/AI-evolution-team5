@@ -1,14 +1,15 @@
 """Content domain router — /content/* CRUD, /stats, /platforms, /search, /share."""
 
+import logging
 import os
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi import Request as FastAPIRequest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...constants import ErrorCode
-from ...data.database import get_db
+from ...data.database import AsyncSessionLocal, get_db
 from ...data.models import ContentStatus
 from ...data.repository import (
     ContentRepository,
@@ -83,6 +84,8 @@ async def list_content(
     cursor: str | None = Query(None),
     status: str | None = Query(None, pattern="^(inbox|archived)$"),
     platform: str | None = Query(None),
+    sort: str = Query("recency", pattern="^(recency|platform|title|status)$"),
+    order: str = Query("desc", pattern="^(asc|desc)$"),
     user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> PaginatedContentResponse:
@@ -100,7 +103,7 @@ async def list_content(
     elif status == "archived":
         status_filter = ContentStatus.ARCHIVED
 
-    is_cursor_mode = cursor is not None
+    is_cursor_mode = cursor is not None and sort == "recency"
     if is_cursor_mode:
         try:
             cursor_created_at, cursor_id = parse_timestamp_cursor(
@@ -117,6 +120,8 @@ async def list_content(
             cursor_id=cursor_id,
             status=status_filter,
             platform=platform,
+            sort=sort,
+            order=order,
         )
     else:
         contents = await repo.get_all_ordered(
@@ -125,6 +130,8 @@ async def list_content(
             offset=offset,
             status=status_filter,
             platform=platform,
+            sort=sort,
+            order=order,
         )
 
     total = await repo.count_all(user_id=user_id, status=status_filter, platform=platform)
@@ -217,6 +224,39 @@ async def get_trend_feed(
         total=total,
         has_more=offset + limit < total,
     )
+
+
+@router.get("/content/trash", response_model=PaginatedContentResponse)
+async def list_trash(
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+) -> PaginatedContentResponse:
+    """List soft-deleted content for the authenticated user (trash can view)."""
+    content_repo = ContentRepository(db)
+    items = await content_repo.get_trash(user_id, limit=limit, offset=offset)
+    total = len(items)
+    has_more = len(items) == limit
+    return PaginatedContentResponse(
+        items=[ContentResponse.from_content(c) for c in items],
+        has_more=has_more,
+        total=total,
+        pagination_mode="offset",
+        next_offset=(offset + len(items)) if has_more else None,
+        next_cursor=None,
+    )
+
+
+@router.delete("/content/trash", response_model=DeleteContentResponse)
+async def clear_trash(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+) -> DeleteContentResponse:
+    """Permanently delete all soft-deleted content for the authenticated user."""
+    content_repo = ContentRepository(db)
+    deleted_count = await content_repo.clear_trash(user_id)
+    return DeleteContentResponse(message=f"Permanently deleted {deleted_count} item(s) from trash.")
 
 
 # UX-003: Content Detail View
@@ -598,34 +638,70 @@ def get_share_handler(request: FastAPIRequest) -> ShareHandler:
     return share_handler
 
 
+async def _background_summarize(
+    content_id: int,
+    user_id: int,
+    url: str,
+    content_extractor,
+    summarizer,
+) -> None:
+    """Fetch page text and summarize it, then persist the result — runs after response is sent."""
+    try:
+        _, text_content = await content_extractor.fetch_html_and_text(url)
+        if not text_content:
+            return
+        summary = await summarizer.summarize(text_content)
+        async with AsyncSessionLocal() as db:
+            repo = ContentRepository(db)
+            await repo.update_summary(content_id, user_id, summary)
+    except Exception as exc:
+        logging.warning("Background summarization failed for content %s: %s", content_id, exc)
+
+
 @router.post("/share", status_code=201, response_model=ShareResponse)
-@limiter.limit("10/minute")  # Rate limit: 10 requests per minute per IP
+@limiter.limit("120/minute")  # Rate limit tuned for extension burst saves
 async def share_content(
     request: Request,
     data: ShareRequest,
+    background_tasks: BackgroundTasks,
     user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     share_handler: ShareHandler = Depends(get_share_handler),
 ) -> ShareResponse:
     """Process shared content from mobile share sheet.
 
-    Automatically extracts content, generates summary, and stores it.
+    Saves content immediately and runs LLM summarization in the background so
+    the response is returned within ~1 s regardless of Anthropic API latency.
 
     TODO #3 (2026-04-14): Added user_id parameter to associate content with authenticated user.
     """
-    # Process share data
+    options = dict(data.options or {})
+    auto_summarize = options.pop("auto_summarize", True)
+
+    # Disable inline summarization — we'll schedule it as a background task
     raw_payload = {
         "content": data.content,
         "platform": data.platform,
         "metadata": data.metadata,
-        "options": data.options,
+        "options": {**options, "auto_summarize": False},
     }
 
     metadata = await share_handler.process_share(raw_payload)
 
-    # Save content using repository with user_id
+    # Save content immediately (no summary yet)
     repo = ContentRepository(db)
     content = await repo.save(metadata, user_id=user_id)
+
+    # Schedule summarization to run after the response is sent
+    if auto_summarize and share_handler._summarizer and data.content:
+        background_tasks.add_task(
+            _background_summarize,
+            content.id,
+            user_id,
+            data.content,
+            share_handler._content_extractor,
+            share_handler._summarizer,
+        )
 
     return ShareResponse(
         id=content.id,

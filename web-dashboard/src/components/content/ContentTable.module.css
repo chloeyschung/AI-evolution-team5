@@ -59,6 +59,25 @@
   white-space: nowrap;
 }
 
+.sortHeaderBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.sortArrow {
+  font-size: 0.72rem;
+  color: var(--color-ink-muted);
+}
+
 .actions {
   display: flex;
   flex-wrap: nowrap;

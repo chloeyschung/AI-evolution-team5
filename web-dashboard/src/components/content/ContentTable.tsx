@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import DataGrid, { type DataGridColumn } from '../ui/DataGrid';
 import type { Content, SwipeAction } from '../../types';
+import type { ContentSort, SortOption } from '../../types';
 import styles from './ContentTable.module.css';
 
 interface ContentTableProps {
@@ -12,6 +13,8 @@ interface ContentTableProps {
   keepActionTone?: 'neutral' | 'signal';
   keepActionIcon?: 'undo' | 'archive';
   canSwipe?: (item: Content) => boolean;
+  sort?: ContentSort;
+  onSortChange?: (option: SortOption) => void;
   emptyMessage: string;
 }
 
@@ -45,6 +48,8 @@ export default function ContentTable({
   keepActionTone = 'signal',
   keepActionIcon = 'undo',
   canSwipe,
+  sort,
+  onSortChange,
   emptyMessage,
 }: ContentTableProps) {
   const tableHostRef = useRef<HTMLDivElement | null>(null);
@@ -60,10 +65,28 @@ export default function ContentTable({
     });
   }, [items]);
 
+  const renderSortableHeader = (label: string, option: SortOption) => {
+    if (!onSortChange || !sort) return <span>{label}</span>;
+    const isActive = sort.option === option;
+    const arrow = isActive ? (sort.order === 'asc' ? '↑' : '↓') : '↕';
+    return (
+      <button
+        type="button"
+        className={styles.sortHeaderBtn}
+        onClick={() => onSortChange(option)}
+        aria-label={`Sort by ${label} ${isActive && sort.order === 'asc' ? 'descending' : 'ascending'}`}
+      >
+        <span>{label}</span>
+        <span className={styles.sortArrow} aria-hidden="true">{arrow}</span>
+      </button>
+    );
+  };
+
   const columns: DataGridColumn<Content>[] = [
     {
       key: 'title',
-      header: 'Title',
+      header: renderSortableHeader('Title', 'title'),
+      ariaSort: sort?.option === 'title' ? (sort.order === 'asc' ? 'ascending' : 'descending') : 'none',
       width: '32%',
       render: (item) => (
         <button className={styles.titleButton} onClick={() => onOpen(item.id)}>
@@ -74,13 +97,15 @@ export default function ContentTable({
     },
     {
       key: 'platform',
-      header: 'Platform',
+      header: renderSortableHeader('Platform', 'platform'),
+      ariaSort: sort?.option === 'platform' ? (sort.order === 'asc' ? 'ascending' : 'descending') : 'none',
       width: '14%',
       render: (item) => <span className={styles.platform}>{item.platform}</span>,
     },
     {
       key: 'status',
-      header: 'Status',
+      header: renderSortableHeader('Status', 'status'),
+      ariaSort: sort?.option === 'status' ? (sort.order === 'asc' ? 'ascending' : 'descending') : 'none',
       width: '12%',
       render: (item) => (
         <span className={`badge ${item.status === 'inbox' ? 'badge-inbox' : 'badge-archived'}`}>
@@ -96,7 +121,8 @@ export default function ContentTable({
     },
     {
       key: 'date',
-      header: 'Created',
+      header: renderSortableHeader('Created', 'recency'),
+      ariaSort: sort?.option === 'recency' ? (sort.order === 'asc' ? 'ascending' : 'descending') : 'none',
       width: '10%',
       render: (item) => <span className={styles.date}>{formatDate(item.created_at)}</span>,
     },

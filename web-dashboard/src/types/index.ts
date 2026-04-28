@@ -57,7 +57,7 @@ export interface UserStatistics {
 // Filter & Sort Types
 
 export type ContentStatus = 'inbox' | 'archived' | 'all';
-export type SortOption = 'recency' | 'platform' | 'title';
+export type SortOption = 'recency' | 'platform' | 'title' | 'status';
 export type SortOrder = 'asc' | 'desc';
 
 export interface ContentFilters {

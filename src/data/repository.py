@@ -620,6 +620,8 @@ class ContentRepository(BaseRepository[Content]):
         cursor_id: int | None = None,
         status: ContentStatus | None = None,
         platform: str | None = None,
+        sort: str = "recency",
+        order: str = "desc",
     ) -> list[Content]:
         """Get all content ordered by creation date (newest first).
 
@@ -633,11 +635,19 @@ class ContentRepository(BaseRepository[Content]):
         Returns:
             List of Content objects ordered by created_at descending.
         """
-        query = (
-            select(Content)
-            .where(Content.is_deleted == False)  # noqa: E712
-            .order_by(Content.created_at.desc(), Content.id.desc())
-        )
+        base_query = select(Content).where(Content.is_deleted == False)  # noqa: E712
+
+        sort_column = Content.created_at
+        if sort == "platform":
+            sort_column = func.lower(Content.platform)
+        elif sort == "title":
+            sort_column = func.lower(func.coalesce(Content.title, ""))
+        elif sort == "status":
+            sort_column = func.lower(Content.status)
+
+        primary_order = sort_column.asc() if order == "asc" else sort_column.desc()
+        tie_breaker = Content.id.asc() if order == "asc" else Content.id.desc()
+        query = base_query.order_by(primary_order, tie_breaker)
         if cursor_created_at is not None and cursor_id is not None:
             query = query.where(
                 (Content.created_at < cursor_created_at)

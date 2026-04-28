@@ -3,9 +3,10 @@ import styles from './DataGrid.module.css';
 
 export interface DataGridColumn<T> {
   key: string;
-  header: string;
+  header: ReactNode;
   width?: string;
   align?: 'left' | 'center' | 'right';
+  ariaSort?: 'ascending' | 'descending' | 'none';
   render: (item: T) => ReactNode;
 }
 
@@ -31,6 +32,7 @@ export default function DataGrid<T>({ columns, rows, rowKey, emptyMessage }: Dat
                 key={column.key}
                 style={{ width: column.width, textAlign: column.align || 'left' }}
                 scope="col"
+                aria-sort={column.ariaSort}
               >
                 {column.header}
               </th>
