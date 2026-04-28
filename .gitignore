@@ -1,0 +1,50 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environment
+.venv
+
+# Database & secrets
+*.db
+.env
+.env.*
+!.env.example
+*.pem
+
+# Extension build artifacts
+*.crx
+
+# Claude / tooling
+.claude/
+**/.claudeignore
+**/CLAUDE.md
+
+# IDE / test / lint caches
+.playwright-mcp/
+.pytest_cache/
+.ruff_cache/
+web-dashboard/test-results/
+
+# Dependencies
+node_modules/
+
+# Local config
+.local/
+.python-version
+.gitignore
+
+# Logs & docs (local-only)
+logs/
+docs/external
+docs/audit
+docs/plans
+docs/records
+
+# Design drafts
+**/briefly-design-language-preferences.md
+**/briefly-design-language-template.md
