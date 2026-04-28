@@ -149,6 +149,12 @@ export async function deleteContent(id: number): Promise<{ message: string }> {
   return response.data;
 }
 
+export async function purgeContent(id: number): Promise<{ message: string }> {
+  const client = getApiClient();
+  const response = await client.delete<{ message: string }>(`/api/v1/content/${id}/purge`);
+  return response.data;
+}
+
 export async function updateContentStatus(
   id: number,
   status: 'inbox' | 'archived'

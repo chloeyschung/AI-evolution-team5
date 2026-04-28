@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { getTrashContent, restoreContent, deleteContent } from '../api/endpoints';
+import { getTrashContent, restoreContent, purgeContent } from '../api/endpoints';
 import type { Content } from '../types';
 import styles from './Trash.module.css';
 
@@ -65,7 +65,7 @@ export default function Trash() {
   const handlePermanentDelete = async (id: number) => {
     if (!window.confirm('Permanently delete this item? This cannot be undone.')) return;
     try {
-      await deleteContent(id);
+      await purgeContent(id);
       setItems((prev) => prev.filter((item) => item.id !== id));
       setSelectedIds((prev) => {
         const next = new Set(prev);
@@ -93,7 +93,7 @@ export default function Trash() {
     if (selectedCount === 0) return;
     if (!window.confirm(`Permanently delete ${selectedCount} selected item(s)? This cannot be undone.`)) return;
     try {
-      await Promise.all(Array.from(selectedIds).map((id) => deleteContent(id)));
+      await Promise.all(Array.from(selectedIds).map((id) => purgeContent(id)));
       setItems((prev) => prev.filter((item) => !selectedIds.has(item.id)));
       setSelectedIds(new Set());
     } catch {
@@ -116,12 +116,14 @@ export default function Trash() {
             {allSelected ? 'Unselect all' : 'Select all'}
           </button>
           <span className={styles.selectionCount}>{selectedCount} items selected</span>
-          <button className={styles.bulkBtn} onClick={() => void handleBulkRestore()} disabled={selectedCount === 0}>
-            Restore selected
-          </button>
-          <button className={styles.bulkDangerBtn} onClick={() => void handleBulkDelete()} disabled={selectedCount === 0}>
-            Delete selected
-          </button>
+          <div className={styles.bulkActions}>
+            <button className={styles.bulkBtn} onClick={() => void handleBulkRestore()} disabled={selectedCount === 0}>
+              Restore selected
+            </button>
+            <button className={styles.bulkDangerBtn} onClick={() => void handleBulkDelete()} disabled={selectedCount === 0}>
+              Delete selected
+            </button>
+          </div>
         </div>
       ) : null}
 

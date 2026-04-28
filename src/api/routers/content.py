@@ -480,6 +480,26 @@ async def delete_content(
     )
 
 
+@router.delete("/content/{content_id}/purge", response_model=DeleteContentResponse)
+async def purge_content(
+    content_id: int,
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+) -> DeleteContentResponse:
+    """Permanently delete one content row from trash.
+
+    This is intended for explicit hard-delete actions in Trash UI.
+    """
+    content_repo = ContentRepository(db)
+    deleted = await content_repo.delete_content(content_id, user_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": ErrorCode.CONTENT_NOT_FOUND, "message": "Content not found."},
+        )
+    return DeleteContentResponse(message="Content permanently deleted.")
+
+
 @router.post("/content/{content_id}/restore", response_model=ContentResponse)
 async def restore_content(
     content_id: int,
