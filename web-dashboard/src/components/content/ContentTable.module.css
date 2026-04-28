@@ -93,6 +93,17 @@
   background: var(--color-surface-muted);
 }
 
+.iconActionKeep {
+  border-color: var(--color-signal);
+  background: var(--color-signal);
+  color: var(--color-signal-on);
+}
+
+.iconActionKeep:hover {
+  border-color: var(--color-signal-hover);
+  background: var(--color-signal-hover);
+}
+
 .iconActionDanger {
   border-color: color-mix(in srgb, var(--color-danger) 40%, var(--color-border));
   color: var(--color-danger);

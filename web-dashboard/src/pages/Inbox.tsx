@@ -10,20 +10,19 @@ export default function Inbox() {
   const [selectedContentId, setSelectedContentId] = useState<number | null>(null);
 
   useEffect(() => {
-    contentStore.updateFilters({ status: 'inbox' });
+    contentStore.updateFilters({ status: 'all' });
     void contentStore.loadPlatforms();
-    // Reset to 'all' when leaving so Dashboard doesn't inherit the inbox filter
     return () => {
-      contentStore.updateFilters({ status: 'all', platform: null });
+      contentStore.updateFilters({ platform: null });
     };
   }, []);
 
-  const handleSwipe = async (action: { content_id: number; action: 'keep' | 'discard' }) => {
-    await contentStore.performSwipe(action);
-  };
-
   const handleDelete = async (id: number) => {
     await contentStore.deleteItem(id);
+  };
+
+  const handleKeep = async (id: number) => {
+    await contentStore.performSwipe({ content_id: id, action: 'keep' });
   };
 
   const handlePlatformChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -35,8 +34,8 @@ export default function Inbox() {
   return (
     <section className={styles.page} data-testid="inbox-page">
       <header className={styles.hero}>
-        <h1>Inbox</h1>
-        <p className={styles.subtitle}>Items requiring action</p>
+        <h1>Library</h1>
+        <p className={styles.subtitle}>Everything you&apos;ve saved</p>
       </header>
 
       <div className={styles.filterRow}>
@@ -62,8 +61,11 @@ export default function Inbox() {
         items={contentStore.items}
         onOpen={setSelectedContentId}
         onDelete={handleDelete}
-        onSwipe={handleSwipe}
-        emptyMessage="No inbox items requiring action."
+        onSwipe={async (action) => handleKeep(action.content_id)}
+        keepActionLabel="Keep"
+        keepActionTone="signal"
+        keepActionIcon="archive"
+        emptyMessage="Nothing saved yet. Use the extension to save articles, videos, and links."
       />
 
       <ContentDrawer

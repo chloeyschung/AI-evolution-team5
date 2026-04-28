@@ -20,6 +20,11 @@ export default function Archive() {
     await contentStore.deleteItem(id);
   };
 
+  const handleRestore = async (id: number) => {
+    if (!window.confirm('Restore this item to Library inbox?')) return;
+    await contentStore.performSwipe({ content_id: id, action: 'keep' });
+  };
+
   return (
     <section className={styles.page} data-testid="archive-page">
       <header className={styles.hero}>
@@ -33,6 +38,10 @@ export default function Archive() {
         items={contentStore.items}
         onOpen={setSelectedContentId}
         onDelete={handleDelete}
+        onSwipe={async (action) => handleRestore(action.content_id)}
+        keepActionLabel="Restore"
+        keepActionTone="neutral"
+        keepActionIcon="undo"
         emptyMessage="No completed or deferred items in archive."
       />
 

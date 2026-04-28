@@ -8,6 +8,9 @@ interface ContentTableProps {
   onOpen: (id: number) => void;
   onDelete: (id: number) => Promise<void>;
   onSwipe?: (action: SwipeAction) => Promise<void>;
+  keepActionLabel?: string;
+  keepActionTone?: 'neutral' | 'signal';
+  keepActionIcon?: 'undo' | 'archive';
   emptyMessage: string;
 }
 
@@ -37,6 +40,9 @@ export default function ContentTable({
   onOpen,
   onDelete,
   onSwipe,
+  keepActionLabel = 'Keep',
+  keepActionTone = 'signal',
+  keepActionIcon = 'undo',
   emptyMessage,
 }: ContentTableProps) {
   const tableHostRef = useRef<HTMLDivElement | null>(null);
@@ -98,16 +104,24 @@ export default function ContentTable({
       width: '18%',
       render: (item) => (
         <div className={styles.actions}>
-          {item.status === 'inbox' && onSwipe ? (
+          {onSwipe ? (
             <button
-              className={styles.iconAction}
+              className={`${styles.iconAction} ${keepActionTone === 'signal' ? styles.iconActionKeep : ''}`}
               onClick={() => void onSwipe({ content_id: item.id, action: 'keep' })}
-              aria-label="Keep item"
-              title="Keep"
+              aria-label={`${keepActionLabel} item`}
+              title={keepActionLabel}
             >
-              <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                <path d="M7 3a5 5 0 1 1-4.8 6.4.75.75 0 1 1 1.45-.38A3.5 3.5 0 1 0 7 4.5H4.8l1.7 1.7a.75.75 0 1 1-1.06 1.06L2.46 4.3a.75.75 0 0 1 0-1.06L5.44.26A.75.75 0 0 1 6.5 1.32L4.84 3H7Z" />
-              </svg>
+              {keepActionIcon === 'archive' ? (
+                <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <rect x="1.5" y="1.5" width="13" height="3" rx="1" fill="none" stroke="currentColor" strokeWidth="1.4" />
+                  <path d="M2.5 4.5v8a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-8" fill="none" stroke="currentColor" strokeWidth="1.4" />
+                  <path d="M6 8h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path d="M7 3a5 5 0 1 1-4.8 6.4.75.75 0 1 1 1.45-.38A3.5 3.5 0 1 0 7 4.5H4.8l1.7 1.7a.75.75 0 1 1-1.06 1.06L2.46 4.3a.75.75 0 0 1 0-1.06L5.44.26A.75.75 0 0 1 6.5 1.32L4.84 3H7Z" />
+                </svg>
+              )}
             </button>
           ) : null}
           <button
