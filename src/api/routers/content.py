@@ -781,7 +781,7 @@ async def share_content(
 
     # Save content immediately (no summary yet)
     repo = ContentRepository(db)
-    content = await repo.save(metadata, user_id=user_id)
+    content = await repo.save(metadata, user_id=user_id, allow_duplicate_url=True)
 
     # Persist idempotency mapping for future retries
     if idempotency_key:
