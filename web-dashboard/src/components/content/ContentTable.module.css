@@ -104,6 +104,18 @@
   background: var(--color-signal-hover);
 }
 
+.iconAction:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.iconActionKeep:disabled {
+  border-color: var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-ink-muted);
+}
+
 .iconActionDanger {
   border-color: color-mix(in srgb, var(--color-danger) 40%, var(--color-border));
   color: var(--color-danger);

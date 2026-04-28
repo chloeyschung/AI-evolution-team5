@@ -11,6 +11,7 @@ interface ContentTableProps {
   keepActionLabel?: string;
   keepActionTone?: 'neutral' | 'signal';
   keepActionIcon?: 'undo' | 'archive';
+  canSwipe?: (item: Content) => boolean;
   emptyMessage: string;
 }
 
@@ -43,6 +44,7 @@ export default function ContentTable({
   keepActionLabel = 'Keep',
   keepActionTone = 'signal',
   keepActionIcon = 'undo',
+  canSwipe,
   emptyMessage,
 }: ContentTableProps) {
   const tableHostRef = useRef<HTMLDivElement | null>(null);
@@ -102,7 +104,9 @@ export default function ContentTable({
       key: 'actions',
       header: 'Actions',
       width: '18%',
-      render: (item) => (
+      render: (item) => {
+        const swipeEnabled = onSwipe ? (canSwipe ? canSwipe(item) : true) : false;
+        return (
         <div className={styles.actions}>
           {onSwipe ? (
             <button
@@ -110,6 +114,7 @@ export default function ContentTable({
               onClick={() => void onSwipe({ content_id: item.id, action: 'keep' })}
               aria-label={`${keepActionLabel} item`}
               title={keepActionLabel}
+              disabled={!swipeEnabled}
             >
               {keepActionIcon === 'archive' ? (
                 <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -135,7 +140,8 @@ export default function ContentTable({
             </svg>
           </button>
         </div>
-      ),
+      );
+      },
     },
   ];
 

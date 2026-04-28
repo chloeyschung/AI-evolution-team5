@@ -62,6 +62,7 @@ export default function Inbox() {
         onOpen={setSelectedContentId}
         onDelete={handleDelete}
         onSwipe={async (action) => handleKeep(action.content_id)}
+        canSwipe={(item) => item.status !== 'archived'}
         keepActionLabel="Keep"
         keepActionTone="signal"
         keepActionIcon="archive"
