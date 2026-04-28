@@ -1,4 +1,5 @@
 import asyncio
+from urllib.parse import urlencode
 
 import httpx
 
@@ -9,26 +10,138 @@ from .exceptions import APIConnectionError, InvalidResponseError, SummarizationE
 
 class Summarizer:
     DEFAULT_MODEL = "claude-3-5-sonnet-20240620"
-    DEFAULT_MAX_TOKENS = 300
+    DEFAULT_MAX_TOKENS = 120
     DEFAULT_TIMEOUT = 30.0
     ANTHROPIC_VERSION = "2023-06-01"
     CONTENT_TYPE_JSON = "application/json"
+    PROVIDERS = {"anthropic", "openai", "gemini", "auto"}
 
-    def __init__(self, api_key: str, base_url: str = "https://api.anthropic.com/v1/messages"):
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str = "https://api.anthropic.com/v1/messages",
+        model: str | None = None,
+        provider: str = "auto",
+    ):
         self.api_key = api_key
         self.base_url = base_url
-        self.headers = {
+        self.model = model or self.DEFAULT_MODEL
+        provider = provider.strip().lower()
+        self.provider = provider if provider in self.PROVIDERS else "auto"
+
+    def _resolved_provider(self) -> str:
+        if self.provider != "auto":
+            return self.provider
+
+        base = self.base_url.lower()
+        if "generativelanguage.googleapis.com" in base or ":generatecontent" in base:
+            return "gemini"
+        if "/chat/completions" in base or "/v1/responses" in base:
+            return "openai"
+        return "anthropic"
+
+    def _anthropic_request(self, prompt: str) -> tuple[str, dict[str, str], dict]:
+        headers = {
             "x-api-key": self.api_key,
             "anthropic-version": self.ANTHROPIC_VERSION,
             "content-type": self.CONTENT_TYPE_JSON,
         }
+        payload = {
+            "model": self.model,
+            "max_tokens": self.DEFAULT_MAX_TOKENS,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        return self.base_url, headers, payload
+
+    def _openai_request(self, prompt: str) -> tuple[str, dict[str, str], dict]:
+        headers = {
+            "content-type": self.CONTENT_TYPE_JSON,
+        }
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        payload = {
+            "model": self.model,
+            "max_tokens": self.DEFAULT_MAX_TOKENS,
+            "messages": [{"role": "user", "content": prompt}],
+            # For reasoning-enabled models (e.g., Qwen3.x on vLLM),
+            # force direct answer tokens so short summaries are returned.
+            "chat_template_kwargs": {"enable_thinking": False},
+        }
+        return self.base_url, headers, payload
+
+    def _gemini_request(self, prompt: str) -> tuple[str, dict[str, str], dict]:
+        url = self.base_url
+        if ":generateContent" not in url:
+            url = url.rstrip("/") + f"/v1beta/models/{self.model}:generateContent"
+        if "key=" not in url and self.api_key:
+            sep = "&" if "?" in url else "?"
+            url = f"{url}{sep}{urlencode({'key': self.api_key})}"
+
+        headers = {"content-type": self.CONTENT_TYPE_JSON}
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"maxOutputTokens": self.DEFAULT_MAX_TOKENS},
+        }
+        return url, headers, payload
+
+    def _build_request(self, prompt: str) -> tuple[str, dict[str, str], dict, str]:
+        provider = self._resolved_provider()
+        if provider == "openai":
+            url, headers, payload = self._openai_request(prompt)
+            return url, headers, payload, provider
+        if provider == "gemini":
+            url, headers, payload = self._gemini_request(prompt)
+            return url, headers, payload, provider
+        url, headers, payload = self._anthropic_request(prompt)
+        return url, headers, payload, "anthropic"
+
+    def _extract_summary(self, data: dict, provider: str) -> str:
+        try:
+            if provider == "openai":
+                message = data["choices"][0]["message"]["content"]
+                if message is None:
+                    raise InvalidResponseError("OpenAI response did not include message content.")
+                if isinstance(message, list):
+                    text_parts = [part.get("text", "") for part in message if isinstance(part, dict)]
+                    return "".join(text_parts).strip()
+                return str(message).strip()
+
+            if provider == "gemini":
+                parts = data["candidates"][0]["content"]["parts"]
+                text_parts = [part.get("text", "") for part in parts if isinstance(part, dict)]
+                return "".join(text_parts).strip()
+
+            for block in data.get("content", []):
+                if isinstance(block, dict) and block.get("type") == "text":
+                    text = block.get("text")
+                    if isinstance(text, str) and text.strip():
+                        return text.strip()
+            raise InvalidResponseError("Anthropic response did not include a text block.")
+        except (KeyError, IndexError, TypeError, AttributeError) as e:
+            raise InvalidResponseError("Unexpected API response format.") from e
+
+    @staticmethod
+    def _anthropic_has_text_block(data: dict) -> bool:
+        content = data.get("content")
+        if not isinstance(content, list):
+            return False
+        return any(
+            isinstance(block, dict)
+            and block.get("type") == "text"
+            and isinstance(block.get("text"), str)
+            and block.get("text").strip()
+            for block in content
+        )
 
     def _build_prompt(self, content: str, max_lines: int) -> str:
         """Build the prompt for summarization."""
         return (
-            f"You are an expert summarizer. Your task is to summarize the following content "
-            f"into exactly {max_lines} lines. Ensure the summary is high-density, "
-            f"avoids fluff, and preserves the core context (Who, What, Why).\n\n"
+            f"Summarize as exactly {max_lines} bullet points.\n"
+            f"Rules:\n"
+            f"- Start each bullet with '• '\n"
+            f"- Max 70 characters per bullet — be ruthlessly brief\n"
+            f"- One concrete fact per bullet: who/what/why, no filler\n"
+            f"- Output ONLY the {max_lines} bullets, nothing else\n\n"
             f"CONTENT:\n{content}"
         )
 
@@ -51,11 +164,7 @@ class Summarizer:
             raise SummarizationError("Input content is empty.")
 
         prompt = self._build_prompt(content, max_lines)
-        payload = {
-            "model": self.DEFAULT_MODEL,
-            "max_tokens": self.DEFAULT_MAX_TOKENS,
-            "messages": [{"role": "user", "content": prompt}],
-        }
+        request_url, headers, payload, provider = self._build_request(prompt)
 
         last_error = None
 
@@ -63,8 +172,8 @@ class Summarizer:
             for attempt in range(max_retries):
                 try:
                     response = await client.post(
-                        self.base_url,
-                        headers=self.headers,
+                        request_url,
+                        headers=headers,
                         json=payload,
                         timeout=self.DEFAULT_TIMEOUT,
                     )
@@ -80,25 +189,27 @@ class Summarizer:
 
                     data = response.json()
 
-                    try:
-                        summary = data["content"][0]["text"].strip()
-                    except (KeyError, IndexError) as e:
-                        raise InvalidResponseError("Unexpected API response format.") from e
+                    # Some reasoning-capable open models behind Anthropic-compatible routes
+                    # emit only "thinking" blocks at low token budgets.
+                    # Retry with a larger budget before failing extraction.
+                    if provider == "anthropic" and not self._anthropic_has_text_block(data):
+                        if attempt < max_retries - 1:
+                            current_max_tokens = int(payload.get("max_tokens", self.DEFAULT_MAX_TOKENS))
+                            payload["max_tokens"] = min(current_max_tokens * 4, 5000)
+                            await asyncio.sleep(2**attempt)
+                            continue
+
+                    summary = self._extract_summary(data, provider)
 
                     lines = summary.split("\n")
                     if len(lines) > max_lines:
                         summary = "\n".join(lines[:max_lines])
 
-                    # Enforce 300-character limit with word-boundary truncation (AI-001 spec)
-                    if len(summary) > 300:
-                        # Truncate to word boundary, no trailing ellipsis
-                        truncated = summary[:300]
-                        # Find last space to avoid cutting words
-                        last_space = truncated.rfind(" ")
-                        if last_space > 200:  # Ensure we have at least 200 chars
-                            summary = truncated[:last_space]
-                        else:
-                            summary = truncated
+                    # Hard cap: 240 chars total (~70 chars × 3 bullets)
+                    if len(summary) > 240:
+                        truncated = summary[:240]
+                        last_newline = truncated.rfind("\n")
+                        summary = truncated[:last_newline] if last_newline > 80 else truncated
 
                     return summary
 

@@ -48,8 +48,50 @@ async def test_summarize_invalid_format(summarizer):
         mock_post.return_value.status_code = 200
         mock_post.return_value.json = MagicMock(return_value=mock_response_data)
 
-        with pytest.raises(InvalidResponseError, match="Unexpected API response format"):
+        with pytest.raises(InvalidResponseError, match="did not include a text block|Unexpected API response format"):
             await summarizer.summarize("Some content")
+
+
+@pytest.mark.asyncio
+async def test_summarize_openai_format():
+    summarizer = Summarizer(
+        api_key="test-key",
+        base_url="https://api.openai.com/v1/chat/completions",
+        model="gpt-4o-mini",
+        provider="openai",
+    )
+    mock_response_data = {
+        "choices": [{"message": {"content": "OpenAI line 1\nOpenAI line 2\nOpenAI line 3"}}]
+    }
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json = MagicMock(return_value=mock_response_data)
+        mock_post.return_value.text = "OK"
+
+        result = await summarizer.summarize("Some content")
+        assert result == "OpenAI line 1\nOpenAI line 2\nOpenAI line 3"
+
+
+@pytest.mark.asyncio
+async def test_summarize_gemini_format():
+    summarizer = Summarizer(
+        api_key="test-key",
+        base_url="https://generativelanguage.googleapis.com",
+        model="gemini-2.0-flash",
+        provider="gemini",
+    )
+    mock_response_data = {
+        "candidates": [{"content": {"parts": [{"text": "Gemini line 1\nGemini line 2\nGemini line 3"}]}}]
+    }
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json = MagicMock(return_value=mock_response_data)
+        mock_post.return_value.text = "OK"
+
+        result = await summarizer.summarize("Some content")
+        assert result == "Gemini line 1\nGemini line 2\nGemini line 3"
 
 @pytest.mark.asyncio
 async def test_summarize_truncates_excess_lines(summarizer):
