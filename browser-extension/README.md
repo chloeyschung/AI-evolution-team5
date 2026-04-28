@@ -155,7 +155,16 @@ npm run build
 ### Settings
 
 - **Auto-summarize**: Toggle AI summarization
-- **API Base URL**: Change backend endpoint (default: `http://localhost:8000`)
+- **API Base URL**: Hidden by default. Enable only for local debugging with `VITE_SHOW_API_URL_SETTING=true`.
+- **Backend URL source**: Uses `VITE_API_BASE_URL` from extension build env.
+
+### Summary Backend
+
+- Extension summary generation is server-side.
+- Configure backend with `ANTHROPIC_API_KEY`.
+- Optional overrides:
+  - `ANTHROPIC_BASE_URL` (default: `https://api.anthropic.com/v1/messages`)
+  - `ANTHROPIC_MODEL` (default: `claude-3-5-sonnet-20240620`)
 
 ## Architecture
 

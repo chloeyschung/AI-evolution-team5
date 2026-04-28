@@ -1,43 +1,109 @@
+/* ============================================================
+   BRIEFLY — browser-extension/src/styles/tokens.css  v4.0
+   ============================================================
+
+   ┌─ HOW TO CHANGE THE COLOR THEME ──────────────────────────┐
+   │  Ctrl+F the hex → replace all → save.                    │
+   │                                                          │
+   │  Signal (CTA / accent)  →  #1F6B58                       │
+   │  Canvas (popup bg)      →  #FAF8F4                       │
+   │  Ink    (primary text)  →  #141210                       │
+   │  AI     (machine mark)  →  #4A7C7E                       │
+   └──────────────────────────────────────────────────────────┘
+
+   These tokens mirror web-dashboard/src/styles/main.css §1.
+   Use --briefly-* prefix to avoid collisions with host pages
+   (tokens in content-script.css run on third-party sites).
+   ============================================================ */
+
 :root {
-  --briefly-bg-canvas: #f7f6f3;
-  --briefly-bg-surface: #fffdfa;
-  --briefly-bg-surface-muted: #f1efe9;
-  --briefly-bg-hover: #ebe8df;
-  --briefly-bg-active: #e4e0d6;
+  /* ── Signal accent ──────────────────────────────────────── */
+  --briefly-signal:         #1F6B58;   /* ← accent hex HERE */
+  --briefly-signal-hover:   #185746;
+  --briefly-signal-active:  #124038;
+  --briefly-signal-subtle:  #E6F2EF;
+  --briefly-signal-on:      #FFFFFF;
 
-  --briefly-text-primary: #1c2127;
-  --briefly-text-secondary: #5f6b7c;
-  --briefly-text-muted: #738091;
-  --briefly-text-inverse: #ffffff;
+  /* ── Canvas & surfaces ──────────────────────────────────── */
+  --briefly-canvas:         #FAF8F4;   /* ← page bg hex HERE */
+  --briefly-surface:        #FFFFFF;
+  --briefly-surface-muted:  #F4F1EC;
 
-  --briefly-border-default: rgba(28, 33, 39, 0.14);
-  --briefly-border-hover: rgba(28, 33, 39, 0.22);
-  --briefly-border-gold: rgba(185, 139, 36, 0.28);
+  /* ── Ink (text) ─────────────────────────────────────────── */
+  --briefly-ink:            #141210;   /* ← text hex HERE */
+  --briefly-ink-soft:       #5C5347;
+  --briefly-ink-muted:      #8A7F72;
+  --briefly-ink-inverse:    #FFFFFF;
 
-  --briefly-accent-primary: #2d72d2;
-  --briefly-accent-secondary: #742ddd;
-  --briefly-accent-success: #238551;
-  --briefly-accent-danger: #cd4246;
-  --briefly-gold: #b98b24;
-  --briefly-gold-bright: #cfa03b;
+  /* ── Borders ────────────────────────────────────────────── */
+  --briefly-border:         #E8E3DA;
+  --briefly-border-muted:   #F0EDE6;
+  --briefly-border-strong:  #D4CCBF;
 
-  --briefly-space-1: 4px;
-  --briefly-space-2: 8px;
-  --briefly-space-3: 12px;
-  --briefly-space-4: 16px;
-  --briefly-space-5: 20px;
-  --briefly-space-6: 24px;
+  /* ── Semantic ───────────────────────────────────────────── */
+  --briefly-ai:             #4A7C7E;   /* ← AI mark hex HERE — ONLY for summaries */
+  --briefly-ai-subtle:      #E5EEEE;
+  --briefly-success:        #3E7A4E;
+  --briefly-success-subtle: #E2EEE5;
+  --briefly-danger:         #A14234;
+  --briefly-danger-subtle:  #F0DDD9;
 
-  --briefly-radius-sm: 6px;
-  --briefly-radius-md: 8px;
-  --briefly-radius-lg: 12px;
-  --briefly-radius-xl: 16px;
+  /* ── Typography ─────────────────────────────────────────── */
+  --briefly-font:       'DM Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --briefly-font-mono:  'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
-  --briefly-shadow-sm:
-    0 0 0 1px rgba(17, 20, 24, 0.1),
-    0 1px 3px 0 rgba(0, 0, 0, 0.1),
-    0 1px 2px -1px rgba(0, 0, 0, 0.1);
-  --briefly-shadow-gold: 0 0 0 1px rgba(185, 139, 36, 0.26), 0 6px 20px rgba(185, 139, 36, 0.14);
+  /* ── Spacing (4px base) ─────────────────────────────────── */
+  --briefly-s1:  4px;
+  --briefly-s2:  8px;
+  --briefly-s3: 12px;
+  --briefly-s4: 16px;
+  --briefly-s5: 20px;
+  --briefly-s6: 24px;
 
-  --briefly-font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* ── Radius ─────────────────────────────────────────────── */
+  --briefly-r-sm:   8px;
+  --briefly-r-md:  12px;
+  --briefly-r-lg:  18px;
+  --briefly-r-pill: 999px;
+
+  /* ── Elevation ──────────────────────────────────────────── */
+  --briefly-elev-1: 0 1px 2px rgba(20,18,16,.05);
+  --briefly-elev-2: 0 1px 2px rgba(20,18,16,.05), 0 6px 18px -6px rgba(20,18,16,.10);
+  --briefly-elev-3: 0 1px 2px rgba(20,18,16,.05), 0 16px 36px -10px rgba(20,18,16,.16);
+  --briefly-elev-signal:
+    0 0 0 1px color-mix(in srgb, var(--briefly-signal) 32%, transparent),
+    0 6px 20px -4px color-mix(in srgb, var(--briefly-signal) 26%, transparent);
+
+  /* ── Motion ─────────────────────────────────────────────── */
+  --briefly-ease:      cubic-bezier(0.2, 0.7, 0.2, 1);
+  --briefly-dur-fast:  140ms;
+  --briefly-dur:       220ms;
+
+  /* ── Legacy aliases (keeps existing component files working) */
+  --briefly-bg-canvas:        var(--briefly-canvas);
+  --briefly-bg-surface:       var(--briefly-surface);
+  --briefly-bg-surface-muted: var(--briefly-surface-muted);
+  --briefly-bg-hover:         var(--briefly-surface-muted);
+  --briefly-bg-active:        var(--briefly-signal-subtle);
+  --briefly-text-primary:     var(--briefly-ink);
+  --briefly-text-secondary:   var(--briefly-ink-soft);
+  --briefly-text-muted:       var(--briefly-ink-muted);
+  --briefly-text-inverse:     var(--briefly-ink-inverse);
+  --briefly-border-default:   var(--briefly-border);
+  --briefly-border-hover:     var(--briefly-border-strong);
+  --briefly-accent-primary:   var(--briefly-signal);
+  --briefly-accent-success:   var(--briefly-success);
+  --briefly-accent-danger:    var(--briefly-danger);
+  --briefly-shadow-sm:        var(--briefly-elev-1);
+  --briefly-font-sans:        var(--briefly-font);
+  --briefly-radius-sm:        var(--briefly-r-sm);
+  --briefly-radius-md:        var(--briefly-r-md);
+  --briefly-radius-lg:        var(--briefly-r-lg);
+  --briefly-radius-xl:        var(--briefly-r-lg);
+  --briefly-space-1:          var(--briefly-s1);
+  --briefly-space-2:          var(--briefly-s2);
+  --briefly-space-3:          var(--briefly-s3);
+  --briefly-space-4:          var(--briefly-s4);
+  --briefly-space-5:          var(--briefly-s5);
+  --briefly-space-6:          var(--briefly-s6);
 }

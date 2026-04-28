@@ -17,7 +17,36 @@
       <p class="eyebrow">Briefly Extension</p>
       <h1>Save now. Learn now.</h1>
       <p class="subtitle">No backlog guilt. Capture any page and return to a clean, bite-sized queue.</p>
+
       <button id="login-btn" class="btn primary">Continue with Google</button>
+
+      <div class="divider">
+        <span>or</span>
+      </div>
+
+      <form id="email-login-form" class="email-login-form" aria-label="Email password login">
+        <input
+          type="email"
+          id="email-input"
+          name="email"
+          placeholder="Email"
+          required
+          autocomplete="email"
+          class="input"
+        />
+        <input
+          type="password"
+          id="password-input"
+          name="password"
+          placeholder="Password"
+          required
+          autocomplete="current-password"
+          class="input"
+        />
+        <button type="submit" id="email-login-btn" class="btn primary block">
+          Sign in with email
+        </button>
+      </form>
     </section>
 
     <section id="logged-in" class="state hidden" aria-label="Logged in">
@@ -37,8 +66,10 @@
           <span>Auto-create a 3-line summary</span>
         </label>
 
-        <label class="setting-item" for="api-url">API base URL</label>
-        <input type="url" id="api-url" name="apiBaseUrl" inputmode="url" autocomplete="url">
+        <div id="api-url-setting">
+          <label class="setting-item" for="api-url">API base URL</label>
+          <input type="url" id="api-url" name="apiBaseUrl" inputmode="url" autocomplete="url">
+        </div>
       </div>
 
       <button id="logout-btn" class="btn ghost block">Logout</button>

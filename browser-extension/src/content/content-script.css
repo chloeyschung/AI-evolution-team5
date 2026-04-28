@@ -1,53 +1,157 @@
-/* Content Script Styles - Minimal, only for injected elements */
-@import '../styles/tokens.css';
+/* ============================================================
+   content-script.css — Briefly injected UI  v4.0
+   ============================================================
+   These styles run on THIRD-PARTY pages (any website).
+   All classes use the .briefly-* namespace to avoid collisions.
+   All tokens use the --briefly-* prefix for the same reason.
+   No @import — tokens are inlined here to keep the inject minimal.
 
+   To change theme: Ctrl+F the hex → replace → save.
+   Save button accent  →  #1F6B58
+   Save button text    →  #FFFFFF
+   ============================================================ */
+
+/* ── Inline tokens (no @import — content scripts are isolated) */
+.briefly-save-button,
+.briefly-toast {
+  --s-signal:        #1F6B58;   /* ← accent hex HERE */
+  --s-signal-hover:  #185746;
+  --s-signal-active: #124038;
+  --s-signal-on:     #FFFFFF;
+  --s-surface:       #FFFFFF;
+  --s-ink:           #141210;
+  --s-ink-soft:      #5C5347;
+  --s-border:        #E8E3DA;
+  --s-ai:            #4A7C7E;
+  --s-ai-subtle:     #E5EEEE;
+  --s-font:          'DM Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --s-font-mono:     'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --s-ease:          cubic-bezier(0.2, 0.7, 0.2, 1);
+  --s-elev:          0 1px 2px rgba(20,18,16,.05), 0 8px 24px -4px rgba(20,18,16,.16);
+  --s-elev-signal:   0 0 0 1px color-mix(in srgb, #1F6B58 32%, transparent),
+                     0 6px 20px -4px color-mix(in srgb, #1F6B58 28%, transparent);
+}
+
+/* ── Save button ─────────────────────────────────────────── */
 .briefly-save-button {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  padding: 12px 20px;
-  background: linear-gradient(135deg, var(--briefly-accent-primary), color-mix(in srgb, var(--briefly-accent-primary) 72%, var(--briefly-accent-secondary)));
-  color: var(--briefly-text-inverse);
-  border: 1px solid color-mix(in srgb, var(--briefly-accent-primary) 45%, var(--briefly-border-default));
-  border-radius: 8px;
-  cursor: pointer;
   z-index: 999999;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 12px 18px;
+  min-height: 44px;
+
+  font-family: var(--s-font);
   font-size: 14px;
-  line-height: 1.43;
   font-weight: 600;
-  font-family: var(--briefly-font-sans);
-  box-shadow: var(--briefly-shadow-sm);
+  line-height: 1;
+  color: var(--s-signal-on);
+
+  background: var(--s-signal);  /* plain fill — no gradient */
+  border: 1px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
   touch-action: manipulation;
+
+  box-shadow: var(--s-elev);
+
   transition:
-    background-color 160ms cubic-bezier(0.4, 1, 0.75, 0.9),
-    transform 160ms cubic-bezier(0.4, 1, 0.75, 0.9),
-    border-color 160ms cubic-bezier(0.4, 1, 0.75, 0.9);
+    background-color 140ms var(--s-ease),
+    box-shadow       140ms var(--s-ease),
+    transform        140ms var(--s-ease),
+    border-color     140ms var(--s-ease);
 }
 
 .briefly-save-button:hover {
-  border-color: color-mix(in srgb, var(--briefly-accent-primary) 72%, var(--briefly-border-default));
-  filter: saturate(1.06) brightness(0.98);
+  background: var(--s-signal-hover);
+  box-shadow: var(--s-elev-signal);
+  transform: translateY(-1px);
 }
 
 .briefly-save-button:active {
-  transform: scale(0.95);
+  background: var(--s-signal-active);
+  transform: translateY(0);
+  box-shadow: var(--s-elev);
 }
 
 .briefly-save-button:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--briefly-accent-primary) 80%, white);
+  outline: 2px solid var(--s-signal);
   outline-offset: 2px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--s-signal) 22%, transparent);
 }
 
+/* Saved state — success, not signal */
 .briefly-save-button.saved {
-  background: var(--briefly-accent-success);
+  background: #3E7A4E;
+  box-shadow: var(--s-elev);
+}
+
+.briefly-save-button.saving {
+  opacity: 0.75;
+  cursor: wait;
+}
+
+/* ── Toast notification ──────────────────────────────────── */
+/* Shown briefly after saving, then auto-dismissed */
+.briefly-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 999999;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 12px 16px;
+  min-height: 44px;
+  max-width: 320px;
+
+  font-family: var(--s-font);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--s-ink);
+
+  background: var(--s-surface);
+  border: 1px solid var(--s-border);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(20,18,16,.05), 0 16px 36px -10px rgba(20,18,16,.18);
+
+  animation: briefly-slide-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.briefly-toast-icon {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--s-signal);
+  color: var(--s-signal-on);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+.briefly-toast-ai {
+  background: var(--s-ai-subtle);
+  border-color: color-mix(in srgb, var(--s-ai) 25%, var(--s-border));
+}
+
+.briefly-toast-ai .briefly-toast-icon {
+  background: var(--s-ai);
+}
+
+/* ── Animations ──────────────────────────────────────────── */
+@keyframes briefly-slide-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .briefly-save-button {
-    transition-duration: 1ms;
-  }
-
-  .briefly-save-button:active {
-    transform: none;
-  }
+  .briefly-save-button { transition-duration: 1ms; }
+  .briefly-toast { animation-duration: 1ms; }
+  .briefly-save-button:active { transform: none; }
 }

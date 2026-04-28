@@ -1,4 +1,5 @@
 import { storageManager } from '../shared/storage';
+import { getRuntimeConfig, resolveApiBaseUrl } from '../shared/runtime-config';
 
 interface GoogleTokenResponse {
   access_token: string;
@@ -49,7 +50,7 @@ async function handleLogin(): Promise<void> {
     showLoading();
 
     // Get Google Client ID from environment
-    const googleClientId = (window as any).__BRIEFLY_CONFIG?.GOOGLE_CLIENT_ID || '';
+    const googleClientId = getRuntimeConfig().GOOGLE_CLIENT_ID || '';
     if (!googleClientId) {
       throw new Error('Google Client ID not configured');
     }
@@ -86,7 +87,7 @@ async function handleLogin(): Promise<void> {
 
     // Step 3: Get API base URL from storage
     const settings = await storageManager.getSettings();
-    const apiBaseUrl = settings.apiBaseUrl;
+    const apiBaseUrl = resolveApiBaseUrl(settings.apiBaseUrl);
 
     // Step 4: Exchange Google ID token for backend tokens
     const backendResponse = await fetch(`${apiBaseUrl}/api/v1/auth/google`, {
