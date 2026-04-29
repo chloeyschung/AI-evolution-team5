@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Briefly</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div id="app">
+    <div id="loading" class="state hidden" role="status" aria-live="polite">
+      <div class="spinner" aria-hidden="true"></div>
+      <p>Checking your Briefly session…</p>
+    </div>
+
+    <section id="logged-out" class="state hidden" aria-label="Logged out">
+      <p class="eyebrow">Briefly Extension</p>
+      <h1>Save now. Learn now.</h1>
+      <p class="subtitle">No backlog guilt. Capture any page and return to a clean, bite-sized queue.</p>
+
+      <button id="login-btn" class="btn primary">Continue with Google</button>
+
+      <div class="divider">
+        <span>or</span>
+      </div>
+
+      <form id="email-login-form" class="email-login-form" aria-label="Email password login">
+        <input
+          type="email"
+          id="email-input"
+          name="email"
+          placeholder="Email"
+          required
+          autocomplete="email"
+          class="input"
+        />
+        <input
+          type="password"
+          id="password-input"
+          name="password"
+          placeholder="Password"
+          required
+          autocomplete="current-password"
+          class="input"
+        />
+        <button type="submit" id="email-login-btn" class="btn primary block">
+          Sign in with email
+        </button>
+      </form>
+    </section>
+
+    <section id="logged-in" class="state hidden" aria-label="Logged in">
+      <header class="panel-head">
+        <div>
+          <p class="eyebrow">Ready to capture</p>
+          <h2>Briefly</h2>
+        </div>
+        <span id="user-email" class="user-pill">user@example.com</span>
+      </header>
+
+      <button id="save-current-page" class="btn primary block">Save current page</button>
+
+      <div class="quick-actions" aria-label="Quick actions">
+        <button id="open-dashboard" class="btn secondary block">Open Dashboard</button>
+      </div>
+
+      <section class="recent-panel" aria-label="Recent saves">
+        <p class="section-title">Recent</p>
+        <ul id="recent-list" class="recent-list">
+          <li class="recent-empty">No recent saves yet.</li>
+        </ul>
+      </section>
+
+      <div class="settings" aria-label="Capture settings">
+        <div id="api-url-setting">
+          <label class="setting-item" for="api-url">API base URL</label>
+          <input type="url" id="api-url" name="apiBaseUrl" inputmode="url" autocomplete="url">
+        </div>
+      </div>
+
+      <button id="logout-btn" class="btn ghost block">Logout</button>
+    </section>
+
+    <section id="error" class="state hidden" aria-live="polite">
+      <p class="error-message" id="error-message">Something went wrong.</p>
+      <button id="retry-btn" class="btn ghost block">Retry</button>
+    </section>
+  </div>
+
+  <script type="module" src="popup.ts"></script>
+</body>
+</html>

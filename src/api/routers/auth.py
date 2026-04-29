@@ -1,0 +1,863 @@
+"""Auth domain router — /auth/* login, register, token refresh, Google OAuth."""
+
+import logging
+from datetime import timedelta
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ...constants import AuthProvider, ErrorCode
+from ...data.auth_repository import AuthenticationRepository
+from ...data.database import get_db
+from ...data.email_auth_repository import EmailAuthRepository
+from ...data.models import AuditEventType, UserAuthMethod, UserProfile, utc_now
+from ...data.repository import AuditRepository, UserProfileRepository
+from ...auth.email_auth import hash_password, hmac_email, encrypt_email, verify_password, generate_token
+from ...auth.tokens import verify_access_token
+from ...services.email_service import EmailService
+from ...utils.datetime_utils import serialize_datetime
+from ...utils.token_hashing import hash_access_token as _hash_token
+from ..dependencies import get_current_user
+from ...middleware.rate_limiter import limiter
+from ..schemas import (
+    AppleLoginRequest,
+    AuthStatusResponse,
+    GoogleLoginRequest,
+    GoogleLoginResponse,
+    GoogleOAuthCodeRequest,
+    LinkAccountRequest,
+    LinkAccountResponse,
+    LoginRequest,
+    LoginResponse,
+    LogoutResponse,
+    PasswordResetConfirmResponse,
+    PasswordResetConfirmSchema,
+    PasswordResetRequestResponse,
+    PasswordResetRequestSchema,
+    RegisterRequest,
+    RegisterResponse,
+    ResendVerificationRequest,
+    ResendVerificationResponse,
+    TokenRefreshRequest,
+    TokenRefreshResponse,
+    UserProfileResponse,
+    VerifyEmailRequest,
+    VerifyEmailResponse,
+)
+
+router = APIRouter()
+logger = logging.getLogger(__name__)
+
+_VERIFICATION_EMAIL_SENT_MESSAGE = "If that email is registered and not yet verified, a verification email has been sent."
+
+
+def _normalize_email(email: str) -> str:
+    return email.strip().lower()
+
+
+async def _rotate_verification_token(email_repo: EmailAuthRepository, user_id: int) -> str:
+    await email_repo.invalidate_verification_tokens_for_user(user_id)
+    raw_token, token_hash = generate_token()
+    await email_repo.create_verification_token(
+        user_id=user_id,
+        token_hash=token_hash,
+        expires_at=utc_now() + timedelta(hours=24),
+    )
+    return raw_token
+
+
+def _send_verification_email_safely(email: str, raw_token: str) -> None:
+    try:
+        EmailService().send_verification_email(email, raw_token)
+    except Exception as exc:
+        logger.error("Verification email failed for %s: %s", email, exc, exc_info=True)
+
+
+# AUTH-001: Authentication endpoints
+
+
+@router.get("/auth/status", response_model=AuthStatusResponse)
+async def get_auth_status(
+    db: AsyncSession = Depends(get_db),
+    authorization: str | None = Header(None, alias="Authorization"),
+) -> AuthStatusResponse:
+    """Check current authentication status.
+
+    Args:
+        db: Database session.
+        authorization: Authorization header with Bearer token.
+
+    Returns:
+        Auth status with user info if authenticated.
+    """
+    # No token provided
+    if not authorization or not authorization.startswith("Bearer "):
+        return AuthStatusResponse(is_authenticated=False)
+
+    # Extract token
+    token = authorization[7:]  # Remove "Bearer " prefix
+
+    # Verify JWT signature before touching the database
+    if verify_access_token(token) is None:
+        return AuthStatusResponse(is_authenticated=False)
+
+    auth_repo = AuthenticationRepository(db)
+
+    # Get token from database
+    token_record = await auth_repo.get_token_by_access_token(token)
+
+    if not token_record:
+        return AuthStatusResponse(is_authenticated=False)
+
+    # Return authenticated status
+    user = await db.get(UserProfile, token_record.user_id)
+    return AuthStatusResponse(
+        is_authenticated=True,
+        user_id=token_record.user_id,
+        email=user.email if user else None,
+        display_name=user.display_name if user else None,
+        avatar_url=user.avatar_url if user else None,
+        token_expires_at=serialize_datetime(token_record.expires_at),
+    )
+
+
+@router.post("/auth/refresh", response_model=TokenRefreshResponse)
+@limiter.limit("10/minute")
+async def refresh_auth_token(
+    request: Request,
+    data: TokenRefreshRequest,
+    db: AsyncSession = Depends(get_db),
+) -> TokenRefreshResponse:
+    """Refresh access token using refresh token.
+
+    Implements token rotation: issues new refresh token on each refresh.
+
+    Args:
+        request: Incoming HTTP request (for IP extraction).
+        data: Refresh token request.
+        db: Database session.
+
+    Returns:
+        New access token and expiry time.
+
+    Raises:
+        401: Invalid or expired refresh token.
+    """
+    ip = request.client.host if request.client else None
+    auth_repo = AuthenticationRepository(db)
+
+    # Refresh token (includes token rotation)
+    refresh_result = await auth_repo.refresh_access_token(data.refresh_token)
+
+    if not refresh_result:
+        raise HTTPException(
+            status_code=401,
+            detail={"error": ErrorCode.INVALID_REFRESH_TOKEN, "message": "Invalid or expired refresh token."},
+        )
+
+    token_record, access_token, raw_refresh_token = refresh_result
+
+    # Log refresh event — token_record already has user_id, commit happens inside refresh_access_token
+    audit = AuditRepository(db)
+    await audit.log_event(
+        AuditEventType.REFRESH_TOKEN,
+        user_id=token_record.user_id,
+        ip_address=ip,
+    )
+    await db.commit()
+
+    return TokenRefreshResponse(
+        access_token=access_token,  # Plaintext JWT for client
+        refresh_token=raw_refresh_token,  # Rotated refresh token (plaintext)
+        expires_at=serialize_datetime(token_record.expires_at),
+    )
+
+
+# AUTH-002: Google OAuth endpoint
+
+
+@router.post("/auth/apple", status_code=200, response_model=GoogleLoginResponse)
+@limiter.limit("5/minute")
+async def apple_login(
+    request: Request,
+    data: AppleLoginRequest,
+    db: AsyncSession = Depends(get_db),
+) -> GoogleLoginResponse:
+    """Authenticate with Sign in with Apple and issue Briefly tokens."""
+    from src.auth.apple_oauth import AppleTokenVerificationError, verify_apple_identity_token
+    from src.config import settings
+    from src.data.repository import AccountDeletionRepository
+
+    try:
+        claims = await verify_apple_identity_token(data.identity_token, settings.APPLE_BUNDLE_ID)
+    except AppleTokenVerificationError as exc:
+        raise HTTPException(
+            status_code=401,
+            detail={"error": "invalid_apple_token", "message": str(exc)},
+        ) from exc
+
+    apple_sub = str(claims["sub"])
+    email = (data.email or claims.get("email") or "").strip().lower()
+    display_name = data.full_name
+
+    email_auth_repo = EmailAuthRepository(db)
+    existing_method = await email_auth_repo.get_auth_method_by_provider(AuthProvider.APPLE, apple_sub)
+
+    user_repo = UserProfileRepository(db)
+    is_new_user = False
+
+    if existing_method is not None:
+        existing_user = await db.get(UserProfile, existing_method.user_id)
+        if existing_user is None:
+            raise HTTPException(
+                status_code=401,
+                detail={"error": "invalid_apple_token", "message": "Apple account is not linked to a valid user."},
+            )
+        await user_repo.update_last_login(existing_user.id)
+    else:
+        if not email:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "apple_email_required",
+                    "message": "Apple email is required on first sign-in.",
+                },
+            )
+
+        deletion_repo = AccountDeletionRepository(db)
+        is_blocked, block_expires_at = await deletion_repo.is_account_blocked(email=email)
+        if is_blocked:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": "account_restriction",
+                    "message": "Account recently deleted. Please wait 30 days before re-registering.",
+                    "available_at": serialize_datetime(block_expires_at),
+                },
+            )
+
+        existing_user = await user_repo.get_user_by_email(email)
+        if existing_user:
+            await user_repo.update_last_login(existing_user.id)
+        else:
+            existing_user = await user_repo.create_user(
+                email=email,
+                google_sub=None,
+                display_name=display_name,
+            )
+            is_new_user = True
+
+        method = await email_auth_repo.create_auth_method(
+            user_id=existing_user.id,
+            provider=AuthProvider.APPLE,
+            provider_id=apple_sub,
+        )
+        await email_auth_repo.mark_email_verified(method.id)
+
+    auth_repo = AuthenticationRepository(db)
+    token_record, access_token, raw_refresh_token = await auth_repo.create_tokens(existing_user.id)
+
+    ip = request.client.host if request.client else None
+    audit = AuditRepository(db)
+    await audit.log_event(
+        AuditEventType.LOGIN_SUCCESS,
+        user_id=existing_user.id,
+        ip_address=ip,
+        metadata={"provider": "apple"},
+    )
+    await db.commit()
+
+    return GoogleLoginResponse(
+        access_token=access_token,
+        refresh_token=raw_refresh_token,
+        expires_at=serialize_datetime(token_record.expires_at),
+        user=UserProfileResponse(
+            id=existing_user.id,
+            email=existing_user.email,
+            display_name=existing_user.display_name,
+            avatar_url=existing_user.avatar_url,
+            bio=existing_user.bio,
+            timezone=existing_user.timezone or "UTC",
+            created_at=serialize_datetime(existing_user.created_at),
+            updated_at=serialize_datetime(existing_user.updated_at),
+        ),
+        is_new_user=is_new_user,
+    )
+
+
+@router.post("/auth/google", status_code=200, response_model=GoogleLoginResponse)
+@limiter.limit("5/minute")
+async def google_login(
+    request: Request,
+    data: GoogleLoginRequest,
+    db: AsyncSession = Depends(get_db),
+) -> GoogleLoginResponse:
+    """Authenticate with Google and get access tokens.
+
+    Handles:
+    - New user registration (auto-create account)
+    - Existing user login (issue new tokens)
+    - 30-day re-registration block enforcement
+
+    Args:
+        data: Google login request with ID token and user info.
+        db: Database session.
+
+    Returns:
+        Access tokens and user info.
+
+    Raises:
+        401: Invalid Google ID token.
+        403: Account within 30-day re-registration block.
+    """
+    from src.auth.google_oauth import GoogleTokenVerificationError, verify_google_id_token
+    from src.config import settings
+    from src.data.repository import AccountDeletionRepository, UserProfileRepository
+
+    # Verify Google ID token with audience validation
+    try:
+        await verify_google_id_token(data.google_id_token, client_id=settings.GOOGLE_CLIENT_ID)
+    except GoogleTokenVerificationError as e:
+        raise HTTPException(
+            status_code=401,
+            detail={"error": ErrorCode.INVALID_GOOGLE_TOKEN, "message": str(e)},
+        ) from e
+
+    # Extract user info from request
+    email = data.google_user_info.email
+    google_sub = data.google_user_info.id
+
+    # Check for 30-day re-registration block
+    deletion_repo = AccountDeletionRepository(db)
+    is_blocked, block_expires_at = await deletion_repo.is_account_blocked(email=email, google_sub=google_sub)
+
+    if is_blocked:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "account_restriction",
+                "message": "Account recently deleted. Please wait 30 days before re-registering.",
+                "available_at": serialize_datetime(block_expires_at),
+            },
+        )
+
+    # Check if user already exists
+    user_repo = UserProfileRepository(db)
+    existing_user = await user_repo.get_user_by_email(email)
+
+    if not existing_user:
+        # Check by google_sub as fallback
+        existing_user = await user_repo.get_user_by_google_sub(google_sub)
+
+    auth_repo = AuthenticationRepository(db)
+    is_new_user = False
+
+    if existing_user:
+        # Existing user: update last login
+        await user_repo.update_last_login(existing_user.id)
+    else:
+        # New user: create account
+        existing_user = await user_repo.create_user(
+            email=email,
+            google_sub=google_sub,
+            display_name=data.google_user_info.name,
+            avatar_url=data.google_user_info.picture,
+        )
+        is_new_user = True
+
+    # Upsert user_auth_methods row for Google provider (AUTH-005)
+    email_auth_repo = EmailAuthRepository(db)
+    existing_method = await email_auth_repo.get_auth_method_by_provider(AuthProvider.GOOGLE, google_sub)
+    if not existing_method:
+        method = await email_auth_repo.create_auth_method(
+            user_id=existing_user.id,
+            provider=AuthProvider.GOOGLE,
+            provider_id=google_sub,
+        )
+        await email_auth_repo.mark_email_verified(method.id)
+
+    # Create authentication tokens (returns tuple of record, plaintext JWT, plaintext refresh token)
+    token_record, access_token, raw_refresh_token = await auth_repo.create_tokens(existing_user.id)
+
+    ip = request.client.host if request.client else None
+    audit = AuditRepository(db)
+    await audit.log_event(
+        AuditEventType.LOGIN_SUCCESS,
+        user_id=existing_user.id,
+        ip_address=ip,
+        metadata={"provider": "google"},
+    )
+    await db.commit()
+
+    return GoogleLoginResponse(
+        access_token=access_token,  # Plaintext JWT for client
+        refresh_token=raw_refresh_token,
+        expires_at=serialize_datetime(token_record.expires_at),
+        user=UserProfileResponse(
+            id=existing_user.id,
+            email=existing_user.email,
+            display_name=existing_user.display_name,
+            avatar_url=existing_user.avatar_url,
+            bio=existing_user.bio,
+            timezone=existing_user.timezone or "UTC",
+            created_at=serialize_datetime(existing_user.created_at),
+            updated_at=serialize_datetime(existing_user.updated_at),
+        ),
+        is_new_user=is_new_user,
+    )
+
+
+@router.post("/auth/google/code", status_code=200, response_model=GoogleLoginResponse)
+@limiter.limit("5/minute")
+async def google_login_with_code(
+    request: Request,
+    data: GoogleOAuthCodeRequest,
+    db: AsyncSession = Depends(get_db),
+) -> GoogleLoginResponse:
+    """Authenticate with Google OAuth code exchange (web flow).
+
+    This endpoint handles the full OAuth code exchange on the backend,
+    so the client secret never needs to be exposed to the frontend.
+
+    Handles:
+    - OAuth code → token exchange (backend with client_secret)
+    - New user registration (auto-create account)
+    - Existing user login (issue new tokens)
+    - 30-day re-registration block enforcement
+
+    Args:
+        data: OAuth code from Google redirect.
+        db: Database session.
+
+    Returns:
+        Access tokens and user info.
+
+    Raises:
+        400: Missing or invalid OAuth code.
+        401: Invalid Google token.
+        403: Account within 30-day re-registration block.
+    """
+    from src.auth.google_oauth import (
+        GoogleTokenVerificationError,
+        exchange_auth_code_for_tokens,
+    )
+    from src.config import settings
+    from src.data.repository import AccountDeletionRepository, UserProfileRepository
+
+    if not data.code:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "oauth_code_required", "message": "OAuth code is required."},
+        )
+
+    # Exchange code for tokens (backend has client_secret).
+    # Chrome extension flows use a chromiumapp.org redirect_uri that must match
+    # what was sent in the initial auth request — accept it from the client when provided.
+    effective_redirect_uri = data.redirect_uri or settings.GOOGLE_REDIRECT_URI
+    try:
+        id_token, google_user_info = await exchange_auth_code_for_tokens(
+            code=data.code,
+            client_id=settings.GOOGLE_CLIENT_ID,
+            client_secret=settings.GOOGLE_CLIENT_SECRET,
+            redirect_uri=effective_redirect_uri,
+        )
+    except GoogleTokenVerificationError as e:
+        raise HTTPException(
+            status_code=401,
+            detail={"error": ErrorCode.INVALID_GOOGLE_TOKEN, "message": str(e)},
+        ) from e
+
+    # Extract user info
+    email = google_user_info.get("email")
+    google_sub = google_user_info.get("sub") or google_user_info.get("id")
+
+    if not email or not google_sub:
+        raise HTTPException(
+            status_code=401,
+            detail={"error": "google_user_info_missing", "message": "Missing email or user ID from Google."},
+        )
+
+    # Check for 30-day re-registration block
+    deletion_repo = AccountDeletionRepository(db)
+    is_blocked, block_expires_at = await deletion_repo.is_account_blocked(
+        email=email, google_sub=google_sub
+    )
+
+    if is_blocked:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "account_restriction",
+                "message": "Account recently deleted. Please wait 30 days before re-registering.",
+                "available_at": serialize_datetime(block_expires_at),
+            },
+        )
+
+    # Check if user already exists
+    user_repo = UserProfileRepository(db)
+    existing_user = await user_repo.get_user_by_email(email)
+
+    if not existing_user:
+        # Check by google_sub as fallback
+        existing_user = await user_repo.get_user_by_google_sub(google_sub)
+
+    auth_repo = AuthenticationRepository(db)
+    is_new_user = False
+
+    if existing_user:
+        # Existing user: update last login
+        await user_repo.update_last_login(existing_user.id)
+    else:
+        # New user: create account
+        existing_user = await user_repo.create_user(
+            email=email,
+            google_sub=google_sub,
+            display_name=google_user_info.get("name"),
+            avatar_url=google_user_info.get("picture"),
+        )
+        is_new_user = True
+
+    # Upsert user_auth_methods row for Google provider (AUTH-005)
+    email_auth_repo = EmailAuthRepository(db)
+    existing_method = await email_auth_repo.get_auth_method_by_provider(AuthProvider.GOOGLE, google_sub)
+    if not existing_method:
+        method = await email_auth_repo.create_auth_method(
+            user_id=existing_user.id,
+            provider=AuthProvider.GOOGLE,
+            provider_id=google_sub,
+        )
+        await email_auth_repo.mark_email_verified(method.id)
+
+    # Create authentication tokens (returns tuple of record, plaintext JWT, plaintext refresh token)
+    token_record, access_token, raw_refresh_token = await auth_repo.create_tokens(existing_user.id)
+
+    ip = request.client.host if request.client else None
+    audit = AuditRepository(db)
+    await audit.log_event(
+        AuditEventType.LOGIN_SUCCESS,
+        user_id=existing_user.id,
+        ip_address=ip,
+        metadata={"provider": "google"},
+    )
+    await db.commit()
+
+    return GoogleLoginResponse(
+        access_token=access_token,  # Plaintext JWT for client
+        refresh_token=raw_refresh_token,
+        expires_at=serialize_datetime(token_record.expires_at),
+        user=UserProfileResponse(
+            id=existing_user.id,
+            email=existing_user.email,
+            display_name=existing_user.display_name,
+            avatar_url=existing_user.avatar_url,
+            bio=existing_user.bio,
+            timezone=existing_user.timezone or "UTC",
+            created_at=serialize_datetime(existing_user.created_at),
+            updated_at=serialize_datetime(existing_user.updated_at),
+        ),
+        is_new_user=is_new_user,
+    )
+
+
+# AUTH-005: Email/Password auth routes ────────────────────────────────────────
+
+
+@router.post("/auth/register", status_code=201, response_model=RegisterResponse)
+@limiter.limit("5/minute")
+async def register(
+    request: Request,
+    data: RegisterRequest,
+    db: AsyncSession = Depends(get_db),
+) -> RegisterResponse:
+    email_repo = EmailAuthRepository(db)
+    normalized_email = _normalize_email(data.email)
+    provider_id = hmac_email(normalized_email)
+
+    existing = await email_repo.get_auth_method_by_provider(AuthProvider.EMAIL_PASSWORD, provider_id)
+    if existing:
+        if existing.email_verified:
+            raise HTTPException(
+                status_code=409,
+                detail={"error": "email_exists", "message": "An account with this email already exists.", "providers": [AuthProvider.EMAIL_PASSWORD.value]},
+            )
+
+        existing.password_hash = hash_password(data.password)
+        raw_token = await _rotate_verification_token(email_repo, existing.user_id)
+        await db.commit()
+        _send_verification_email_safely(normalized_email, raw_token)
+        return RegisterResponse(message="Verification email sent. Please check your inbox.")
+
+    user_repo = UserProfileRepository(db)
+    existing_user = await user_repo.get_user_by_email(normalized_email)
+    if existing_user:
+        auth_methods = await email_repo.get_auth_methods_for_user(existing_user.id)
+        raise HTTPException(
+            status_code=409,
+            detail={"error": "email_exists", "message": "An account with this email already exists.", "providers": [method.provider.value for method in auth_methods]},
+        )
+
+    user = UserProfile(
+        email=normalized_email,
+        created_at=utc_now(),
+        updated_at=utc_now(),
+    )
+    db.add(user)
+    await db.flush()
+
+    await email_repo.create_auth_method(
+        user_id=user.id,
+        provider=AuthProvider.EMAIL_PASSWORD,
+        provider_id=provider_id,
+        password_hash=hash_password(data.password),
+        email_encrypted=encrypt_email(normalized_email),
+    )
+
+    raw_token = await _rotate_verification_token(email_repo, user.id)
+
+    await db.commit()
+    _send_verification_email_safely(normalized_email, raw_token)
+
+    return RegisterResponse(message="Verification email sent. Please check your inbox.")
+
+
+@router.post("/auth/verify-email")
+async def verify_email(
+    request: VerifyEmailRequest,
+    db: AsyncSession = Depends(get_db),
+) -> VerifyEmailResponse:
+    email_repo = EmailAuthRepository(db)
+    token_hash = _hash_token(request.token)
+    token_rec = await email_repo.consume_verification_token(token_hash)
+    if token_rec is None:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "invalid_or_expired_token", "message": "Verification token is invalid or has expired."},
+        )
+
+    method = await email_repo.get_email_auth_method(token_rec.user_id)
+    if method:
+        method.email_verified = True
+        method.verified_at = utc_now()
+    await db.commit()
+
+    return VerifyEmailResponse(message="Email verified. You can now sign in.")
+
+
+@router.post("/auth/verify-email/resend", response_model=ResendVerificationResponse)
+async def resend_verification_email(
+    request: ResendVerificationRequest,
+    db: AsyncSession = Depends(get_db),
+) -> ResendVerificationResponse:
+    email_repo = EmailAuthRepository(db)
+    normalized_email = _normalize_email(request.email)
+    provider_id = hmac_email(normalized_email)
+    method = await email_repo.get_auth_method_by_provider(AuthProvider.EMAIL_PASSWORD, provider_id)
+
+    if method and not method.email_verified:
+        raw_token = await _rotate_verification_token(email_repo, method.user_id)
+        await db.commit()
+        _send_verification_email_safely(normalized_email, raw_token)
+
+    return ResendVerificationResponse(message=_VERIFICATION_EMAIL_SENT_MESSAGE)
+
+
+@router.post("/auth/login", response_model=LoginResponse)
+@limiter.limit("3/minute")
+async def login_email(
+    request: Request,
+    data: LoginRequest,
+    db: AsyncSession = Depends(get_db),
+) -> LoginResponse:
+    ip = request.client.host if request.client else None
+    audit = AuditRepository(db)
+    email_repo = EmailAuthRepository(db)
+    normalized_email = _normalize_email(data.email)
+    provider_id = hmac_email(normalized_email)
+
+    method = await email_repo.get_auth_method_by_provider(AuthProvider.EMAIL_PASSWORD, provider_id)
+    if method is None:
+        await audit.log_event(
+            AuditEventType.LOGIN_FAILURE,
+            ip_address=ip,
+            metadata={"reason": "user_not_found", "email_hmac": provider_id},
+        )
+        await db.commit()
+        raise HTTPException(
+            status_code=401,
+            detail={"error": "invalid_credentials", "message": "Invalid email or password."},
+        )
+
+    if not verify_password(data.password, method.password_hash or ""):
+        await audit.log_event(
+            AuditEventType.LOGIN_FAILURE,
+            user_id=method.user_id,
+            ip_address=ip,
+            metadata={"reason": "invalid_password"},
+        )
+        await db.commit()
+        raise HTTPException(
+            status_code=401,
+            detail={"error": "invalid_credentials", "message": "Invalid email or password."},
+        )
+
+    if not method.email_verified:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "email_not_verified",
+                "can_resend": True,
+                "message": "Email not verified. Please verify your email or request a new verification email.",
+            },
+        )
+
+    user = await db.get(UserProfile, method.user_id)
+    if user is None:
+        await audit.log_event(
+            AuditEventType.LOGIN_FAILURE,
+            ip_address=ip,
+            metadata={"reason": "user_not_found"},
+        )
+        await db.commit()
+        raise HTTPException(
+            status_code=401,
+            detail={"error": "invalid_credentials", "message": "Invalid email or password."},
+        )
+
+    user_repo = UserProfileRepository(db)
+    await user_repo.update_last_login(user.id)
+    auth_repo = AuthenticationRepository(db)
+    token_record, access_token, raw_refresh_token = await auth_repo.create_tokens(user.id)
+
+    await audit.log_event(
+        AuditEventType.LOGIN_SUCCESS,
+        user_id=user.id,
+        ip_address=ip,
+    )
+    await db.commit()
+
+    return LoginResponse(
+        access_token=access_token,
+        refresh_token=raw_refresh_token,
+        expires_at=serialize_datetime(token_record.expires_at),
+        user_id=user.id,
+        email=user.email,
+    )
+
+
+@router.post("/auth/password-reset/request", response_model=PasswordResetRequestResponse)
+@limiter.limit("3/minute")
+async def password_reset_request(
+    request: Request,
+    data: PasswordResetRequestSchema,
+    db: AsyncSession = Depends(get_db),
+) -> PasswordResetRequestResponse:
+    email_repo = EmailAuthRepository(db)
+    normalized_email = _normalize_email(data.email)
+    provider_id = hmac_email(normalized_email)
+    method = await email_repo.get_auth_method_by_provider(AuthProvider.EMAIL_PASSWORD, provider_id)
+
+    if method:
+        raw_token, token_hash = generate_token()
+        await email_repo.create_reset_token(
+            user_id=method.user_id,
+            token_hash=token_hash,
+            expires_at=utc_now() + timedelta(hours=1),
+        )
+        await db.commit()
+        try:
+            EmailService().send_password_reset_email(normalized_email, raw_token)
+        except Exception:
+            pass  # Never reveal whether email exists
+
+    return PasswordResetRequestResponse(message="If that email is registered, a reset link has been sent.")
+
+
+@router.post("/auth/password-reset/confirm", response_model=PasswordResetConfirmResponse)
+@limiter.limit("5/minute")
+async def password_reset_confirm(
+    request: Request,
+    data: PasswordResetConfirmSchema,
+    db: AsyncSession = Depends(get_db),
+) -> PasswordResetConfirmResponse:
+    email_repo = EmailAuthRepository(db)
+    token_hash = _hash_token(data.token)
+    token_rec = await email_repo.consume_reset_token(token_hash)
+    if token_rec is None:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "invalid_or_expired_token", "message": "Password reset token is invalid or has expired."},
+        )
+
+    method = await email_repo.get_email_auth_method(token_rec.user_id)
+    if method is None:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "invalid_or_expired_token", "message": "Password reset token is invalid or has expired."},
+        )
+
+    method.password_hash = hash_password(data.new_password)
+    await db.commit()
+    return PasswordResetConfirmResponse(message="Password updated. You can now sign in.")
+
+
+@router.post("/auth/link-account")
+async def link_account(
+    request: LinkAccountRequest,
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+) -> LinkAccountResponse:
+    """Link an email/password identity to an existing account (re-auth required)."""
+    email_repo = EmailAuthRepository(db)
+    provider_id = hmac_email(request.email)
+
+    existing_method = await email_repo.get_auth_method_by_provider(AuthProvider.EMAIL_PASSWORD, provider_id)
+    if existing_method and existing_method.user_id != user_id:
+        raise HTTPException(
+            status_code=409,
+            detail={"error": "email_taken_by_another_account", "message": "This email is already linked to another account."},
+        )
+    if existing_method and existing_method.user_id == user_id:
+        raise HTTPException(
+            status_code=409,
+            detail={"error": "already_linked", "message": "This email is already linked to your account."},
+        )
+
+    await email_repo.create_auth_method(
+        user_id=user_id,
+        provider=AuthProvider.EMAIL_PASSWORD,
+        provider_id=provider_id,
+        password_hash=hash_password(request.password),
+        email_encrypted=encrypt_email(request.email),
+    )
+    await db.commit()
+
+    return LinkAccountResponse(message="Email/password identity linked. Verify your email to activate it.")
+
+
+# AUTH-003: Logout endpoint
+
+
+@router.post("/auth/logout", response_model=LogoutResponse)
+@limiter.limit("10/minute")
+async def logout(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user),
+) -> LogoutResponse:
+    """End current session and revoke tokens.
+
+    Local data is retained on the client and will sync on re-login.
+
+    Args:
+        db: Database session.
+        user_id: Authenticated user ID.
+
+    Returns:
+        Logout confirmation.
+
+    Raises:
+        401: Invalid or missing token.
+    """
+    auth_repo = AuthenticationRepository(db)
+    await auth_repo.revoke_token_by_user_id(user_id)
+    return LogoutResponse(message="Logged out successfully")

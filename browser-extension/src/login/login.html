@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Briefly Login</title>
+  <link rel="stylesheet" href="login.css">
+</head>
+<body>
+  <div class="container">
+    <p class="eyebrow">Briefly Secure Login</p>
+    <h1>Finishing sign in…</h1>
+    <p class="subtitle">We are linking your account and returning you to the extension.</p>
+
+    <div id="loading" role="status" aria-live="polite">
+      <div class="spinner" aria-hidden="true"></div>
+      <p>Completing login…</p>
+    </div>
+
+    <div id="error" class="hidden" aria-live="polite">
+      <p class="error-message" id="error-message"></p>
+      <button id="back-btn" class="btn">Close</button>
+    </div>
+  </div>
+  <script type="module" src="login.ts"></script>
+</body>
+</html>

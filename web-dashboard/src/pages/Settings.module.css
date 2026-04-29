@@ -1,0 +1,160 @@
+.page {
+  display: grid;
+  gap: var(--space-6);
+  max-width: 720px;
+}
+
+.kicker {
+  font-family: var(--font-mono);
+  color: var(--color-ink-muted);
+  font-size: var(--text-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.hero h1 {
+  margin: 6px 0 0;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+}
+
+.toast {
+  border: 1px solid color-mix(in srgb, var(--color-success) 30%, transparent);
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
+  color: var(--color-success);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-size: 0.875rem;
+}
+
+/* ── Section layout ─────────────────────────────────────── */
+
+.sections {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.section {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.sectionTitle {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-ink-muted);
+  margin: 0;
+  padding: 0 2px;
+}
+
+/* ── Card (wraps one section's rows) ────────────────────── */
+
+.card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+/* ── Setting row ────────────────────────────────────────── */
+
+.settingRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--space-6);
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border-muted);
+}
+
+.settingRow:last-child {
+  border-bottom: none;
+}
+
+.settingInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.settingName {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-ink-primary);
+  line-height: 1.4;
+}
+
+.settingDescription {
+  font-size: 0.8rem;
+  color: var(--color-ink-muted);
+  line-height: 1.45;
+}
+
+.settingControl {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.settingControl select,
+.settingControl input {
+  height: 36px;
+  min-width: 160px;
+  max-width: 220px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-canvas);
+  color: var(--color-ink-primary);
+  padding: 0 10px;
+  font-size: 0.875rem;
+}
+
+.settingControl input[type="url"] {
+  min-width: 200px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+.settingControl select:focus,
+.settingControl input:focus {
+  outline: none;
+  border-color: var(--color-signal);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-signal) 15%, transparent);
+}
+
+/* ── Save bar ───────────────────────────────────────────── */
+
+.saveBar {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.saveBar button {
+  height: 40px;
+  padding: 0 24px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--color-signal);
+  color: var(--color-signal-on);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 140ms var(--ease-standard),
+    box-shadow       140ms var(--ease-standard),
+    opacity          140ms var(--ease-standard);
+}
+
+.saveBar button:hover:not(:disabled) {
+  background: var(--color-signal-hover);
+  box-shadow: var(--elevation-signal);
+}
+
+.saveBar button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

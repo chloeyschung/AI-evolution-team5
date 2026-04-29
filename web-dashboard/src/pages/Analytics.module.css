@@ -1,0 +1,55 @@
+.page {
+  display: grid;
+  gap: 16px;
+}
+
+.kicker {
+  font-family: var(--font-mono);
+  color: var(--color-ink-muted);
+  font-size: var(--text-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.hero h1 {
+  margin-top: 6px;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+}
+
+.message {
+  color: var(--color-ink-secondary);
+}
+
+.statGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.statCard,
+.detailCard {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  background: var(--color-surface);
+}
+
+.statCard h2 {
+  font-size: 1.8rem;
+}
+
+.statCard p,
+.detailCard span {
+  color: var(--color-ink-secondary);
+}
+
+.detailCard {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.detailCard div {
+  display: grid;
+  gap: 4px;
+}

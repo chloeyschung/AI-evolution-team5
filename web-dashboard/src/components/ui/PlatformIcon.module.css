@@ -1,0 +1,33 @@
+.iconWrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0;
+  background: transparent;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.iconWrap svg {
+  width: 100%;
+  height: 100%;
+}
+
+.faviconImg {
+  border-radius: 0;
+  display: block;
+  object-fit: contain;
+  flex-shrink: 0;
+  background: transparent;
+}
+
+.initial {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-surface-muted);
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--color-ink-primary);
+  flex-shrink: 0;
+}
