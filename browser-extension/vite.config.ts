@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import { resolve } from 'path';
+import { resolve, dirname } from 'path';
 import { readFileSync, writeFileSync, copyFileSync, existsSync } from 'fs';
 import { mkdir } from 'fs/promises';
 
@@ -68,11 +68,8 @@ function extensionBuilderPlugin() {
           if (transform) {
             content = transform(content);
           }
-          // Ensure dest directory exists
-          const destDir = destPath.substring(0, destPath.lastIndexOf('/'));
-          if (destDir) {
-            syncMkdir(destDir, { recursive: true });
-          }
+          // Ensure dest directory exists (dirname handles both / and \ separators)
+          syncMkdir(dirname(destPath), { recursive: true });
           writeFileSync(destPath, content);
           console.log(`  ✓ Copied ${src} → ${dest}`);
         }
