@@ -333,6 +333,9 @@ input:focus-visible,
 /* ── §14  Email login form ───────────────────────────────── */
 .email-login-form { display: grid; gap: var(--briefly-s2); }
 
+/* ── §14b  URL 직접 입력 저장 폼 ──────────────────────────── */
+.save-url-form { display: grid; gap: var(--briefly-s2); }
+
 /* ── §15  Success state ──────────────────────────────────── */
 .login-success {
   display: flex; flex-direction: column; align-items: center;
