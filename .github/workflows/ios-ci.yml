@@ -2,9 +2,13 @@ name: iOS CI
 
 on:
   push:
-    branches: [prototype-1]
+    branches: ['**']
+    paths:
+      - 'Briefly/**'
   pull_request:
-    branches: [prototype-1]
+    branches: ['**']
+    paths:
+      - 'Briefly/**'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -52,7 +56,7 @@ jobs:
           xcodebuild build \
             -project Briefly.xcodeproj \
             -scheme Briefly \
-            -destination 'generic/platform=iOS Simulator' \
+            -sdk iphonesimulator \
             -clonedSourcePackagesDirPath SourcePackages \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_ENTITLEMENTS="" \
