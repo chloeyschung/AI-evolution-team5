@@ -13,6 +13,9 @@ packages:
   SwiftSoup:
     url: https://github.com/scinfu/SwiftSoup
     from: "2.7.0"
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    from: "8.0.0"
 
 targets:
 
@@ -25,6 +28,8 @@ targets:
       - target: BrieflyShareExtension
         embed: true
       - package: SwiftSoup
+      - package: GoogleSignIn
+        product: GoogleSignIn
     sources:
       - path: Briefly
         excludes:
@@ -41,10 +46,14 @@ targets:
           NSExceptionDomains:
             localhost:
               NSExceptionAllowsInsecureHTTPLoads: true
+        GIDClientID: "742261948942-9s5t6mftmpp5bpi9slul3dd2ubbr049m.apps.googleusercontent.com"
         CFBundleURLTypes:
           - CFBundleURLSchemes:
               - briefly
             CFBundleURLName: com.briefly-ai.app
+          - CFBundleURLSchemes:
+              - com.googleusercontent.apps.742261948942-9s5t6mftmpp5bpi9slul3dd2ubbr049m
+            CFBundleURLName: com.googleusercontent.apps.742261948942-9s5t6mftmpp5bpi9slul3dd2ubbr049m
     entitlements:
       path: Briefly/Briefly.entitlements
       properties:

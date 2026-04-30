@@ -1,4 +1,5 @@
 import SwiftUI
+import GoogleSignIn
 
 struct AccountView: View {
     @StateObject private var viewModel = AuthViewModel()
@@ -163,8 +164,48 @@ final class AuthViewModel: ObservableObject {
     }
 
     func signInWithGoogle() {
-        // GoogleService-Info.plist 및 OAuth 설정 완료 후 활성화 예정 (TODOS.md 참조)
-        presentError("Google 로그인은 OAuth 설정 완료 후 사용 가능합니다.")
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootVC = windowScene.windows.first?.rootViewController else { return }
+        isLoading = true
+        Task {
+            defer { isLoading = false }
+            do {
+                let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootVC)
+                guard let idToken = result.user.idToken?.tokenString else {
+                    presentError("Google ID 토큰을 가져올 수 없습니다.")
+                    return
+                }
+                let profile = result.user.profile
+                let loginResult = try await BrieflyAPI.shared.loginWithGoogle(
+                    idToken: idToken,
+                    userID: result.user.userID ?? "",
+                    email: profile?.email ?? "",
+                    name: profile?.name,
+                    picture: profile?.imageURL(withDimension: 120)?.absoluteString
+                )
+                AuthTokenStore.shared.save(
+                    accessToken: loginResult.accessToken,
+                    refreshToken: loginResult.refreshToken,
+                    userId: loginResult.user.id,
+                    displayName: loginResult.user.displayName,
+                    email: loginResult.user.email
+                )
+                loggedInEmail = loginResult.user.email
+                isLoggedIn = true
+            } catch let error as NSError
+                where error.domain == "com.google.GIDSignIn" && error.code == -5 {
+                // 사용자 취소 — 에러 없이 무시
+            } catch let error as BrieflyAPI.APIError {
+                switch error {
+                case .httpError(403, _):
+                    presentError("계정 삭제 후 30일 내 재가입 불가합니다.")
+                default:
+                    presentError("Google 로그인 실패: \(error.localizedDescription)")
+                }
+            } catch {
+                presentError("Google 로그인 실패: \(error.localizedDescription)")
+            }
+        }
     }
 
     func logout() {
