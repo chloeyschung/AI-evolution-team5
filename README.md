@@ -1,493 +1,389 @@
 # Briefly
 
-Swipe-based knowledge management app. Save content from anywhere, keep what matters, discard the rest.
+Swipe-based knowledge management app. Save articles, videos, links, and notes from a browser extension or native client, then decide what to keep with a lightweight inbox workflow.
 
-**Stack:** Python 3.13 (FastAPI) · React 18 · Chrome MV3 Extension · SQLite
-
----
-
-## Table of Contents
-
-1. [Prerequisites](#prerequisites)
-2. [One-Time Setup](#one-time-setup)
-3. [Running the Stack](#running-the-stack)
-4. [Browser Extension Setup](#browser-extension-setup)
-5. [End-to-End Test Checklist](#end-to-end-test-checklist)
-6. [iOS / macOS Xcode Integration Guide](#ios--macos-xcode-integration-guide)
-7. [Known Issues & Bugs](#known-issues--bugs)
+한국어 README가 먼저 나오고, 같은 내용을 영어로 다시 제공합니다. 자세한 설치, 로컬 LLM, iOS 연동, 문서 업데이트 규칙은 [docs/SETUP_AND_INTEGRATION_GUIDE.md](docs/SETUP_AND_INTEGRATION_GUIDE.md)에 정리했습니다.
 
 ---
 
-## Prerequisites
+## 한국어
 
-| Tool | Version | Install |
+### 한눈에 보기
+
+Briefly는 세 부분으로 구성됩니다.
+
+| 영역 | 위치 | 역할 |
 |---|---|---|
-| Python | 3.13 | [python.org](https://python.org) |
-| `uv` | latest | `curl -Lsf https://astral.sh/uv/install.sh \| sh` |
-| Node.js | 18+ | [nodejs.org](https://nodejs.org) |
-| Chrome / Chromium | any | For extension testing |
+| Backend API | `src/` | FastAPI 서버. 인증, 콘텐츠 저장, 스와이프, DB, AI 요약, 외부 연동을 담당합니다. |
+| Web Dashboard | `web-dashboard/` | React/Vite 웹앱. 저장한 콘텐츠를 보고 keep/discard/archive 합니다. |
+| Browser Extension | `browser-extension/` | Chrome Manifest V3 확장. 현재 페이지나 선택 텍스트를 Briefly로 저장합니다. |
+| Database | `briefly.db` | 로컬 개발용 SQLite DB. 서버 시작 시 필요한 테이블을 준비합니다. |
+| Docs | `docs/` | 제품 의도, 스펙, 구현 순서, 완료 기록, 의사결정 문서가 있습니다. |
 
----
+기본 로컬 주소는 다음과 같습니다.
 
-## One-Time Setup
+| 서비스 | 주소 |
+|---|---|
+| API | `http://localhost:8000` |
+| API 문서 | `http://localhost:8000/docs` |
+| Health check | `http://localhost:8000/health` |
+| Web Dashboard | `http://localhost:3001` |
+| Mail catcher UI | `http://localhost:8025` |
+| Local SMTP | `localhost:1025` |
 
-### 1. Clone and enter the repo
+### 빠른 시작
+
+macOS:
 
 ```bash
 git clone <repo-url> Briefly
 cd Briefly
-```
-
-### 2. Backend environment
-
-Copy the example and fill in real values:
-
-```bash
-cp .env.example .env   # or use the existing .env if it's already populated
-```
-
-Open `.env` and set these **required** variables (the server will refuse to start if any are missing):
-
-| Variable | Where to get it |
-|---|---|
-| `JWT_SECRET_KEY` | Any 32+ character random string, e.g. `openssl rand -hex 32` |
-| `ENCRYPTION_KEY` | 44-char Fernet key, e.g. `python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
-| `GOOGLE_CLIENT_ID` | Google Cloud Console → OAuth 2.0 Client ID |
-| `GOOGLE_CLIENT_SECRET` | Same OAuth client |
-| `GOOGLE_REDIRECT_URI` | `http://localhost:8000/api/v1/auth/google/callback` |
-
-Optional variables (leave as-is for local dev):
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `DATABASE_URL` | `sqlite+aiosqlite:///./briefly.db` | SQLite file location |
-| `ANTHROPIC_API_KEY` | — | Enables AI summarisation and tag generation |
-| `ANTHROPIC_BASE_URL` | `https://api.anthropic.com/v1/messages` | Anthropic-compatible summary endpoint override |
-| `ANTHROPIC_MODEL` | `claude-3-5-sonnet-20240620` | Summary model override |
-| `YOUTUBE_CLIENT_ID` | — | YouTube integration |
-| `YOUTUBE_CLIENT_SECRET` | — | YouTube integration |
-| `VLLM_SERVER_URL` | `http://localhost:8000` | Local vLLM server (optional) |
-
-### 3. Install Python dependencies
-
-```bash
-uv sync
-```
-
-### 4. Web dashboard environment
-
-```bash
-cd web-dashboard
-cp .env.example .env
-```
-
-Edit `web-dashboard/.env`:
-
-```env
-VITE_API_BASE_URL=http://localhost:8000
-VITE_GOOGLE_CLIENT_ID=<your-google-client-id>
-VITE_ENABLE_TEST_LOGIN=true   # set to bypass Google OAuth in dev
-```
-
-Install JS dependencies:
-
-```bash
-npm install
-cd ..
-```
-
-### 5. Browser extension environment
-
-```bash
-cd browser-extension
-cp .env.example .env
-```
-
-Edit `browser-extension/.env`:
-
-```env
-VITE_GOOGLE_CLIENT_ID=<your-google-client-id>
-VITE_API_BASE_URL=http://localhost:8000
-```
-
-Install JS dependencies:
-
-```bash
-npm install
-cd ..
-```
-
----
-
-## Running the Stack
-
-### Recommended: one command launcher
-
-```bash
 ./scripts/run-stack.sh start
 ```
 
-Useful controls:
+Windows:
 
-```bash
-./scripts/run-stack.sh status
-./scripts/run-stack.sh stop
-./scripts/run-stack.sh restart
+```bat
+git clone <repo-url> Briefly
+cd Briefly
+scripts\run-stack.bat start
 ```
 
-The script will:
-- auto-fill missing local `.env` defaults,
-- install missing deps (`uv sync`, web/extension `npm install`),
-- start backend + dashboard + extension watch (tmux when available, background otherwise).
+실행 후 브라우저에서 `http://localhost:3001`을 엽니다. API 상태는 `http://localhost:8000/health`에서 확인합니다.
 
-### Manual mode (three terminals)
+### 처음 준비해야 하는 것
 
-Start all three services manually if you prefer:
+1. Python 3.13
+2. `uv`
+3. Node.js 18 이상
+4. Chrome 또는 Chromium 계열 브라우저
+5. Google OAuth Client ID, Google 로그인을 테스트할 경우
+6. 선택 사항: LM Studio 또는 Ollama 같은 로컬 LLM 서버
 
-### Terminal 1 — Backend API
+`run-stack` 스크립트는 로컬 개발에 필요한 `.env` 기본값을 만들고, 빠진 의존성을 설치한 뒤 다음 프로세스를 실행합니다.
+
+| 프로세스 | 명령 |
+|---|---|
+| Mail catcher | `uv run python -m src.utils.mail_catcher` |
+| Backend | `uv run uvicorn src.api.app:app --host 0.0.0.0 --port 8000 --reload` |
+| Dashboard | `npm run dev` in `web-dashboard/` |
+| Extension watch build | `npm run dev` in `browser-extension/` |
+
+### 수동 실행
+
+자동 스크립트 대신 터미널을 나누어 실행할 수도 있습니다.
 
 ```bash
-cd /path/to/Briefly
+uv sync
 uv run uvicorn src.api.app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-- URL: `http://localhost:8000`
-- API docs (Swagger UI): `http://localhost:8000/docs`
-- OpenAPI JSON: `http://localhost:8000/openapi.json`
-- Health check: `http://localhost:8000/`
-- **Database:** `briefly.db` is created automatically in the repo root on first start.
-
-### Terminal 2 — Web Dashboard
-
 ```bash
 cd web-dashboard
+npm install
 npm run dev
 ```
 
-- URL: `http://localhost:3001`
-- All `/api/*` requests are proxied automatically to `http://localhost:8000`.
-
-### Terminal 3 — Browser Extension (dev watch)
-
 ```bash
 cd browser-extension
-npm run dev    # rebuilds on file change; reload extension manually in Chrome after each rebuild
+npm install
+npm run build
 ```
 
-Or build once for a stable test:
+Chrome에서 `chrome://extensions/`를 열고 Developer mode를 켠 뒤 `browser-extension/dist/`를 Load unpacked로 불러옵니다.
 
-```bash
-npm run build  # outputs to browser-extension/dist/
+### API와 환경 변수
+
+Backend는 `/api/v1` 아래에 주요 API를 제공합니다. 모든 인증 필요 요청에는 다음 헤더를 붙입니다.
+
+```http
+Authorization: Bearer <access_token>
 ```
 
-### Extension health checks (recommended before manual testing)
+중요한 환경 변수:
+
+| 변수 | 설명 |
+|---|---|
+| `JWT_SECRET_KEY` | 32자 이상 임의 문자열 |
+| `ENCRYPTION_KEY` | Fernet 키. OAuth 토큰 암호화용 |
+| `GOOGLE_CLIENT_ID` | Google OAuth Client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret |
+| `GOOGLE_REDIRECT_URI` | 웹 OAuth callback 주소 |
+| `EMAIL_LOOKUP_KEY` | 이메일 로그인 lookup 보호 키 |
+| `DATABASE_URL` | 기본값 `sqlite+aiosqlite:///./briefly.db` |
+| `SUMMARY_PROVIDER` | `auto`, `anthropic`, `openai`, `gemini` |
+| `SUMMARY_BASE_URL` | 로컬 LLM 또는 외부 LLM API endpoint |
+| `SUMMARY_MODEL` | 사용할 모델 이름 |
+| `SUMMARY_API_KEY` | 로컬 서버면 더미 값 가능 |
+
+자세한 API 요청 예시는 [상세 가이드](docs/SETUP_AND_INTEGRATION_GUIDE.md#ios--native-client-integration-korean)를 보세요.
+
+### 로컬 LLM 테스트
+
+초보자에게는 GUI가 있는 LM Studio가 가장 쉽고, 터미널이 편하면 Ollama도 좋습니다.
+
+LM Studio 기본 설정:
+
+```env
+SUMMARY_PROVIDER=openai
+SUMMARY_BASE_URL=http://localhost:1234/v1/chat/completions
+SUMMARY_MODEL=<LM Studio에서 로드한 모델 이름>
+SUMMARY_API_KEY=local
+```
+
+Ollama 기본 설정:
+
+```env
+SUMMARY_PROVIDER=openai
+SUMMARY_BASE_URL=http://localhost:11434/v1/chat/completions
+SUMMARY_MODEL=<ollama model name>
+SUMMARY_API_KEY=ollama
+```
+
+이 repo의 `scripts/vllm-server.sh`는 별도 vLLM 서버를 `8180` 포트로 띄우는 고급 사용자용 helper입니다. 현재 FastAPI 런타임은 `SUMMARY_*` 값을 통해 요약 서버를 연결합니다.
+
+### iOS 연동 포인트
+
+iOS 앱은 Backend API를 직접 호출하면 됩니다.
+
+| 목적 | Endpoint |
+|---|---|
+| 앱 설정, 강제 업데이트, 점검 모드 | `GET /api/v1/config/app` |
+| Google ID token 로그인 | `POST /api/v1/auth/google` |
+| Apple 로그인 | `POST /api/v1/auth/apple` |
+| access token 갱신 | `POST /api/v1/auth/refresh` |
+| Share Sheet 저장 | `POST /api/v1/share` |
+| 콘텐츠 목록 | `GET /api/v1/content` |
+| Inbox | `GET /api/v1/content/pending` |
+| Keep/Discard | `POST /api/v1/swipe` |
+| Push token 등록 | `POST /api/v1/user/device-token` |
+| Universal Links | `GET /.well-known/apple-app-site-association` |
+
+iOS 날짜 파싱 주의: API datetime은 문자열입니다. Swift `Codable` 기본 ISO8601 전략과 맞지 않는 값이 있을 수 있으므로 앱 쪽에서 custom `DateFormatter`를 준비하세요.
+
+### 문서 업데이트 원칙
+
+`docs/PROJECT-MANAGEMENT-FRAMEWORK.md` 기준으로 문서는 다음처럼 관리합니다.
+
+| 상황 | 업데이트 문서 |
+|---|---|
+| 제품 의도나 기능 목록 변경 | `docs/external/Briefly_FeatureList.md` |
+| 기능 요구사항 변경 | `docs/specs/{ID}.md` |
+| 구현 상태 변경 | `docs/feature-inventory.md` |
+| 기능 간 의존성 변경 | `docs/dependency-matrix.md` |
+| 아키텍처 결정 | 새 `docs/decisions/ARCH-NNN-{slug}.md` |
+| 기능 완료 | `docs/records/{ID}-record.md`에 append |
+| README, 사용법, 운영 절차 변경 | `README.md` 또는 관련 guide 문서 |
+
+스펙이나 FeatureList가 바뀌면 `doc-doc-sync` 후 `doc-code-sync` 순서로 검증합니다.
+
+### 테스트
 
 ```bash
-cd browser-extension
-npx vitest run src/__tests__/web-guidelines-extension.test.ts
-npm run test -- --run src/__tests__/extractor.test.ts
+uv run pytest
+```
+
+```bash
+cd web-dashboard
 npm run typecheck
+npm run test
+npm run test:e2e
+```
+
+```bash
+cd browser-extension
+npm run typecheck
+npm run test
 npm run build
 ```
 
 ---
 
-## Browser Extension Setup
+## English
 
-1. Build the extension: `cd browser-extension && npm run build`
-2. Open Chrome and navigate to `chrome://extensions/`
-3. Enable **Developer mode** (toggle, top right)
-4. Click **Load unpacked** → select the `browser-extension/dist/` folder
-5. Note the **Extension ID** shown under the extension card (looks like `abcdefghijklmnopabcdefghijklmnop`)
-6. In [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials → your OAuth Client → Authorized redirect URIs, add:
-   ```
-   chrome-extension://<your-extension-id>/login/login.html
-   ```
-7. Rebuild the extension after updating `.env` with your Google Client ID.
-8. After loading, click the extension icon → a login popup appears.
+### Overview
 
-> **Tip:** After any `npm run build`, click the refresh icon on the extension card in `chrome://extensions/` to pick up changes.
+Briefly has three main runtime parts.
 
----
+| Area | Path | Responsibility |
+|---|---|---|
+| Backend API | `src/` | FastAPI server for auth, content, swipes, DB, AI summaries, and integrations. |
+| Web Dashboard | `web-dashboard/` | React/Vite dashboard for reviewing saved content. |
+| Browser Extension | `browser-extension/` | Chrome MV3 extension for saving the current page or selected text. |
+| Database | `briefly.db` | Local SQLite database for development. |
+| Docs | `docs/` | Product intent, specs, implementation plans, records, and decisions. |
 
-## End-to-End Test Checklist
+Default local URLs:
 
-Use this to verify the full stack is working before handing off:
+| Service | URL |
+|---|---|
+| API | `http://localhost:8000` |
+| API docs | `http://localhost:8000/docs` |
+| Health check | `http://localhost:8000/health` |
+| Web Dashboard | `http://localhost:3001` |
+| Mail catcher UI | `http://localhost:8025` |
+| Local SMTP | `localhost:1025` |
 
-### Auth
-- [ ] Open `http://localhost:3001` — redirected to login page
-- [ ] Sign in with Google → redirected to dashboard
-- [ ] Refresh page → still logged in (token persisted)
-- [ ] Click logout → redirected to login, tokens cleared
+### Quick Start
 
-### Content from Browser Extension
-- [ ] Navigate to any article or YouTube video in Chrome
-- [ ] Click extension icon → popup shows page title and URL
-- [ ] Click "Save" → item appears in web dashboard inbox
+macOS:
 
-### Web Dashboard Swipe Flow
-- [ ] Open `http://localhost:3001/inbox`
-- [ ] Swipe / click Keep on an item → moves to Kept list
-- [ ] Swipe / click Discard on an item → moves to Discarded list
-- [ ] `GET http://localhost:8000/api/v1/stats` in browser → counts match
-
-### Profile & Preferences
-- [ ] `http://localhost:3001/settings` → update display name → saved
-- [ ] `GET http://localhost:8000/api/v1/profile` returns your user data
-
-### Database
-- [ ] `sqlite3 briefly.db "SELECT email, display_name FROM users;"` → your account exists
-- [ ] `sqlite3 briefly.db "SELECT COUNT(*) FROM content WHERE user_id=(SELECT id FROM users LIMIT 1);"` → matches dashboard count
-
-### API Docs
-- [ ] `http://localhost:8000/docs` loads Swagger UI with all endpoints visible
-
----
-
-## iOS / macOS Xcode Integration Guide
-
-### Authentication Flow (recommended for native apps)
-
-Use the **Google ID Token flow** — obtain a Google ID token using the Google Sign-In SDK on-device, then POST it to the Briefly backend:
-
-```
-POST /api/v1/auth/google
-Content-Type: application/json
-
-{
-  "google_id_token": "<google-id-token-from-sdk>",
-  "google_user_info": {
-    "id": "1234567890",
-    "email": "user@example.com",
-    "name": "Jane Doe",
-    "picture": "https://..."
-  }
-}
+```bash
+git clone <repo-url> Briefly
+cd Briefly
+./scripts/run-stack.sh start
 ```
 
-Response:
-```json
-{
-  "access_token": "eyJ...",
-  "refresh_token": "abc123...",
-  "expires_at": "2026-04-17T14:00:00",
-  "user": { "id": 1, "email": "...", "display_name": "...", "avatar_url": "..." },
-  "is_new_user": true
-}
+Windows:
+
+```bat
+git clone <repo-url> Briefly
+cd Briefly
+scripts\run-stack.bat start
 ```
 
-Store both tokens securely (Keychain). The access token expires in 60 minutes.
+Then open `http://localhost:3001`. Check the API at `http://localhost:8000/health`.
 
-### Token Refresh
+### Prerequisites
 
+1. Python 3.13
+2. `uv`
+3. Node.js 18 or newer
+4. Chrome or Chromium
+5. Google OAuth Client ID if you want Google sign-in
+6. Optional: LM Studio or Ollama for a local LLM API server
+
+The stack launcher creates local `.env` defaults, installs missing dependencies, and starts:
+
+| Process | Command |
+|---|---|
+| Mail catcher | `uv run python -m src.utils.mail_catcher` |
+| Backend | `uv run uvicorn src.api.app:app --host 0.0.0.0 --port 8000 --reload` |
+| Dashboard | `npm run dev` in `web-dashboard/` |
+| Extension watch build | `npm run dev` in `browser-extension/` |
+
+### Manual Run
+
+```bash
+uv sync
+uv run uvicorn src.api.app:app --host 0.0.0.0 --port 8000 --reload
 ```
-POST /api/v1/auth/refresh
-Content-Type: application/json
 
-{ "refresh_token": "<stored-refresh-token>" }
+```bash
+cd web-dashboard
+npm install
+npm run dev
 ```
 
-Response: `{ "access_token": "...", "expires_at": "..." }`
-
-> Note: The current implementation does **not** rotate the refresh token. The same refresh token remains valid for 7 days.
-
-### All Authenticated Requests
-
-Include the access token in every request:
-
+```bash
+cd browser-extension
+npm install
+npm run build
 ```
+
+Open `chrome://extensions/`, enable Developer mode, and load `browser-extension/dist/` as an unpacked extension.
+
+### API and Environment
+
+Backend routes are served under `/api/v1`. Authenticated requests use:
+
+```http
 Authorization: Bearer <access_token>
 ```
 
-### CORS
+Important environment variables:
 
-CORS middleware is **not configured** on the backend. This is intentional for native clients (iOS/URLSession does not enforce CORS). Web-based clients making cross-origin XHR/fetch calls will be blocked by the browser — CORS must be added before any web deployment.
+| Variable | Meaning |
+|---|---|
+| `JWT_SECRET_KEY` | Random string, 32+ chars |
+| `ENCRYPTION_KEY` | Fernet key for OAuth token encryption |
+| `GOOGLE_CLIENT_ID` | Google OAuth Client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret |
+| `GOOGLE_REDIRECT_URI` | Web OAuth callback URL |
+| `EMAIL_LOOKUP_KEY` | Email login lookup protection key |
+| `DATABASE_URL` | Defaults to `sqlite+aiosqlite:///./briefly.db` |
+| `SUMMARY_PROVIDER` | `auto`, `anthropic`, `openai`, or `gemini` |
+| `SUMMARY_BASE_URL` | Local or hosted LLM endpoint |
+| `SUMMARY_MODEL` | Model name |
+| `SUMMARY_API_KEY` | Can be a dummy value for local servers |
 
-### Date / Datetime Fields
+For request examples, see the [detailed guide](docs/SETUP_AND_INTEGRATION_GUIDE.md#ios--native-client-integration-english).
 
-> **Critical for Swift Codable:** All datetime strings from the API are ISO 8601 without a timezone suffix (e.g. `"2026-04-16T14:00:00"`). Swift's default `ISO8601DateFormatter` requires a `Z` suffix. Use a custom `DateFormatter` or decoder strategy:
+### Local LLM Testing
 
-```swift
-let decoder = JSONDecoder()
-let formatter = DateFormatter()
-formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-formatter.locale = Locale(identifier: "en_US_posix")
-decoder.dateDecodingStrategy = .formatted(formatter)
+LM Studio is the easiest GUI option. Ollama is also friendly if you are comfortable with a terminal.
+
+LM Studio:
+
+```env
+SUMMARY_PROVIDER=openai
+SUMMARY_BASE_URL=http://localhost:1234/v1/chat/completions
+SUMMARY_MODEL=<model loaded in LM Studio>
+SUMMARY_API_KEY=local
 ```
 
-### Key Enums (StrEnum, all lowercase)
+Ollama:
 
-| Enum | Values |
+```env
+SUMMARY_PROVIDER=openai
+SUMMARY_BASE_URL=http://localhost:11434/v1/chat/completions
+SUMMARY_MODEL=<ollama model name>
+SUMMARY_API_KEY=ollama
+```
+
+`scripts/vllm-server.sh` is an advanced helper for a separate vLLM server on port `8180`. The FastAPI app connects summaries through the `SUMMARY_*` variables.
+
+### iOS Integration Points
+
+Native clients should call the Backend API directly.
+
+| Purpose | Endpoint |
 |---|---|
-| Swipe action | `keep`, `discard` |
-| Content type | `article`, `video`, `image`, `social_post`, `profile`, `deep_link` |
-| Content status | `inbox`, `archived` |
-| Theme | `light`, `dark`, `system` |
-| Default sort | `recency`, `platform` |
-| Sync frequency | `hourly`, `daily`, `weekly` |
+| App config, force update, maintenance | `GET /api/v1/config/app` |
+| Google ID token login | `POST /api/v1/auth/google` |
+| Apple login | `POST /api/v1/auth/apple` |
+| Refresh access token | `POST /api/v1/auth/refresh` |
+| Share Sheet ingestion | `POST /api/v1/share` |
+| Content list | `GET /api/v1/content` |
+| Inbox | `GET /api/v1/content/pending` |
+| Keep/Discard | `POST /api/v1/swipe` |
+| Push token registration | `POST /api/v1/user/device-token` |
+| Universal Links | `GET /.well-known/apple-app-site-association` |
 
-### Complete API Endpoint Reference
+Datetime fields are API strings. Some values may not include a timezone suffix, so Swift clients should use an explicit decoder strategy.
 
-All routes are prefixed with `/api/v1`.
+### Documentation Rules
 
-#### Auth
-| Method | Path | Auth | Notes |
-|---|---|---|---|
-| GET | `/auth/status` | Optional | Check token validity |
-| POST | `/auth/google` | No | **Native app login** — send Google ID token |
-| POST | `/auth/google/code` | No | Web OAuth code exchange |
-| POST | `/auth/refresh` | No | Renew access token |
-| POST | `/auth/logout` | Required | Revoke current session |
-| POST | `/auth/account/delete` | Required | Two-step deletion (⚠ see Known Issues) |
+The repo follows `docs/PROJECT-MANAGEMENT-FRAMEWORK.md`.
 
-#### Content
-| Method | Path | Auth | Notes |
-|---|---|---|---|
-| POST | `/content` | Required | Manual add |
-| GET | `/content` | Required | All content, `?limit=50` |
-| GET | `/content/pending` | Required | Inbox (unread), `?limit&platform&tags[]` ⚠ filters currently silently ignored |
-| GET | `/content/kept` | Required | Kept, `?limit&offset&platform&tags[]` |
-| GET | `/content/discarded` | Required | Discarded, `?limit&offset&platform` |
-| GET | `/content/trend-feed` | Required | Ranked feed, `?limit&offset&time_range&min_score` |
-| GET | `/content/{id}` | Required | Detail + last swipe |
-| PATCH | `/content/{id}/status` | Required | Update status |
-| DELETE | `/content/{id}` | Required | Permanent delete |
-| POST | `/content/{id}/categorize` | Required | AI tag generation (requires `ANTHROPIC_API_KEY`) |
+| Change | Update |
+|---|---|
+| Product intent or feature list | `docs/external/Briefly_FeatureList.md` |
+| Feature requirements | `docs/specs/{ID}.md` |
+| Implementation status | `docs/feature-inventory.md` |
+| Feature dependencies | `docs/dependency-matrix.md` |
+| Architecture decision | New `docs/decisions/ARCH-NNN-{slug}.md` |
+| Completed feature | Append to `docs/records/{ID}-record.md` |
+| Usage or operation docs | `README.md` or a guide under `docs/` |
 
-#### Swipe
-| Method | Path | Auth | Notes |
-|---|---|---|---|
-| POST | `/swipe` | Required | Single: `{content_id, action}` or batch: `{actions: [...]}` |
+When a spec or FeatureList changes, run doc-doc sync before doc-code sync.
 
-#### Stats / Search
-| Method | Path | Auth | Notes |
-|---|---|---|---|
-| GET | `/stats` | Required | `{pending, kept, discarded}` counts |
-| GET | `/platforms` | Required | Platform breakdown |
-| GET | `/search` | Required | `?q=&limit&offset` |
-
-#### User
-| Method | Path | Auth | Notes |
-|---|---|---|---|
-| GET | `/profile` | Required | User profile |
-| PATCH | `/profile` | Required | Update display_name, avatar_url, bio |
-| GET | `/preferences` | Required | App preferences |
-| PATCH | `/preferences` | Required | Update theme, notifications, daily_goal |
-| GET | `/user/statistics` | Required | Swipe stats + streak ⚠ see Known Issues |
-| GET | `/interests` | Required | Interest tags list |
-| POST | `/interests` | Required | Add tag `{tag: "..."}` |
-| DELETE | `/interests/{tag}` | Required | Remove tag |
-
-#### Achievements / Reminders
-| Method | Path | Auth | Notes |
-|---|---|---|---|
-| GET | `/achievements` | Required | All with progress |
-| GET | `/achievements/stats` | Required | Summary stats |
-| POST | `/achievements/check` | Required | Award newly earned |
-| GET | `/reminders/preferences` | Required | Reminder settings |
-| PUT | `/reminders/preferences` | Required | Update settings |
-| GET | `/reminders/suggest` | Required | Current suggestion |
-| POST | `/reminders/respond` | Required | acted / dismissed |
-
-#### Integrations — YouTube
-| Method | Path | Auth | Notes |
-|---|---|---|---|
-| GET | `/integrations/youtube/status` | Required | Connection status |
-| POST | `/integrations/youtube/connect` | Required | Get OAuth URL |
-| GET | `/integrations/youtube/callback` | No | OAuth callback (browser redirect) |
-| POST | `/integrations/youtube/disconnect` | Required | Revoke + delete configs |
-| GET | `/integrations/youtube/playlists` | Required | User's playlists |
-| GET | `/integrations/youtube/configs` | Required | Sync configs |
-| POST | `/integrations/youtube/configs` | Required | Create config |
-| PATCH | `/integrations/youtube/configs/{id}` | Required | Update config |
-| DELETE | `/integrations/youtube/configs/{id}` | Required | Delete config |
-| GET | `/integrations/youtube/logs` | Required | Sync logs |
-| POST | `/integrations/youtube/sync` | Required | Trigger manual sync |
-
-#### Integrations — LinkedIn
-| Method | Path | Auth | Notes |
-|---|---|---|---|
-| GET | `/integrations/linkedin/status` | Required | Always returns `is_connected: false` (no OAuth flow yet) |
-| POST | `/integrations/linkedin/disconnect` | Required | Clear any stored tokens |
-| GET | `/integrations/linkedin/sync/logs` | Required | Sync history |
-| POST | `/integrations/linkedin/import` | Required | Import single post by URL |
-
----
-
-## Known Issues & Bugs
-
-These are confirmed bugs found during pre-handoff review. Severity labels reflect impact on a multi-user deployment.
-
-### CRITICAL — `GET /user/statistics` leaks cross-user data
-
-**File:** `src/data/repository.py` — `get_statistics()` method  
-**Bug:** The database query has no `WHERE user_id = ?` filter. Every user receives the platform's aggregate swipe totals and a streak calculated from all users combined.  
-**Impact:** Data privacy violation in any multi-user environment.  
-**Workaround:** Not usable safely in production until fixed. iOS clients should avoid this endpoint.
-
----
-
-### CRITICAL — `POST /auth/account/delete` crashes on confirmation step
-
-**File:** `src/api/routes.py` — `delete_account` route  
-**Bug:** Step 2 (submitting the confirmation token) references `auth_repo` which is never defined in the function scope. This raises a `NameError` and returns HTTP 500, leaving the account in an inconsistent state.  
-**Impact:** Account deletion is completely non-functional.
-
----
-
-### CRITICAL — `GET /content/pending` filter params silently ignored
-
-**File:** `src/api/routes.py` — `list_pending_content` route  
-**Bug:** The route accepts `?platform=` and `?tags[]=` query parameters but does not forward them to the service layer. All pending content is returned regardless of filter values.  
-**Impact:** iOS filter UI will appear to work but return wrong results.
-
----
-
-### HIGH — Account deletion confirmation token never returned to client
-
-**File:** `src/api/routes.py` — `delete_account` Step 1  
-**Bug:** The server generates and stores a confirmation token, but `AccountDeleteResponse` has no field to carry it back to the client. The token is unreachable; Step 2 can never be completed by a client that doesn't have server-side DB access.  
-**Impact:** The entire two-step deletion flow is non-functional for API clients.
-
----
-
-### HIGH — YouTube OAuth callback is vulnerable to CSRF
-
-**File:** `src/api/routes.py` — `GET /integrations/youtube/callback`  
-**Bug:** The `state` parameter carries a raw integer user ID with no CSRF token. An attacker who knows any user's ID can link their own YouTube account to a victim's Briefly account.  
-**Impact:** Account hijacking via YouTube OAuth flow.  
-**Workaround:** Don't expose YouTube connect flow to end users until fixed.
-
----
-
-### MEDIUM — No CORS middleware
-
-**File:** `src/api/app.py`  
-**State:** `CORSMiddleware` is not registered. Native iOS clients are unaffected (URLSession doesn't enforce CORS). The web dashboard and browser extension work in development only because the Vite dev server proxies `/api/*` requests locally.  
-**Impact:** Any direct browser-to-API call from a different origin will be blocked. Required before production web deployment.
-
----
-
-### LOW (but blocking for iOS) — Datetime strings lack timezone suffix
-
-**File:** All schemas in `src/api/schemas.py`  
-**State:** Dates are serialised as `"2026-04-16T14:00:00"` (no `Z` or `+00:00`). Swift `Codable` with default date decoding will throw a parse error on every date field.  
-**Fix needed before iOS integration:** Use a custom `DateFormatter` as shown in the [iOS guide above](#date--datetime-fields), or request that the backend append `Z` to all datetime strings.
-
----
-
-## Running Tests
+### Tests
 
 ```bash
-# Backend unit tests
 uv run pytest
+```
 
-# Web dashboard unit tests
-cd web-dashboard && npm run test
+```bash
+cd web-dashboard
+npm run typecheck
+npm run test
+npm run test:e2e
+```
 
-# Web dashboard E2E (requires both backend and dashboard running)
-cd web-dashboard && npm run test:e2e
-
-# Three-circle integration test (frontend → backend → DB)
-cd web-dashboard && npm run test:e2e:circles
+```bash
+cd browser-extension
+npm run typecheck
+npm run test
+npm run build
 ```

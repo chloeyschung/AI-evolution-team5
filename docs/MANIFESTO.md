@@ -1,4 +1,4 @@
-# MANIFEST
+# MANIFESTO
 
 **프로젝트명:** Briefly (가제)
 

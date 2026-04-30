@@ -1,0 +1,40 @@
+name: Browser Extension CI
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'browser-extension/**'
+  pull_request:
+    branches: ['**']
+    paths:
+      - 'browser-extension/**'
+
+jobs:
+  build:
+    name: Typecheck & Build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: browser-extension
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: browser-extension/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
