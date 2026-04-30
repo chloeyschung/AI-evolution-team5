@@ -8,6 +8,7 @@ on:
       - 'tests/**'
       - 'pyproject.toml'
       - 'uv.lock'
+      - '.github/workflows/python-ci.yml'
   pull_request:
     branches: ['**']
     paths:
@@ -15,6 +16,7 @@ on:
       - 'tests/**'
       - 'pyproject.toml'
       - 'uv.lock'
+      - '.github/workflows/python-ci.yml'
 
 jobs:
   test:
