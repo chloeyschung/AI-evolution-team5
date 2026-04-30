@@ -30,7 +30,11 @@ test.describe('Circle 3: DB-to-Backend-to-Frontend', () => {
     });
 
     expect(backendResponse.status()).toBe(200);
-    const backendItems = (await backendResponse.json()) as Array<{ id: number; title: string }>;
+    const backendPayload = (await backendResponse.json()) as {
+      items: Array<{ id: number; title: string }>;
+      has_more: boolean;
+    };
+    const backendItems = backendPayload.items;
     expect(backendItems.some((item) => item.title === 'Circle 3: DB to Backend to Frontend')).toBeTruthy();
 
     await page.addInitScript((data) => {
@@ -51,7 +55,7 @@ test.describe('Circle 3: DB-to-Backend-to-Frontend', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(backendItems),
+        body: JSON.stringify({ items: backendItems, has_more: backendPayload.has_more }),
       });
     });
 

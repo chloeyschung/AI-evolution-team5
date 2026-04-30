@@ -2,8 +2,8 @@ import { expect, test } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-const TEST_EMAIL = process.env.E2E_EMAIL ?? 'testtest@test.com';
-const TEST_PASSWORD = process.env.E2E_PASSWORD ?? '3644@3644';
+const TEST_EMAIL = process.env.E2E_EMAIL ?? 'test@localhost';
+const TEST_PASSWORD = process.env.E2E_PASSWORD ?? 'testpass123';
 
 type DiagnosticRecord = {
   route: string;
@@ -43,8 +43,9 @@ test.describe('Dashboard Dynamic Diagnostics', () => {
     // Step 1: Login (live backend)
     await page.goto('/login');
     await page.fill('input[name="email"]', TEST_EMAIL);
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await page.fill('input[name="password"]', TEST_PASSWORD);
-    await page.getByRole('button', { name: /sign in with email/i }).click();
+    await page.getByRole('button', { name: /^sign in$/i }).click();
     await page.waitForURL(/\/dashboard/, { timeout: 25_000 });
     await expect(page.getByTestId('dashboard-page')).toBeVisible();
 

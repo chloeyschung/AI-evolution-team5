@@ -1,7 +1,6 @@
 import { defineConfig } from 'vite';
 import { resolve, dirname } from 'path';
-import { readFileSync, writeFileSync, copyFileSync, existsSync } from 'fs';
-import { mkdir } from 'fs/promises';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 
 // Load environment variables
 function loadEnv(): Record<string, string> {
@@ -146,7 +145,7 @@ function extensionBuilderPlugin() {
   };
 }
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   envPrefix: 'VITE_',
   define: {
     __BRIEFLY_CONFIG: JSON.stringify({
@@ -155,7 +154,7 @@ export default defineConfig({
       SHOW_API_URL_SETTING: env.VITE_SHOW_API_URL_SETTING === 'true',
     }),
   },
-  plugins: [extensionBuilderPlugin()],
+  plugins: command === 'build' ? [extensionBuilderPlugin()] : [],
   build: {
     outDir: 'dist',
     emptyOutDir: true,
@@ -182,4 +181,4 @@ export default defineConfig({
   server: {
     port: 3000,
   },
-});
+}));

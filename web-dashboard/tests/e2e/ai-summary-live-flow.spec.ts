@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 
 const BACKEND_BASE_URL = process.env.E2E_BACKEND_BASE_URL ?? 'http://127.0.0.1:8000';
-const TEST_EMAIL = process.env.E2E_EMAIL ?? 'testtest@test.com';
-const TEST_PASSWORD = process.env.E2E_PASSWORD ?? '3644@3644';
+const TEST_EMAIL = process.env.E2E_EMAIL ?? 'test@localhost';
+const TEST_PASSWORD = process.env.E2E_PASSWORD ?? 'testpass123';
 
 const RSS_FEEDS = [
   'https://feeds.bbci.co.uk/news/rss.xml',
@@ -48,8 +48,9 @@ test.describe('Live AI Summary E2E', () => {
 
     await page.goto('/login');
     await page.fill('input[name="email"]', TEST_EMAIL);
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await page.fill('input[name="password"]', TEST_PASSWORD);
-    await page.getByRole('button', { name: /sign in with email/i }).click();
+    await page.getByRole('button', { name: /^sign in$/i }).click();
     await page.waitForURL(/\/dashboard/, { timeout: 20_000 });
 
     const accessToken = await page.evaluate(() => localStorage.getItem('briefly_access_token'));

@@ -13,6 +13,7 @@ export default function Inbox() {
 
   useEffect(() => {
     contentStore.updateFilters({ status: 'all' });
+    void contentStore.loadContent(1);
     void contentStore.loadPlatforms();
     return () => {
       contentStore.updateFilters({ platform: null });
