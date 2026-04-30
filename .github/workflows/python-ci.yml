@@ -50,3 +50,11 @@ jobs:
 
       - name: Run tests
         run: uv run pytest tests/ -v
+        env:
+          JWT_SECRET_KEY: "ci-test-secret-key-at-least-32-characters-long"
+          ENCRYPTION_KEY: "ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM1Pg="
+          GOOGLE_CLIENT_ID: "test-client-id.apps.googleusercontent.com"
+          GOOGLE_CLIENT_SECRET: "test-client-secret"
+          GOOGLE_REDIRECT_URI: "http://localhost:3001/oauth-callback"
+          EMAIL_LOOKUP_KEY: "ci-test-email-lookup-key-at-least-32-chars"
+          SMTP_HOST: "localhost"
