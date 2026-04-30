@@ -1,10 +1,11 @@
 """Tests for AI-002: Multi-Modal Metadata Extraction."""
 
-import pytest
 from datetime import datetime
 
-from src.ai.metadata_extractor import MetadataExtractor, ContentMetadata
+import pytest
+
 from src.ai.exceptions import InvalidURLError
+from src.ai.metadata_extractor import ContentMetadata, MetadataExtractor
 from src.constants import ContentType
 
 

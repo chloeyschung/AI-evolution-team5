@@ -22,6 +22,11 @@ def rate_limit_exceeded_handler(request, exc: RateLimitExceeded):
 
     return JSONResponse(
         status_code=429,
-        content={"error": "rate_limit_exceeded", "message": "Rate limit exceeded. Please try again later.", "code": 429, "details": None},
+        content={
+            "error": "rate_limit_exceeded",
+            "message": "Rate limit exceeded. Please try again later.",
+            "code": 429,
+            "details": None,
+        },
         headers=getattr(exc, "headers", {}),
     )

@@ -181,7 +181,9 @@ async def deactivate_device_token(
     repo = DeviceTokenRepository(db)
     token = await repo.deactivate(user_id, data.device_token)
     if token is None:
-        raise HTTPException(status_code=404, detail={"error": "device_token_not_found", "message": "Device token not found."})
+        raise HTTPException(
+            status_code=404, detail={"error": "device_token_not_found", "message": "Device token not found."}
+        )
     await db.commit()
     await db.refresh(token)
     return DeviceTokenResponse(

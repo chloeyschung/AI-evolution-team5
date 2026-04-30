@@ -1,7 +1,6 @@
 """Tests for /.well-known/ endpoints required by iOS Universal Links."""
 
 import httpx
-import pytest
 from httpx import ASGITransport
 
 from src.api.app import app
@@ -63,9 +62,7 @@ async def test_aasa_body_has_applinks_key(db):
         f"Response body missing 'applinks' key. Got keys: {list(body.keys())}. "
         "The AASA payload must contain an 'applinks' entry per Apple's spec."
     )
-    assert "details" in body["applinks"], (
-        f"'applinks' is missing 'details'. Got: {body['applinks']}"
-    )
-    assert isinstance(body["applinks"].get("apps"), list), (
-        f"'applinks.apps' must be a list. Got: {body['applinks'].get('apps')}"
-    )
+    assert "details" in body["applinks"], f"'applinks' is missing 'details'. Got: {body['applinks']}"
+    assert isinstance(
+        body["applinks"].get("apps"), list
+    ), f"'applinks.apps' must be a list. Got: {body['applinks'].get('apps')}"

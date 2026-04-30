@@ -108,9 +108,7 @@ class ReminderLogRepository(BaseRepository[ReminderLog]):
     async def mark_dismissed(self, user_id: int, log_id: int, dismissed_at: datetime | None = None) -> bool:
         """Mark that user dismissed the reminder."""
         result = await self.session.execute(
-            select(ReminderLog)
-            .where(ReminderLog.id == log_id)
-            .where(ReminderLog.user_id == user_id)
+            select(ReminderLog).where(ReminderLog.id == log_id).where(ReminderLog.user_id == user_id)
         )
         log = result.scalar_one_or_none()
         if not log:

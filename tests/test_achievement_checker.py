@@ -1,13 +1,13 @@
 """Tests for achievement checker (ADV-002)."""
 
+from datetime import UTC, date, datetime, timedelta
+
 import pytest
-from datetime import date, datetime, timezone, timedelta
-from unittest.mock import AsyncMock, patch
 
 from src.ai.achievement_checker import AchievementChecker
 from src.data.achievement_repository import AchievementRepository, StreakRepository
 from src.data.models import Content, ContentStatus, SwipeAction, SwipeHistory
-from src.data.seed_achievements import seed_achievements, ACHIEVEMENT_DEFINITIONS
+from src.data.seed_achievements import ACHIEVEMENT_DEFINITIONS, seed_achievements
 
 
 @pytest.mark.asyncio
@@ -18,6 +18,7 @@ async def test_seed_achievements(db_session):
 
     # Verify achievements were created
     from sqlalchemy import select
+
     from src.data.models import AchievementDefinition
 
     result = await db_session.execute(select(AchievementDefinition))
@@ -70,6 +71,7 @@ async def test_calculate_user_stats_with_data(db_session):
     # Create a user first (required for FK)
     from src.data.models import UserProfile
     from src.utils.datetime_utils import utc_now
+
     user = UserProfile(email="achiev_test@example.com", created_at=utc_now(), updated_at=utc_now())
     db_session.add(user)
     await db_session.flush()
@@ -90,7 +92,7 @@ async def test_calculate_user_stats_with_data(db_session):
         swipe = SwipeHistory(
             content_id=content.id,
             action=SwipeAction.KEEP,
-            swiped_at=datetime.now(timezone.utc) - timedelta(days=i),
+            swiped_at=datetime.now(UTC) - timedelta(days=i),
             user_id=user.id,
         )
         db_session.add(swipe)
@@ -186,6 +188,7 @@ async def test_award_achievement_idempotent(db_session):
 
     # Get first achievement
     from sqlalchemy import select
+
     from src.data.models import AchievementDefinition
 
     result = await db_session.execute(select(AchievementDefinition).limit(1))
@@ -291,6 +294,7 @@ async def test_check_and_award_all_types(db_session):
     # Create a user first (required for FK)
     from src.data.models import UserProfile
     from src.utils.datetime_utils import utc_now
+
     user = UserProfile(email="award_all@example.com", created_at=utc_now(), updated_at=utc_now())
     db_session.add(user)
     await db_session.flush()
@@ -312,7 +316,7 @@ async def test_check_and_award_all_types(db_session):
         swipe = SwipeHistory(
             content_id=content.id,
             action=SwipeAction.KEEP,
-            swiped_at=datetime.now(timezone.utc) - timedelta(days=i % 10),
+            swiped_at=datetime.now(UTC) - timedelta(days=i % 10),
             user_id=user.id,
         )
         db_session.add(swipe)

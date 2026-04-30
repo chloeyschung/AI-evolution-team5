@@ -1,13 +1,13 @@
 """Tests for trend analyzer (ADV-001)."""
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
-from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, patch
 
 from src.ai.trend_analyzer import TrendAnalyzer, TrendFeedItem
 from src.constants import ContentType
 from src.data.models import Content, ContentStatus, SwipeAction, SwipeHistory
-from src.data.repository import ContentRepository, SwipeRepository, ContentTagRepository, UserProfileRepository
+from src.data.repository import ContentTagRepository
 
 
 @pytest.mark.asyncio
@@ -35,7 +35,7 @@ async def test_get_trend_feed_minimal(db_session):
     analyzer = TrendAnalyzer(db_session)
 
     # Create 5 kept contents with swipe history
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for i in range(5):
         kept_at = now - timedelta(days=i)
         content = Content(
@@ -84,7 +84,7 @@ async def test_calculate_interest_match_score(db_session):
 
     # "artificial-intelligence" matches, "technology" matches
     # 2/3 = 0.666...
-    assert score == pytest.approx(2/3, rel=0.01)
+    assert score == pytest.approx(2 / 3, rel=0.01)
 
     # Test with no matches
     user_interests_no_match = ["cooking", "gardening"]
@@ -130,7 +130,7 @@ async def test_calculate_recency_score(db_session):
         content_type=ContentType.VIDEO.value,
         url="https://youtube.com/watch?v=1",
         title="Recent Video",
-        updated_at=datetime.now(timezone.utc) - timedelta(days=1),
+        updated_at=datetime.now(UTC) - timedelta(days=1),
     )
     recent_score = analyzer._calculate_recency_score(recent_content)
     # 1 / (1 + 1/30) = 0.9677
@@ -143,7 +143,7 @@ async def test_calculate_recency_score(db_session):
         content_type=ContentType.VIDEO.value,
         url="https://youtube.com/watch?v=2",
         title="Old Video",
-        updated_at=datetime.now(timezone.utc) - timedelta(days=60),
+        updated_at=datetime.now(UTC) - timedelta(days=60),
     )
     old_score = analyzer._calculate_recency_score(old_content)
     # 1 / (1 + 60/30) = 0.333
@@ -157,7 +157,7 @@ async def test_filter_by_time_range(db_session):
     analyzer = TrendAnalyzer(db_session)
 
     # Create contents with different dates
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     contents = [
         Content(
             platform="YouTube",
@@ -206,7 +206,7 @@ async def test_get_preferred_tags(db_session):
         swipe = SwipeHistory(
             content_id=content.id,
             action=SwipeAction.KEEP,
-            swiped_at=datetime.now(timezone.utc) - timedelta(days=i),
+            swiped_at=datetime.now(UTC) - timedelta(days=i),
             user_id=1,
         )
         db_session.add(swipe)
@@ -270,7 +270,7 @@ async def test_score_threshold_filtering(db_session):
     analyzer = TrendAnalyzer(db_session)
 
     # Create 15 kept contents (enough for scoring)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for i in range(15):
         kept_at = now - timedelta(days=i)
         content = Content(
@@ -314,7 +314,7 @@ async def test_pagination(db_session):
     analyzer = TrendAnalyzer(db_session)
 
     # Create 25 kept contents
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for i in range(25):
         kept_at = now - timedelta(days=i)
         content = Content(

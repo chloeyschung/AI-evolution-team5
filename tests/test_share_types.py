@@ -1,8 +1,6 @@
 """Tests for share types data structures."""
 
-import pytest
-
-from src.ingestion.share_types import ShareDataType, ShareData
+from src.ingestion.share_types import ShareData, ShareDataType
 
 
 class TestShareDataType:

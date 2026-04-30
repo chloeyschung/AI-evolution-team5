@@ -8,6 +8,7 @@ Commit boundary policy:
   - consume_*, mark_email_verified, update_password do NOT commit; callers
     must commit to keep these mutations atomic with surrounding operations.
 """
+
 from datetime import datetime
 
 from sqlalchemy import select
@@ -45,9 +46,7 @@ class EmailAuthRepository:
         await self._db.refresh(method)
         return method
 
-    async def get_auth_method_by_provider(
-        self, provider: AuthProvider, provider_id: str
-    ) -> UserAuthMethod | None:
+    async def get_auth_method_by_provider(self, provider: AuthProvider, provider_id: str) -> UserAuthMethod | None:
         result = await self._db.execute(
             select(UserAuthMethod).where(
                 UserAuthMethod.provider == provider,
@@ -57,9 +56,7 @@ class EmailAuthRepository:
         return result.scalar_one_or_none()
 
     async def get_auth_methods_for_user(self, user_id: int) -> list[UserAuthMethod]:
-        result = await self._db.execute(
-            select(UserAuthMethod).where(UserAuthMethod.user_id == user_id)
-        )
+        result = await self._db.execute(select(UserAuthMethod).where(UserAuthMethod.user_id == user_id))
         return list(result.scalars().all())
 
     async def get_email_auth_method(self, user_id: int) -> UserAuthMethod | None:
@@ -74,9 +71,7 @@ class EmailAuthRepository:
 
     async def mark_email_verified(self, method_id: int) -> UserAuthMethod:
         """Mark auth method as email-verified. Caller must commit."""
-        result = await self._db.execute(
-            select(UserAuthMethod).where(UserAuthMethod.id == method_id)
-        )
+        result = await self._db.execute(select(UserAuthMethod).where(UserAuthMethod.id == method_id))
         method = result.scalar_one()
         method.email_verified = True
         method.verified_at = utc_now()
@@ -84,9 +79,7 @@ class EmailAuthRepository:
 
     async def update_password(self, method_id: int, new_hash: str) -> UserAuthMethod:
         """Update stored password hash. Caller must commit."""
-        result = await self._db.execute(
-            select(UserAuthMethod).where(UserAuthMethod.id == method_id)
-        )
+        result = await self._db.execute(select(UserAuthMethod).where(UserAuthMethod.id == method_id))
         method = result.scalar_one()
         method.password_hash = new_hash
         return method
@@ -134,9 +127,7 @@ class EmailAuthRepository:
 
     # ── PasswordResetToken ────────────────────────────────────────────────
 
-    async def create_reset_token(
-        self, user_id: int, token_hash: str, expires_at: datetime
-    ) -> PasswordResetToken:
+    async def create_reset_token(self, user_id: int, token_hash: str, expires_at: datetime) -> PasswordResetToken:
         token = PasswordResetToken(user_id=user_id, token_hash=token_hash, expires_at=expires_at)
         self._db.add(token)
         await self._db.flush()

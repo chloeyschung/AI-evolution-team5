@@ -1,4 +1,5 @@
 """Test factories for AUTH-005. Bypass SMTP and token delivery entirely."""
+
 from datetime import timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession

@@ -10,23 +10,22 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from ..ai.summarizer import Summarizer
-from ..data.database import init_db, AsyncSessionLocal
+from ..config import settings
+from ..data.database import AsyncSessionLocal, init_db
 from ..ingestion.extractor import ContentExtractor
 from ..ingestion.share_handler import ShareHandler
-from ..config import settings
 from ..middleware.rate_limiter import limiter, rate_limit_exceeded_handler
 from ..middleware.security_headers import security_headers_middleware
 from ..utils.http_client import HttpClientPool
-from .routers import auth, content, swipe, user, integrations, ai, account, well_known, config
+from .routers import account, ai, auth, config, content, integrations, swipe, user, well_known
 from .routers.integrations import _background_tasks
-
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +43,7 @@ async def _purge_expired_soft_deletes() -> None:
     SwipeHistory is never soft-deleted and is excluded.
     """
     from sqlalchemy import delete as sql_delete
-    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+    from sqlalchemy.ext.asyncio import async_sessionmaker
 
     from ..data.database import engine  # reuse existing engine
     from ..data.models import Content, ContentTag, InterestTag
@@ -60,6 +59,7 @@ async def _purge_expired_soft_deletes() -> None:
             async with AsyncSessionLocal() as session:
                 # Find expired Content IDs for cascade deleting ContentTags
                 from sqlalchemy import select
+
                 expired_ids_result = await session.execute(
                     select(Content.id).where(
                         Content.is_deleted == True,  # noqa: E712
@@ -69,12 +69,8 @@ async def _purge_expired_soft_deletes() -> None:
                 expired_ids = [row[0] for row in expired_ids_result.fetchall()]
 
                 if expired_ids:
-                    await session.execute(
-                        sql_delete(ContentTag).where(ContentTag.content_id.in_(expired_ids))
-                    )
-                    await session.execute(
-                        sql_delete(Content).where(Content.id.in_(expired_ids))
-                    )
+                    await session.execute(sql_delete(ContentTag).where(ContentTag.content_id.in_(expired_ids)))
+                    await session.execute(sql_delete(Content).where(Content.id.in_(expired_ids)))
 
                 # Purge expired InterestTag rows
                 await session.execute(
@@ -199,16 +195,17 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
         content={"error": "internal_server_error", "message": "An unexpected error occurred.", "code": 500},
     )
 
+
 # CORS middleware — must be added before other middleware so it runs outermost.
 # chrome-extension://* cannot be expressed as a glob in allow_origins when
 # allow_credentials=True; we use allow_origin_regex instead (matches any
 # 32-char extension ID, which is the canonical Chrome extension ID format).
-_cors_kwargs: dict = dict(
-    allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+_cors_kwargs: dict = {
+    "allow_origins": settings.ALLOWED_ORIGINS,
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
 if settings.ALLOWED_ORIGIN_REGEX:
     _cors_kwargs["allow_origin_regex"] = settings.ALLOWED_ORIGIN_REGEX
 app.add_middleware(CORSMiddleware, **_cors_kwargs)
@@ -222,15 +219,15 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # SlowAPI middleware must be installed for per-route limiter decorators to enforce limits.
 app.add_middleware(SlowAPIMiddleware)
 
-app.include_router(well_known.router,   prefix="",        tags=[])
-app.include_router(config.router,       prefix="/api/v1", tags=["config"])
-app.include_router(auth.router,         prefix="/api/v1", tags=["auth"])
-app.include_router(account.router,      prefix="/api/v1", tags=["account"])
-app.include_router(swipe.router,        prefix="/api/v1", tags=["swipe"])
-app.include_router(content.router,      prefix="/api/v1", tags=["content"])
-app.include_router(user.router,         prefix="/api/v1", tags=["user"])
+app.include_router(well_known.router, prefix="", tags=[])
+app.include_router(config.router, prefix="/api/v1", tags=["config"])
+app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
+app.include_router(account.router, prefix="/api/v1", tags=["account"])
+app.include_router(swipe.router, prefix="/api/v1", tags=["swipe"])
+app.include_router(content.router, prefix="/api/v1", tags=["content"])
+app.include_router(user.router, prefix="/api/v1", tags=["user"])
 app.include_router(integrations.router, prefix="/api/v1", tags=["integrations"])
-app.include_router(ai.router,           prefix="/api/v1", tags=["ai"])
+app.include_router(ai.router, prefix="/api/v1", tags=["ai"])
 
 
 @app.get("/")

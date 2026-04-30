@@ -1,16 +1,16 @@
 """Tests for YouTube integration (INT-001)."""
 
-import pytest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.integrations.youtube.client import YouTubeClient, YouTubeAuthError, YouTubeAPIError
-from src.integrations.youtube.models import YouTubeVideo, YouTubePlaylist, SyncResult
-from src.integrations.repositories.integration import IntegrationRepository
-from src.data.models import IntegrationTokens, IntegrationSyncConfig, IntegrationSyncLog
+import pytest
 
+from src.integrations.repositories.integration import IntegrationRepository
+from src.integrations.youtube.client import YouTubeAuthError, YouTubeClient
+from src.integrations.youtube.models import SyncResult, YouTubePlaylist, YouTubeVideo
 
 # YouTube Client Tests
+
 
 @pytest.mark.asyncio
 async def test_youtube_client_initialization():
@@ -31,7 +31,7 @@ async def test_youtube_client_no_api_key():
 @pytest.mark.asyncio
 async def test_youtube_client_get_access_token_valid():
     """Test getting access token when still valid."""
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    expires_at = datetime.now(UTC) + timedelta(hours=1)
     client = YouTubeClient(
         api_key="test_key",
         access_token="valid_token",
@@ -44,7 +44,7 @@ async def test_youtube_client_get_access_token_valid():
 @pytest.mark.asyncio
 async def test_youtube_client_get_access_token_expired_no_refresh():
     """Test getting access token fails when expired and no refresh token."""
-    expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
+    expires_at = datetime.now(UTC) - timedelta(hours=1)
     client = YouTubeClient(
         api_key="test_key",
         access_token="expired_token",
@@ -84,6 +84,7 @@ async def test_youtube_client_refresh_token():
 
 # YouTube Video Model Tests
 
+
 def test_youtube_video_model():
     """Test YouTubeVideo model serialization."""
     video = YouTubeVideo(
@@ -91,7 +92,7 @@ def test_youtube_video_model():
         title="Test Video",
         channel_title="Test Channel",
         channel_id="UC123",
-        published_at=datetime.now(timezone.utc),
+        published_at=datetime.now(UTC),
         thumbnail_url="https://example.com/thumb.jpg",
         description="Test description",
     )
@@ -106,13 +107,14 @@ def test_youtube_video_model_minimal():
         title="Test Video",
         channel_title="Test Channel",
         channel_id="UC123",
-        published_at=datetime.now(timezone.utc),
+        published_at=datetime.now(UTC),
     )
     assert video.thumbnail_url is None
     assert video.description is None
 
 
 # YouTube Playlist Model Tests
+
 
 def test_youtube_playlist_model():
     """Test YouTubePlaylist model serialization."""
@@ -141,6 +143,7 @@ def test_youtube_playlist_watch_later():
 
 # Sync Result Model Tests
 
+
 def test_sync_result_model():
     """Test SyncResult model."""
     result = SyncResult(
@@ -165,11 +168,12 @@ def test_sync_result_empty():
 
 # Integration Repository Tests
 
+
 @pytest.mark.asyncio
 async def test_integration_repo_save_tokens(db_session):
     """Test saving OAuth tokens."""
     repo = IntegrationRepository(db_session)
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    expires_at = datetime.now(UTC) + timedelta(hours=1)
 
     token = await repo.save_tokens(
         user_id=1,
@@ -190,7 +194,7 @@ async def test_integration_repo_save_tokens(db_session):
 async def test_integration_repo_get_tokens(db_session):
     """Test getting OAuth tokens."""
     repo = IntegrationRepository(db_session)
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    expires_at = datetime.now(UTC) + timedelta(hours=1)
 
     # Save tokens
     await repo.save_tokens(
@@ -221,7 +225,7 @@ async def test_integration_repo_get_tokens_not_found(db_session):
 async def test_integration_repo_delete_tokens(db_session):
     """Test deleting OAuth tokens."""
     repo = IntegrationRepository(db_session)
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    expires_at = datetime.now(UTC) + timedelta(hours=1)
 
     # Save tokens
     await repo.save_tokens(
@@ -366,7 +370,7 @@ async def test_integration_repo_update_last_sync(db_session):
     )
 
     # Update last sync
-    sync_time = datetime.now(timezone.utc)
+    sync_time = datetime.now(UTC)
     await repo.update_last_sync(1, "youtube", "PL123", sync_time)
 
     # Verify
@@ -374,7 +378,7 @@ async def test_integration_repo_update_last_sync(db_session):
     assert last_sync is not None
     # Handle timezone-aware vs naive comparison (SQLite may strip timezone)
     if last_sync.tzinfo is None:
-        last_sync = last_sync.replace(tzinfo=timezone.utc)
+        last_sync = last_sync.replace(tzinfo=UTC)
     assert abs((last_sync - sync_time).total_seconds()) < 1
 
 
@@ -451,7 +455,7 @@ async def test_integration_repo_get_due_syncs(db_session):
     )
 
     # Update last sync to 2 hours ago
-    old_time = datetime.now(timezone.utc) - timedelta(hours=2)
+    old_time = datetime.now(UTC) - timedelta(hours=2)
     await repo.update_last_sync(1, "youtube", "PL123", old_time)
 
     # Save daily config (not due)
@@ -465,7 +469,7 @@ async def test_integration_repo_get_due_syncs(db_session):
     )
 
     # Update last sync to 1 hour ago
-    recent_time = datetime.now(timezone.utc) - timedelta(hours=1)
+    recent_time = datetime.now(UTC) - timedelta(hours=1)
     await repo.update_last_sync(1, "youtube", "PL456", recent_time)
 
     # Get due syncs
@@ -515,7 +519,7 @@ async def test_integration_repo_get_due_syncs_inactive(db_session):
     )
 
     # Update last sync to 2 hours ago
-    old_time = datetime.now(timezone.utc) - timedelta(hours=2)
+    old_time = datetime.now(UTC) - timedelta(hours=2)
     await repo.update_last_sync(1, "youtube", "PL123", old_time)
 
     # Get due syncs
@@ -528,6 +532,7 @@ async def test_integration_repo_get_due_syncs_inactive(db_session):
 # ---------------------------------------------------------------------------
 # SEC-002: OAuthState model + repository methods
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_oauth_state_table_exists(db_session):
@@ -573,6 +578,7 @@ async def test_save_oauth_state_returns_record(db_session):
 async def test_get_and_consume_valid_state(db_session):
     """get_and_consume_oauth_state returns user_id and deletes the row."""
     from sqlalchemy import select
+
     from src.data.models import OAuthState
     from src.utils.datetime_utils import utc_now
 
@@ -588,9 +594,7 @@ async def test_get_and_consume_valid_state(db_session):
     user_id = await repo.get_and_consume_oauth_state("consume_me", "youtube")
     assert user_id == 7
 
-    result = await db_session.execute(
-        select(OAuthState).where(OAuthState.state_token == "consume_me")
-    )
+    result = await db_session.execute(select(OAuthState).where(OAuthState.state_token == "consume_me"))
     assert result.scalar_one_or_none() is None
 
 
@@ -642,11 +646,12 @@ async def test_get_and_consume_wrong_provider_returns_none(db_session):
 # SEC-002: connect_youtube and youtube_callback route fixes
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_connect_youtube_state_is_opaque(authenticated_client):
     """connect_youtube must embed a non-integer opaque state in the auth URL."""
     import os
-    from urllib.parse import urlparse, parse_qs
+    from urllib.parse import parse_qs, urlparse
 
     os.environ["YOUTUBE_CLIENT_ID"] = "test_client_id"
     try:
@@ -657,9 +662,10 @@ async def test_connect_youtube_state_is_opaque(authenticated_client):
         # Must NOT be parseable as an integer (old vulnerable pattern was str(user_id))
         try:
             int(state)
-            assert False, f"state should be opaque, got integer-like: {state!r}"
         except ValueError:
             pass  # expected — token_urlsafe produces non-integer strings
+        else:
+            raise AssertionError(f"state should be opaque, got integer-like: {state!r}")
     finally:
         os.environ.pop("YOUTUBE_CLIENT_ID", None)
 

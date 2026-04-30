@@ -10,9 +10,7 @@ from src.api.app import app
 
 async def test_gzip_encoding_returned_when_client_accepts_gzip(db):
     """GZip middleware should be registered and negotiate via Accept-Encoding."""
-    assert any(m.cls is GZipMiddleware for m in app.user_middleware), (
-        "GZipMiddleware is not registered in app.py"
-    )
+    assert any(m.cls is GZipMiddleware for m in app.user_middleware), "GZipMiddleware is not registered in app.py"
 
     async with httpx.AsyncClient(
         transport=ASGITransport(app=app),
@@ -24,9 +22,9 @@ async def test_gzip_encoding_returned_when_client_accepts_gzip(db):
     assert plain.status_code == 200
     assert gzip.status_code == 200
     assert plain.json()["openapi"] == gzip.json()["openapi"]
-    assert "Accept-Encoding" in gzip.headers.get("vary", ""), (
-        "Expected Vary: Accept-Encoding for gzip-negotiated response"
-    )
+    assert "Accept-Encoding" in gzip.headers.get(
+        "vary", ""
+    ), "Expected Vary: Accept-Encoding for gzip-negotiated response"
 
 
 async def test_global_exception_handler_returns_structured_json(db):
@@ -60,8 +58,7 @@ async def test_global_exception_handler_returns_structured_json(db):
         "message": "An unexpected error occurred.",
         "code": 500,
     }, (
-        f"Expected structured error JSON but got: {body}\n"
-        "Global exception handler is not registered in app.py"
+        f"Expected structured error JSON but got: {body}\n" "Global exception handler is not registered in app.py"
     )
     assert resp.headers["X-Content-Type-Options"] == "nosniff"
     assert resp.headers["X-Frame-Options"] == "DENY"

@@ -8,10 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..constants import (
     REMINDER_BACKLOG_THRESHOLD,
+    STREAK_CHECK_DAYS,
     ReminderFrequency,
     ReminderPriority,
     ReminderType,
-    STREAK_CHECK_DAYS,
 )
 from ..data.models import (
     Content,
@@ -164,9 +164,7 @@ class ReminderEngine:
 
         return None
 
-    async def _check_backlog_reminder(
-        self, user_id: int, preferences: ReminderPreference
-    ) -> ReminderSuggestion | None:
+    async def _check_backlog_reminder(self, user_id: int, preferences: ReminderPreference) -> ReminderSuggestion | None:
         """Check if user needs a backlog reminder.
 
         Triggered when unread content exceeds threshold.
@@ -249,9 +247,7 @@ class ReminderEngine:
 
     async def _get_user_streak(self, user_id: int) -> UserStreak | None:
         """Get user's current streak."""
-        result = await self._log_repo.session.execute(
-            select(UserStreak).where(UserStreak.user_id == user_id)
-        )
+        result = await self._log_repo.session.execute(select(UserStreak).where(UserStreak.user_id == user_id))
         return result.scalar_one_or_none()
 
     async def _get_unread_count(self, user_id: int) -> int:

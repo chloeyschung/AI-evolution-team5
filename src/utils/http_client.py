@@ -20,7 +20,7 @@ TODO #10 (2026-04-14): Replace Generator with | None syntax for type hints
 """
 
 import threading
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import Generator
 from contextlib import asynccontextmanager
 
 import httpx

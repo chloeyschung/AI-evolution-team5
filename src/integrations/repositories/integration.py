@@ -7,7 +7,7 @@ TODO #13 (2026-04-14): Moved magic numbers to constants.py
 
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import delete, insert, select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.constants import DAILY_SYNC_THRESHOLD, HOURLY_SYNC_THRESHOLD, WEEKLY_SYNC_THRESHOLD
@@ -17,8 +17,8 @@ from src.data.models import (
     IntegrationTokens,
     OAuthState,
 )
-from src.utils.datetime_utils import utc_now
 from src.integrations.youtube.models import SyncConfig, SyncLog
+from src.utils.datetime_utils import utc_now
 
 
 class IntegrationRepository:
@@ -474,7 +474,5 @@ class IntegrationRepository:
             return None
 
         user_id = record.user_id
-        await self.session.execute(
-            delete(OAuthState).where(OAuthState.id == record.id)
-        )
+        await self.session.execute(delete(OAuthState).where(OAuthState.id == record.id))
         return user_id

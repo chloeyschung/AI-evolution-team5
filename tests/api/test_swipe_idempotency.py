@@ -8,8 +8,7 @@ the second call must:
   - Leave exactly ONE SwipeHistory row for (user_id, content_id) in the DB
 """
 
-import pytest
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 
 from src.data.models import SwipeHistory
 from tests.conftest import AsyncTestingSessionLocal
@@ -41,8 +40,7 @@ class TestSwipeIdempotency:
             json={"content_id": content_id, "action": "keep"},
         )
         assert r2.status_code in (200, 201), (
-            f"Second (retry) swipe returned {r2.status_code}: {r2.text}. "
-            "Expected idempotent 200/201."
+            f"Second (retry) swipe returned {r2.status_code}: {r2.text}. " "Expected idempotent 200/201."
         )
 
     async def test_duplicate_single_swipe_returns_same_record(self, authenticated_client):
@@ -90,14 +88,12 @@ class TestSwipeIdempotency:
         async with AsyncTestingSessionLocal() as session:
             count = (
                 await session.execute(
-                    select(func.count()).select_from(SwipeHistory)
-                    .where(SwipeHistory.content_id == content_id)
+                    select(func.count()).select_from(SwipeHistory).where(SwipeHistory.content_id == content_id)
                 )
             ).scalar()
 
         assert count == 1, (
-            f"Expected exactly 1 SwipeHistory row, found {count}. "
-            "Duplicate rows were inserted on retry."
+            f"Expected exactly 1 SwipeHistory row, found {count}. " "Duplicate rows were inserted on retry."
         )
 
     async def test_non_duplicate_swipes_still_work(self, authenticated_client):
@@ -120,8 +116,7 @@ class TestSwipeIdempotency:
         async with AsyncTestingSessionLocal() as session:
             count = (
                 await session.execute(
-                    select(func.count()).select_from(SwipeHistory)
-                    .where(SwipeHistory.content_id.in_(content_ids))
+                    select(func.count()).select_from(SwipeHistory).where(SwipeHistory.content_id.in_(content_ids))
                 )
             ).scalar()
 

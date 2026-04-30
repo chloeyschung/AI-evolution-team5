@@ -1,8 +1,8 @@
 """Tests for Sign in with Apple auth endpoint."""
 
-from tests.conftest import AsyncTestingSessionLocal
 from src.constants import AuthProvider
 from src.data.email_auth_repository import EmailAuthRepository
+from tests.conftest import AsyncTestingSessionLocal
 
 
 async def test_apple_login_creates_user_and_auth_method(async_client, db, monkeypatch):
