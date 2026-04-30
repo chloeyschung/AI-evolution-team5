@@ -58,7 +58,7 @@ jobs:
           xcodebuild build \
             -project Briefly.xcodeproj \
             -scheme Briefly \
-            -destination 'generic/platform=iOS' \
+            -sdk iphoneos \
             -clonedSourcePackagesDirPath SourcePackages \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_ENTITLEMENTS="" \
