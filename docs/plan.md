@@ -14,7 +14,8 @@
 |-------|------|-----------|------|
 | 1 | Share Extension (URL 저장) | `phase1-share-extension.md` (plan.md 하단 참조) | ✅ 완료 |
 | 2a | 콘텐츠 크롤링 (제목·썸네일·본문) | [phase2-crawling.md](phase2-crawling.md) | 🟡 부분 완료 |
-| 2b | iOS ↔ 백엔드 인증 연동 | [specs/IOS-001.md](specs/IOS-001.md) | ✅ 완료 |
+| 2b | iOS ↔ 백엔드 인증 연동 (이메일) | [specs/IOS-001.md](specs/IOS-001.md) | ✅ 완료 |
+| 2b-2 | iOS Google Sign-In | [specs/IOS-002.md](specs/IOS-002.md) | ✅ 완료 |
 | 2c | AI 요약 (Claude API) | phase2-ai-summary.md (미작성) | 🔲 대기 |
 | 3 | Swipe UX (Keep / Discard) | phase3-swipe-ux.md (미작성) | 🔲 대기 |
 
@@ -127,6 +128,7 @@
 | 2026-04-10 | /autoplan 실행. 팀 결정: prototype-1은 Phase 1(Share Extension)만 집중. |
 | 2026-04-13 | Share Extension 노출 위치 변경: 앱 아이콘 행 → 하단 액션 목록. `NSExtensionPointIdentifier`를 `com.apple.share-services` → `com.apple.ui-services`로 변경. 표시 이름 "Briefly" → "Save Document to Briefly". `NSExtensionActivationRule`을 딕셔너리에서 Predicate 문자열로 교체. |
 | 2026-04-30 | suyoung-v1 브랜치: iOS ↔ 백엔드 인증 연동 완료 (IOS-001). AuthTokenStore(App Group UserDefaults), BrieflyAPI(URLSession actor), AccountView(이메일 로그인 폼 + AuthViewModel), ShareViewController API 전송 추가. Info.plist localhost HTTP ATS 예외 추가. 시뮬레이터 수동 검증 완료 (test@localhost). |
+| 2026-04-30 | suyoung-v1 브랜치: Google Sign-In 구현 완료 (IOS-002). GoogleSignIn-iOS SPM 추가, BrieflyAPI.loginWithGoogle(), AccountView Google 버튼, BrieflyApp URL 콜백. GoogleService-Info.plist 수동 추가 필요. |
 
 ---
 

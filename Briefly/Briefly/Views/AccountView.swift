@@ -77,16 +77,38 @@ struct AccountView: View {
                 if viewModel.isLoading {
                     ProgressView()
                 } else {
-                    Button {
-                        viewModel.login()
-                    } label: {
-                        Text("로그인")
+                    VStack(spacing: 12) {
+                        Button {
+                            viewModel.login()
+                        } label: {
+                            Text("로그인")
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 4)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(viewModel.emailInput.isEmpty || viewModel.passwordInput.isEmpty)
+
+                        HStack {
+                            Rectangle().frame(height: 1).foregroundStyle(Color(UIColor.separator))
+                            Text("또는").font(.caption).foregroundStyle(.secondary)
+                            Rectangle().frame(height: 1).foregroundStyle(Color(UIColor.separator))
+                        }
+
+                        Button {
+                            viewModel.signInWithGoogle()
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "globe")
+                                    .foregroundStyle(.primary)
+                                Text("Google로 로그인")
+                                    .foregroundStyle(.primary)
+                            }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 4)
+                        }
+                        .buttonStyle(.bordered)
                     }
-                    .buttonStyle(.borderedProminent)
                     .padding(.horizontal, 24)
-                    .disabled(viewModel.emailInput.isEmpty || viewModel.passwordInput.isEmpty)
                 }
             }
         }
@@ -138,6 +160,11 @@ final class AuthViewModel: ObservableObject {
                 presentError("로그인 실패: \(error.localizedDescription)")
             }
         }
+    }
+
+    func signInWithGoogle() {
+        // GoogleService-Info.plist 및 OAuth 설정 완료 후 활성화 예정 (TODOS.md 참조)
+        presentError("Google 로그인은 OAuth 설정 완료 후 사용 가능합니다.")
     }
 
     func logout() {

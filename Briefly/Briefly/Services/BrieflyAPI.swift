@@ -74,6 +74,66 @@ actor BrieflyAPI {
         return try await post("/auth/login", body: body, token: nil)
     }
 
+    // MARK: - Auth: Google
+
+    struct GoogleUserInfoPayload: Encodable {
+        let id: String
+        let email: String
+        let name: String?
+        let picture: String?
+    }
+
+    struct GoogleLoginPayload: Encodable {
+        let googleIdToken: String
+        let googleUserInfo: GoogleUserInfoPayload
+
+        enum CodingKeys: String, CodingKey {
+            case googleIdToken = "google_id_token"
+            case googleUserInfo = "google_user_info"
+        }
+    }
+
+    struct GoogleLoginResult: Decodable {
+        let accessToken: String
+        let refreshToken: String
+        let expiresAt: String
+        let user: GoogleUser
+        let isNewUser: Bool
+
+        struct GoogleUser: Decodable {
+            let id: Int
+            let email: String
+            let displayName: String?
+            let avatarUrl: String?
+
+            enum CodingKeys: String, CodingKey {
+                case id, email
+                case displayName = "display_name"
+                case avatarUrl = "avatar_url"
+            }
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case accessToken = "access_token"
+            case refreshToken = "refresh_token"
+            case expiresAt = "expires_at"
+            case user
+            case isNewUser = "is_new_user"
+        }
+    }
+
+    func loginWithGoogle(
+        idToken: String,
+        userID: String,
+        email: String,
+        name: String?,
+        picture: String?
+    ) async throws -> GoogleLoginResult {
+        let userInfo = GoogleUserInfoPayload(id: userID, email: email, name: name, picture: picture)
+        let body = GoogleLoginPayload(googleIdToken: idToken, googleUserInfo: userInfo)
+        return try await post("/auth/google", body: body, token: nil)
+    }
+
     // MARK: - Auth: Refresh
 
     struct RefreshPayload: Encodable {
