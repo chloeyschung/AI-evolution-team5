@@ -58,7 +58,7 @@ jobs:
           xcodebuild build \
             -project Briefly.xcodeproj \
             -scheme Briefly \
-            -destination 'platform=macOS,arch=arm64,variant=Designed for iPad' \
+            -destination 'generic/platform=iOS' \
             -clonedSourcePackagesDirPath SourcePackages \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_ENTITLEMENTS="" \
