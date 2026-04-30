@@ -11,9 +11,11 @@ export default function OAuthCallback() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const search = location.search;
+
     const handleCallback = async () => {
       try {
-        const code = new URLSearchParams(location.search).get('code');
+        const code = new URLSearchParams(search).get('code');
         if (!code) {
           throw new Error('OAuth code missing');
         }
@@ -27,20 +29,20 @@ export default function OAuthCallback() {
         });
 
         const allowedRedirects = ['/dashboard', '/inbox', '/archive', '/analytics', '/settings'];
-        const requestedRedirect = new URLSearchParams(location.search).get('redirect') || '';
+        const requestedRedirect = new URLSearchParams(search).get('redirect') || '';
         const redirect = allowedRedirects.includes(requestedRedirect) ? requestedRedirect : '/dashboard';
-        navigate(redirect);
+        navigate(redirect, { replace: true });
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Login failed';
         setError(errorMessage);
         setTimeout(() => {
-          navigate({ pathname: '/login', search: `?error=${encodeURIComponent(errorMessage)}` });
+          navigate({ pathname: '/login', search: `?error=${encodeURIComponent(errorMessage)}` }, { replace: true });
         }, 2000);
       }
     };
 
     void handleCallback();
-  }, [location, navigate, authStore]);
+  }, []);
 
   return (
     <section className={styles.page} data-testid="oauth-callback-page">

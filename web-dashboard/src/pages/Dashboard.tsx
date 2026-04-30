@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useContentStore } from '../stores/useContentStore';
 import ContentCard from '../components/content/ContentCard';
 import ContentTable from '../components/content/ContentTable';
+import ConfirmModal from '../components/ui/ConfirmModal';
 import type { Content, SwipeAction, ViewMode } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 import { deleteContent, recordSwipe } from '../api/endpoints';
@@ -27,6 +28,8 @@ export default function Dashboard() {
     index: number;
     timeoutId: number;
   } | null>(null);
+  const [pendingDiscard, setPendingDiscard] = useState<{ item: Content; action: SwipeAction } | null>(null);
+
   const [actionStrip, setActionStrip] = useState<{
     message: string;
     mode: 'pending' | 'undone';
@@ -119,13 +122,27 @@ export default function Dashboard() {
   const handleDelete = async (id: number) => {
     const item = useContentStore.getState().items.find((candidate) => candidate.id === id);
     if (!item) return;
-    queueAction(item, 'discard');
+    setPendingDiscard({ item, action: { content_id: id, action: 'discard' } });
   };
 
   const handleSwipe = async (action: SwipeAction) => {
     const item = useContentStore.getState().items.find((candidate) => candidate.id === action.content_id);
     if (!item) return;
+    if (action.action === 'discard') {
+      setPendingDiscard({ item, action });
+      return;
+    }
     queueAction(item, action.action);
+  };
+
+  const handleConfirmDiscard = () => {
+    if (!pendingDiscard) return;
+    queueAction(pendingDiscard.item, 'discard');
+    setPendingDiscard(null);
+  };
+
+  const handleCancelDiscard = () => {
+    setPendingDiscard(null);
   };
 
   const handleUndoAction = () => {
@@ -157,6 +174,13 @@ export default function Dashboard() {
   };
 
   return (
+    <>
+    <ConfirmModal
+      isOpen={pendingDiscard !== null}
+      message="Move this item to trash?"
+      onConfirm={handleConfirmDiscard}
+      onCancel={handleCancelDiscard}
+    />
     <section className={styles.page} data-testid="dashboard-page">
       <header className={styles.heroPlane} data-testid="dashboard-hero-plane">
         <p className={styles.kicker}>TODAY&apos;S READING FLOW</p>
@@ -217,5 +241,6 @@ export default function Dashboard() {
         )}
       </section>
     </section>
+    </>
   );
 }
