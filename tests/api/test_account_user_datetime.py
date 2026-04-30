@@ -16,7 +16,6 @@ from src.data.models import UserProfile
 from tests.conftest import AsyncTestingSessionLocal
 from tests.factories import make_user
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

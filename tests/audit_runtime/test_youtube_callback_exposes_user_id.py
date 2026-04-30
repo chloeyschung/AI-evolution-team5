@@ -56,4 +56,3 @@ async def test_youtube_callback_success_returns_user_id(async_client, db_session
 
     os.environ.pop("YOUTUBE_CLIENT_ID", None)
     os.environ.pop("YOUTUBE_CLIENT_SECRET", None)
-

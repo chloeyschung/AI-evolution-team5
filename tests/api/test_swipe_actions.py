@@ -1,7 +1,5 @@
 """Tests for UX-002 Swipe Actions API endpoints."""
 
-import pytest
-
 
 class TestBatchSwipeEndpoints:
     """Tests for batch swipe recording."""

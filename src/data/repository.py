@@ -5,10 +5,9 @@ TODO #4 (2026-04-14): Fix limit=None handling in get_pending, get_kept, get_disc
 TODO #6 (2026-04-14): Fix timezone handling inconsistencies in get_statistics method
 """
 
-from datetime import date, datetime, timedelta
 import unicodedata
+from datetime import date, datetime, timedelta
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
-from typing import Optional
 
 from sqlalchemy import case, delete, func, or_, select, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -26,6 +25,8 @@ from .models import (
     ContentStatus,
     ContentTag,
     DefaultSort,
+    DeviceToken,
+    IdempotencyRecord,
     InterestTag,
     SwipeAction,
     SwipeHistory,
@@ -93,7 +94,11 @@ class ContentRepository(BaseRepository[Content]):
         existing = None
         if not allow_duplicate_url:
             result = await self.session.execute(
-                select(Content).where(Content.url == metadata.url, Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
+                select(Content).where(
+                    Content.url == metadata.url,
+                    Content.user_id == user_id,
+                    Content.is_deleted.is_(False),
+                )
             )
             existing = result.scalar_one_or_none()
 
@@ -156,7 +161,11 @@ class ContentRepository(BaseRepository[Content]):
             Content object if found, None otherwise.
         """
         result = await self.session.execute(
-            select(Content).where(Content.url == url, Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
+            select(Content).where(
+                Content.url == url,
+                Content.user_id == user_id,
+                Content.is_deleted.is_(False),
+            )
         )
         return result.scalar_one_or_none()
 
@@ -235,9 +244,7 @@ class ContentRepository(BaseRepository[Content]):
         if delete_ids:
             await self.session.execute(delete(SwipeHistory).where(SwipeHistory.content_id.in_(delete_ids)))
             await self.session.execute(delete(ContentTag).where(ContentTag.content_id.in_(delete_ids)))
-            await self.session.execute(
-                delete(Content).where(Content.user_id == user_id, Content.id.in_(delete_ids))
-            )
+            await self.session.execute(delete(Content).where(Content.user_id == user_id, Content.id.in_(delete_ids)))
 
         await self.session.commit()
         return len(delete_ids)
@@ -270,7 +277,12 @@ class ContentRepository(BaseRepository[Content]):
             List of Content objects, optionally filtered by status.
         """
         # TODO #4 (2026-04-14): Build query without limit first, apply conditionally
-        query = select(Content).where(Content.user_id == user_id, Content.is_deleted == False).order_by(Content.created_at.desc()).offset(offset)  # noqa: E712
+        query = (
+            select(Content)
+            .where(Content.user_id == user_id, Content.is_deleted.is_(False))
+            .order_by(Content.created_at.desc())
+            .offset(offset)
+        )  # noqa: E712
         # Only apply limit if not None (SQLAlchemy .limit(None) still limits!)
         if limit is not None:
             query = query.limit(limit)
@@ -279,9 +291,7 @@ class ContentRepository(BaseRepository[Content]):
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
-    async def update_status(
-        self, content_id: int, new_status: ContentStatus, user_id: int | None = None
-    ) -> Content:
+    async def update_status(self, content_id: int, new_status: ContentStatus, user_id: int | None = None) -> Content:
         """Update content status.
 
         Args:
@@ -436,7 +446,7 @@ class ContentRepository(BaseRepository[Content]):
         for content, cursor_swiped_at in rows:
             if content.id in seen_ids:
                 continue
-            setattr(content, "_cursor_swiped_at", cursor_swiped_at)
+            content._cursor_swiped_at = cursor_swiped_at
             seen_ids.add(content.id)
             contents.append(content)
         return contents
@@ -491,7 +501,7 @@ class ContentRepository(BaseRepository[Content]):
         for content, cursor_swiped_at in rows:
             if content.id in seen_ids:
                 continue
-            setattr(content, "_cursor_swiped_at", cursor_swiped_at)
+            content._cursor_swiped_at = cursor_swiped_at
             seen_ids.add(content.id)
             contents.append(content)
         return contents
@@ -505,8 +515,11 @@ class ContentRepository(BaseRepository[Content]):
         Returns:
             List of (platform, count) tuples, sorted by count descending.
         """
-        query = select(Content.platform, func.count(Content.id)).where(Content.is_deleted == False).group_by(Content.platform).order_by(  # noqa: E712
-            func.count(Content.id).desc()
+        query = (
+            select(Content.platform, func.count(Content.id))
+            .where(Content.is_deleted.is_(False))
+            .group_by(Content.platform)
+            .order_by(func.count(Content.id).desc())
         )
         if user_id is not None:
             query = query.where(Content.user_id == user_id)
@@ -610,8 +623,7 @@ class ContentRepository(BaseRepository[Content]):
         # pending = items currently in inbox (domain-correct; not arithmetic subtraction
         # which goes negative when test runs accumulate multiple swipes per item)
         inbox_base = select(func.count()).select_from(
-            select(Content)
-            .where(Content.is_deleted == False, Content.status == ContentStatus.INBOX)  # noqa: E712
+            select(Content).where(Content.is_deleted == False, Content.status == ContentStatus.INBOX)  # noqa: E712
         )
         if user_id is not None:
             inbox_base = select(func.count()).select_from(
@@ -637,8 +649,9 @@ class ContentRepository(BaseRepository[Content]):
         ).scalar() or 0
         discarded_count = (
             await self.session.execute(
-                select(func.count())
-                .select_from(swipe_query.where(SwipeHistory.action == SwipeAction.DISCARD).subquery())
+                select(func.count()).select_from(
+                    swipe_query.where(SwipeHistory.action == SwipeAction.DISCARD).subquery()
+                )
             )
         ).scalar() or 0
 
@@ -743,21 +756,18 @@ class ContentRepository(BaseRepository[Content]):
             Total count of matching content rows.
         """
         query_pattern = f"%{query}%"
-        stmt = (
-            select(func.count())
-            .select_from(
-                select(Content.id)
-                .where(Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
-                .outerjoin(ContentTag, Content.id == ContentTag.content_id)
-                .where(
-                    (Content.title.ilike(query_pattern))
-                    | (Content.url.ilike(query_pattern))
-                    | (Content.author.ilike(query_pattern))
-                    | (ContentTag.tag.ilike(query_pattern))
-                )
-                .distinct()
-                .subquery()
+        stmt = select(func.count()).select_from(
+            select(Content.id)
+            .where(Content.user_id == user_id, Content.is_deleted == False)  # noqa: E712
+            .outerjoin(ContentTag, Content.id == ContentTag.content_id)
+            .where(
+                (Content.title.ilike(query_pattern))
+                | (Content.url.ilike(query_pattern))
+                | (Content.author.ilike(query_pattern))
+                | (ContentTag.tag.ilike(query_pattern))
             )
+            .distinct()
+            .subquery()
         )
         result = await self.session.execute(stmt)
         return result.scalar_one()
@@ -829,21 +839,15 @@ class ContentRepository(BaseRepository[Content]):
         from sqlalchemy import delete as sql_delete
 
         # Check ownership (include soft-deleted rows so hard-delete can still clean them)
-        result = await self.session.execute(
-            select(Content).where(Content.id == content_id, Content.user_id == user_id)
-        )
+        result = await self.session.execute(select(Content).where(Content.id == content_id, Content.user_id == user_id))
         content = result.scalar_one_or_none()
 
         if content is None:
             return False
 
         # Delete related records first
-        await self.session.execute(
-            sql_delete(ContentTag).where(ContentTag.content_id == content_id)
-        )
-        await self.session.execute(
-            sql_delete(SwipeHistory).where(SwipeHistory.content_id == content_id)
-        )
+        await self.session.execute(sql_delete(ContentTag).where(ContentTag.content_id == content_id))
+        await self.session.execute(sql_delete(SwipeHistory).where(SwipeHistory.content_id == content_id))
 
         # Delete the content
         await self.session.execute(sql_delete(Content).where(Content.id == content_id))
@@ -870,9 +874,7 @@ class ContentRepository(BaseRepository[Content]):
             Content object after soft-delete, or None if not found / not owned.
         """
         # Find content (including already-deleted for idempotency)
-        result = await self.session.execute(
-            select(Content).where(Content.id == content_id, Content.user_id == user_id)
-        )
+        result = await self.session.execute(select(Content).where(Content.id == content_id, Content.user_id == user_id))
         content = result.scalar_one_or_none()
 
         if content is None:
@@ -900,12 +902,15 @@ class ContentRepository(BaseRepository[Content]):
             RuntimeError: If content not found or not owned by user (→ 404).
             ValueError: If recovery window has expired (→ 410).
         """
-        from datetime import timezone
 
         RECOVERY_WINDOW_DAYS = 30
 
         result = await self.session.execute(
-            select(Content).where(Content.id == content_id, Content.user_id == user_id, Content.is_deleted == True)  # noqa: E712
+            select(Content).where(
+                Content.id == content_id,
+                Content.user_id == user_id,
+                Content.is_deleted.is_(True),
+            )
         )
         content = result.scalar_one_or_none()
 
@@ -983,9 +988,7 @@ class SwipeRepository(BaseRepository[SwipeHistory]):
     def __init__(self, session: AsyncSession):
         super().__init__(session)
 
-    async def record_swipe(
-        self, content_id: int, action: SwipeAction, user_id: int
-    ) -> SwipeHistory:
+    async def record_swipe(self, content_id: int, action: SwipeAction, user_id: int) -> SwipeHistory:
         """Record a swipe action (idempotent — safe for iOS retry on network timeout).
 
         If a SwipeHistory row already exists for (user_id, content_id), the existing
@@ -1117,9 +1120,7 @@ class SwipeRepository(BaseRepository[SwipeHistory]):
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
-    async def record_swipes_batch(
-        self, actions: list[tuple[int, SwipeAction]], user_id: int
-    ) -> list[SwipeHistory]:
+    async def record_swipes_batch(self, actions: list[tuple[int, SwipeAction]], user_id: int) -> list[SwipeHistory]:
         """Record multiple swipe actions atomically.
 
         All actions succeed or all fail - no partial commits.
@@ -1604,9 +1605,7 @@ class AccountDeletionRepository(BaseRepository[AccountDeletion]):
 
         # Upsert: if a record for this email already exists (e.g. step-2 of two-step
         # deletion), update it rather than inserting a duplicate (AUTH-004).
-        result = await self.session.execute(
-            select(AccountDeletion).where(AccountDeletion.email == email)
-        )
+        result = await self.session.execute(select(AccountDeletion).where(AccountDeletion.email == email))
         deletion = result.scalar_one_or_none()
 
         if deletion is not None:
@@ -1764,6 +1763,7 @@ class ContentTagRepository(BaseRepository[ContentTag]):
 
 # SEC-003: Audit Logging
 
+
 class AuditRepository:
     """Append-only security event log repository (SEC-003).
 
@@ -1777,9 +1777,9 @@ class AuditRepository:
     async def log_event(
         self,
         event_type: AuditEventType,
-        user_id: Optional[int] = None,
-        ip_address: Optional[str] = None,
-        metadata: Optional[dict] = None,
+        user_id: int | None = None,
+        ip_address: str | None = None,
+        metadata: dict | None = None,
     ) -> None:
         """Insert one audit row in the caller's transaction.
 
@@ -1803,9 +1803,9 @@ class IdempotencyRepository:
         self.session = session
 
     async def get(self, user_id: int, key: str) -> "IdempotencyRecord | None":
-        from .models import IdempotencyRecord
-        from src.utils.datetime_utils import utc_now
         from datetime import timedelta
+
+        from src.utils.datetime_utils import utc_now
 
         cutoff = utc_now() - timedelta(hours=self.IDEMPOTENCY_TTL_HOURS)
         result = await self.session.execute(
@@ -1818,7 +1818,7 @@ class IdempotencyRepository:
         return result.scalar_one_or_none()
 
     async def create(self, user_id: int, key: str, content_id: int) -> None:
-        from .models import IdempotencyRecord
+
         record = IdempotencyRecord(user_id=user_id, idempotency_key=key, content_id=content_id)
         self.session.add(record)
         await self.session.flush()
@@ -1831,8 +1831,8 @@ class DeviceTokenRepository:
         self.session = session
 
     async def upsert(self, user_id: int, device_token: str, platform: str) -> "DeviceToken":
-        from .models import DeviceToken
         from src.utils.datetime_utils import utc_now
+
         now = utc_now()
         result = await self.session.execute(
             select(DeviceToken).where(
@@ -1862,8 +1862,8 @@ class DeviceTokenRepository:
         return token
 
     async def deactivate(self, user_id: int, device_token: str) -> "DeviceToken | None":
-        from .models import DeviceToken
         from src.utils.datetime_utils import utc_now
+
         result = await self.session.execute(
             select(DeviceToken).where(
                 DeviceToken.user_id == user_id,

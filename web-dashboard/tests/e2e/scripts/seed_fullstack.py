@@ -51,14 +51,16 @@ def main() -> None:
 
     conn.execute(
       """
-      INSERT INTO user_profile (id, email, display_name, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO user_profile (id, email, display_name, created_at, updated_at, is_deleted, deleted_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         email=excluded.email,
         display_name=excluded.display_name,
-        updated_at=excluded.updated_at
+        updated_at=excluded.updated_at,
+        is_deleted=excluded.is_deleted,
+        deleted_at=excluded.deleted_at
       """,
-      (USER_ID, USER_EMAIL, "Circle 3 User", now.isoformat(), now.isoformat()),
+      (USER_ID, USER_EMAIL, "Circle 3 User", now.isoformat(), now.isoformat(), False, None),
     )
 
     conn.execute("DELETE FROM authentication_tokens WHERE user_id = ?", (USER_ID,))
@@ -76,8 +78,8 @@ def main() -> None:
     conn.execute(
       """
       INSERT INTO content
-      (user_id, platform, content_type, url, title, author, summary, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (user_id, platform, content_type, url, title, author, summary, is_ai_summarized, is_ai_titled, status, created_at, updated_at, is_deleted, deleted_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       """,
       (
         USER_ID,
@@ -87,9 +89,13 @@ def main() -> None:
         CONTENT_TITLE,
         "Briefly QA",
         CONTENT_SUMMARY,
+        True,
+        False,
         "INBOX",
         now.isoformat(),
         now.isoformat(),
+        False,
+        None,
       ),
     )
 

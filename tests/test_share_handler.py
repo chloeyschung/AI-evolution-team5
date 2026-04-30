@@ -3,12 +3,11 @@
 import pytest
 
 from src.constants import ContentType
-from src.ingestion.share_handler import ShareHandler
-from src.ingestion.share_types import ShareDataType, ShareData
 from src.ingestion.exceptions import (
     InvalidShareDataError,
-    UnsupportedShareTypeError,
 )
+from src.ingestion.share_handler import ShareHandler
+from src.ingestion.share_types import ShareData, ShareDataType
 
 
 @pytest.fixture

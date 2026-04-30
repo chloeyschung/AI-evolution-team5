@@ -1,7 +1,5 @@
 """Tests for API routes."""
 
-import pytest
-
 
 class TestContentEndpoints:
     """Tests for content API endpoints."""
@@ -212,9 +210,7 @@ class TestContentEndpoints:
         page1_data = page1.json()
         assert page1_data["next_cursor"] is not None
 
-        page2 = await authenticated_client.get(
-            f"/api/v1/content?limit=2&cursor={page1_data['next_cursor']}"
-        )
+        page2 = await authenticated_client.get(f"/api/v1/content?limit=2&cursor={page1_data['next_cursor']}")
         assert page2.status_code == 200
         page2_data = page2.json()
         assert page2_data["next_offset"] is None

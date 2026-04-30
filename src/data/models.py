@@ -1,13 +1,12 @@
 """SQLAlchemy ORM models for Briefly storage engine."""
 
 from datetime import datetime
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
 
 import sqlalchemy
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Index, Integer, JSON, String, Text
+from sqlalchemy import JSON, Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy import Enum as SQLEnum
-from sqlalchemy.orm import DeclarativeBase, Mapped, declarative_base, mapped_column, relationship
+from sqlalchemy.orm import declarative_base, relationship
 
 from src.constants import (
     AuthProvider,
@@ -23,15 +22,16 @@ Base = declarative_base()
 
 # SEC-003: Audit event type enum
 
-class AuditEventType(str, Enum):
-    LOGIN_SUCCESS            = "login_success"
-    LOGIN_FAILURE            = "login_failure"
-    LOGOUT                   = "logout"
-    REFRESH_TOKEN            = "refresh_token"
+
+class AuditEventType(StrEnum):
+    LOGIN_SUCCESS = "login_success"
+    LOGIN_FAILURE = "login_failure"
+    LOGOUT = "logout"
+    REFRESH_TOKEN = "refresh_token"
     ACCOUNT_DELETE_INITIATED = "account_delete_initiated"
     ACCOUNT_DELETE_CONFIRMED = "account_delete_confirmed"
-    OAUTH_CONNECT            = "oauth_connect"
-    OAUTH_DISCONNECT         = "oauth_disconnect"
+    OAUTH_CONNECT = "oauth_connect"
+    OAUTH_DISCONNECT = "oauth_disconnect"
     PASSWORD_RESET_REQUESTED = "password_reset_requested"
     PASSWORD_RESET_COMPLETED = "password_reset_completed"
 
@@ -41,16 +41,14 @@ class AuditLog(Base):
 
     __tablename__ = "audit_logs"
 
-    id         = Column(Integer, primary_key=True, autoincrement=True)
-    user_id    = Column(Integer, nullable=True, index=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=True, index=True)
     event_type = Column(String(50), nullable=False, index=True)
     ip_address = Column(String(45), nullable=True)
-    meta       = Column(JSON, nullable=True)
+    meta = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), default=utc_now, nullable=False, index=True)
 
-    __table_args__ = (
-        sqlalchemy.Index("ix_audit_logs_user_created", "user_id", "created_at"),
-    )
+    __table_args__ = (sqlalchemy.Index("ix_audit_logs_user_created", "user_id", "created_at"),)
 
 
 class Content(Base):
@@ -84,9 +82,7 @@ class Content(Base):
     user = relationship("UserProfile", back_populates="content")
 
     # TODO #17 (2026-04-14): Added compound index for common query pattern (user_id + created_at)
-    __table_args__ = (
-        sqlalchemy.Index("ix_content_user_created", "user_id", "created_at"),
-    )
+    __table_args__ = (sqlalchemy.Index("ix_content_user_created", "user_id", "created_at"),)
 
 
 class SwipeHistory(Base):
@@ -104,9 +100,7 @@ class SwipeHistory(Base):
     content = relationship("Content", back_populates="swipe_history")
     user = relationship("UserProfile", back_populates="swipe_history")
 
-    __table_args__ = (
-        sqlalchemy.UniqueConstraint("user_id", "content_id", name="uq_swipe_user_content"),
-    )
+    __table_args__ = (sqlalchemy.UniqueConstraint("user_id", "content_id", name="uq_swipe_user_content"),)
 
 
 class UserProfile(Base):
@@ -118,7 +112,9 @@ class UserProfile(Base):
     email = Column(
         String(320), unique=True, nullable=True, index=True
     )  # AUTH-002 (nullable for backward compatibility)
-    google_sub = Column(String(100), unique=True, nullable=True, index=True)  # AUTH-002; DEPRECATED AUTH-005 — migrated to user_auth_methods
+    google_sub = Column(
+        String(100), unique=True, nullable=True, index=True
+    )  # AUTH-002; DEPRECATED AUTH-005 — migrated to user_auth_methods
     display_name = Column(String(100))
     avatar_url = Column(String(500))
     bio = Column(String(500))
@@ -351,9 +347,7 @@ class DeviceToken(Base):
     created_at = Column(DateTime, default=utc_now, nullable=False)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
-    __table_args__ = (
-        sqlalchemy.UniqueConstraint("user_id", "device_token", name="uq_device_token_user_token"),
-    )
+    __table_args__ = (sqlalchemy.UniqueConstraint("user_id", "device_token", name="uq_device_token_user_token"),)
 
 
 # ADV-002: Gamified Achievement System models
@@ -471,6 +465,7 @@ class UserActivityPattern(Base):
 
 # ── AUTH-005: Identity table + token tables ───────────────────────────────────
 
+
 class UserAuthMethod(Base):
     """Per-provider identity row for a user (AUTH-005).
 
@@ -486,7 +481,7 @@ class UserAuthMethod(Base):
     # OAuth: provider's user ID (e.g. google_sub).
     # email_password: HMAC-SHA256(normalized_email, EMAIL_LOOKUP_KEY) — deterministic, indexable.
     provider_id = Column(String(500), nullable=False)
-    password_hash = Column(Text, nullable=True)    # Argon2id; NULL for OAuth rows
+    password_hash = Column(Text, nullable=True)  # Argon2id; NULL for OAuth rows
     email_encrypted = Column(Text, nullable=True)  # Fernet-encrypted; NULL for OAuth rows
     email_verified = Column(Boolean, nullable=False, default=False)
     verified_at = Column(DateTime, nullable=True)
@@ -495,9 +490,7 @@ class UserAuthMethod(Base):
 
     user = relationship("UserProfile", backref="auth_methods")
 
-    __table_args__ = (
-        sqlalchemy.UniqueConstraint("provider", "provider_id", name="uq_auth_method_provider_id"),
-    )
+    __table_args__ = (sqlalchemy.UniqueConstraint("provider", "provider_id", name="uq_auth_method_provider_id"),)
 
 
 class EmailVerificationToken(Base):
@@ -542,6 +535,4 @@ class IdempotencyRecord(Base):
     content_id = Column(Integer, ForeignKey("content.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, default=utc_now, nullable=False, index=True)
 
-    __table_args__ = (
-        sqlalchemy.UniqueConstraint("user_id", "idempotency_key", name="uq_idempotency_user_key"),
-    )
+    __table_args__ = (sqlalchemy.UniqueConstraint("user_id", "idempotency_key", name="uq_idempotency_user_key"),)

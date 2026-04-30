@@ -1,19 +1,18 @@
 """Tests for repository operations."""
 
+from datetime import UTC, datetime
+
 import pytest
-from datetime import datetime, timezone
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.metadata_extractor import ContentMetadata
 from src.constants import ContentType
-from src.data.models import SwipeAction, Content, UserProfile
+from src.data.models import SwipeAction, UserProfile
 from src.data.repository import ContentRepository, SwipeRepository
 from src.utils.datetime_utils import utc_now
 
-
 # Import shared test fixtures from conftest
-from tests.conftest import test_async_engine, AsyncTestingSessionLocal, Base
-from sqlalchemy import delete
-from sqlalchemy.ext.asyncio import AsyncSession
+from tests.conftest import AsyncTestingSessionLocal
 
 
 @pytest.fixture(scope="function")
@@ -29,7 +28,6 @@ async def db_session(db):
 @pytest.fixture
 async def test_user_id(db_session: AsyncSession):
     """Create a test user and return the user ID."""
-    from sqlalchemy.ext.asyncio import AsyncSession
 
     user = UserProfile(
         email="test@example.com",
@@ -53,7 +51,7 @@ def sample_metadata():
         url="https://youtube.com/watch?v=test123",
         title="Test Video",
         author="Test Author",
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
     )
 
 
@@ -86,7 +84,7 @@ class TestContentRepository:
             url="https://youtube.com/watch?v=test123",
             title="Updated Title",
             author="Updated Author",
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
         result = await repo.save(updated_metadata, user_id=test_user_id)
 
@@ -201,7 +199,7 @@ class TestContentRepository:
             ),
             user_id=test_user_id,
         )
-        content2 = await content_repo.save(
+        await content_repo.save(
             ContentMetadata(
                 platform="Test",
                 content_type=ContentType.ARTICLE,
@@ -209,7 +207,7 @@ class TestContentRepository:
             ),
             user_id=test_user_id,
         )
-        content3 = await content_repo.save(
+        await content_repo.save(
             ContentMetadata(
                 platform="Test",
                 content_type=ContentType.ARTICLE,
@@ -296,7 +294,7 @@ class TestContentRepository:
         content_repo = ContentRepository(db_session)
 
         # Save contents with timestamps
-        content1 = await content_repo.save(
+        await content_repo.save(
             ContentMetadata(
                 platform="Test",
                 content_type=ContentType.ARTICLE,
@@ -308,7 +306,7 @@ class TestContentRepository:
         # Small delay to ensure different timestamps
         await db_session.commit()
 
-        content2 = await content_repo.save(
+        await content_repo.save(
             ContentMetadata(
                 platform="Test",
                 content_type=ContentType.ARTICLE,

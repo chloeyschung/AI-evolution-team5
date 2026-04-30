@@ -2,8 +2,8 @@
 
 from sqlalchemy import select
 
-from tests.conftest import AsyncTestingSessionLocal
 from src.data.models import DeviceToken
+from tests.conftest import AsyncTestingSessionLocal
 
 
 async def test_register_device_token_upserts_active_token(authenticated_client, db):

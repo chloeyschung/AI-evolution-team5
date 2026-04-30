@@ -235,7 +235,9 @@ class YouTubeClient:
         # Parse publishedAt, defaulting to utc_now() if missing or invalid
         published_at_str = snippet.get("publishedAt", "")
         try:
-            published_at = datetime.fromisoformat(published_at_str.replace("Z", "+00:00")) if published_at_str else utc_now()
+            published_at = (
+                datetime.fromisoformat(published_at_str.replace("Z", "+00:00")) if published_at_str else utc_now()
+            )
         except (ValueError, AttributeError):
             published_at = utc_now()
 

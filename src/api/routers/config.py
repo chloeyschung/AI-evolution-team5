@@ -1,7 +1,6 @@
 """App lifecycle and configuration endpoint for iOS clients."""
 
 from fastapi import APIRouter
-from fastapi.responses import JSONResponse
 
 from ...config import settings
 from ..schemas import AppConfigResponse

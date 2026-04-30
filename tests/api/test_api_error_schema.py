@@ -4,15 +4,16 @@ TDD: these tests are written BEFORE the implementation.
 They assert the unified error shape:
   {"error": str, "message": str, "code": int, "details": dict | None}
 """
+
 import pytest
 
 from tests.conftest import AsyncTestingSessionLocal
-from tests.factories import make_user, make_unverified_user
-
+from tests.factories import make_unverified_user, make_user
 
 # ---------------------------------------------------------------------------
 # Tests — pure shape (no DB needed; use async_client which brings in db)
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_http_exception_returns_unified_error_shape(async_client):

@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 test.describe('Circle 1: Frontend-to-Frontend', () => {
   test('renders bite-sized inbox cards with mocked API and supports swipe actions', async ({ page }) => {
     await page.addInitScript(() => {
+      localStorage.setItem('briefly_access_token', 'circle1-access-token');
       localStorage.setItem(
         'briefly_auth_state',
         JSON.stringify({
@@ -20,24 +21,27 @@ test.describe('Circle 1: Frontend-to-Frontend', () => {
       });
     });
 
-    await page.route('**/api/v1/content/pending**', async (route) => {
+    await page.route('**/api/v1/content**', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify([
-          {
-            id: 1001,
-            platform: 'youtube',
-            content_type: 'video',
-            url: 'https://example.com/one',
-            title: 'Circle 1 Mock Card',
-            author: 'Frontend Test',
-            summary: 'This card proves frontend rendering with deterministic API stubs.',
-            status: 'inbox',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ]),
+        body: JSON.stringify({
+          items: [
+            {
+              id: 1001,
+              platform: 'youtube',
+              content_type: 'video',
+              url: 'https://example.com/one',
+              title: 'Circle 1 Mock Card',
+              author: 'Frontend Test',
+              summary: 'This card proves frontend rendering with deterministic API stubs.',
+              status: 'inbox',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+          ],
+          has_more: false,
+        }),
       });
     });
 

@@ -6,19 +6,19 @@ from datetime import timedelta
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...auth.email_auth import encrypt_email, generate_token, hash_password, hmac_email, verify_password
+from ...auth.tokens import verify_access_token
 from ...constants import AuthProvider, ErrorCode
 from ...data.auth_repository import AuthenticationRepository
 from ...data.database import get_db
 from ...data.email_auth_repository import EmailAuthRepository
-from ...data.models import AuditEventType, UserAuthMethod, UserProfile, utc_now
+from ...data.models import AuditEventType, UserProfile, utc_now
 from ...data.repository import AuditRepository, UserProfileRepository
-from ...auth.email_auth import hash_password, hmac_email, encrypt_email, verify_password, generate_token
-from ...auth.tokens import verify_access_token
+from ...middleware.rate_limiter import limiter
 from ...services.email_service import EmailService
 from ...utils.datetime_utils import serialize_datetime
 from ...utils.token_hashing import hash_access_token as _hash_token
 from ..dependencies import get_current_user
-from ...middleware.rate_limiter import limiter
 from ..schemas import (
     AppleLoginRequest,
     AuthStatusResponse,
@@ -48,7 +48,9 @@ from ..schemas import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-_VERIFICATION_EMAIL_SENT_MESSAGE = "If that email is registered and not yet verified, a verification email has been sent."
+_VERIFICATION_EMAIL_SENT_MESSAGE = (
+    "If that email is registered and not yet verified, a verification email has been sent."
+)
 
 
 def _normalize_email(email: str) -> str:
@@ -479,9 +481,7 @@ async def google_login_with_code(
 
     # Check for 30-day re-registration block
     deletion_repo = AccountDeletionRepository(db)
-    is_blocked, block_expires_at = await deletion_repo.is_account_blocked(
-        email=email, google_sub=google_sub
-    )
+    is_blocked, block_expires_at = await deletion_repo.is_account_blocked(email=email, google_sub=google_sub)
 
     if is_blocked:
         raise HTTPException(
@@ -578,7 +578,11 @@ async def register(
         if existing.email_verified:
             raise HTTPException(
                 status_code=409,
-                detail={"error": "email_exists", "message": "An account with this email already exists.", "providers": [AuthProvider.EMAIL_PASSWORD.value]},
+                detail={
+                    "error": "email_exists",
+                    "message": "An account with this email already exists.",
+                    "providers": [AuthProvider.EMAIL_PASSWORD.value],
+                },
             )
 
         existing.password_hash = hash_password(data.password)
@@ -593,7 +597,11 @@ async def register(
         auth_methods = await email_repo.get_auth_methods_for_user(existing_user.id)
         raise HTTPException(
             status_code=409,
-            detail={"error": "email_exists", "message": "An account with this email already exists.", "providers": [method.provider.value for method in auth_methods]},
+            detail={
+                "error": "email_exists",
+                "message": "An account with this email already exists.",
+                "providers": [method.provider.value for method in auth_methods],
+            },
         )
 
     user = UserProfile(
@@ -814,7 +822,10 @@ async def link_account(
     if existing_method and existing_method.user_id != user_id:
         raise HTTPException(
             status_code=409,
-            detail={"error": "email_taken_by_another_account", "message": "This email is already linked to another account."},
+            detail={
+                "error": "email_taken_by_another_account",
+                "message": "This email is already linked to another account.",
+            },
         )
     if existing_method and existing_method.user_id == user_id:
         raise HTTPException(

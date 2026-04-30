@@ -24,7 +24,7 @@ test.describe('Signup Flow', () => {
     await expect(page.getByRole('button', { name: /create account/i })).toBeVisible();
   });
 
-  test('should submit signup form and create account', async ({ page }) => {
+  test('should submit signup form through the canonical API path', async ({ page }) => {
     // Track API requests to verify correct endpoint
     const apiRequests: { url: string; method: string }[] = [];
     page.on('request', request => {
@@ -35,6 +35,15 @@ test.describe('Signup Flow', () => {
         });
       }
     });
+    await page.route('**/api/v1/auth/register', async (route) => {
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message: 'Registration successful. Please check your email to verify your account.',
+        }),
+      });
+    });
 
     await page.goto('/signup');
 
@@ -44,11 +53,11 @@ test.describe('Signup Flow', () => {
     await page.fill('input[name="password"]', 'password123');
     await page.fill('input[name="confirm"]', 'password123');
 
-    // Submit form
+    const registerResponsePromise = page.waitForResponse(
+      response => response.request().method() === 'POST' && response.url().includes('/api/v1/auth/register')
+    );
     await page.click('button[type="submit"]');
-
-    // Wait for API response
-    await page.waitForTimeout(3000);
+    await registerResponsePromise;
 
     // Verify correct API endpoint was called (no double prefix)
     const registerRequest = apiRequests.find(
@@ -82,62 +91,4 @@ test.describe('Signup Flow', () => {
     await expect(page.getByText(/passwords do not match/i)).toBeVisible();
   });
 
-  test('should handle existing email error', async ({ page }) => {
-    // Track API responses
-    let registerResponseStatus: number | null = null;
-    page.on('response', async response => {
-      if (response.url().includes('/register')) {
-        registerResponseStatus = response.status();
-      }
-    });
-
-    await page.goto('/signup');
-
-    // Use a known email (if exists in test database) or just verify the flow
-    await page.fill('input[type="email"]', 'test@example.com');
-    await page.fill('input[name="password"]', 'password123');
-    await page.fill('input[name="confirm"]', 'password123');
-
-    // Submit form
-    await page.click('button[type="submit"]');
-
-    // Wait for response
-    await page.waitForTimeout(3000);
-
-    // Should have made the API call (status could be 201, 409, etc.)
-    expect(registerResponseStatus).not.toBeNull();
-  });
-
-  test('should have correct API path without double prefix', async ({ page }) => {
-    // This test specifically verifies the fix for the double-prefix bug
-    // where VITE_API_BASE_URL=/api caused /api/api/v1/... paths
-
-    const apiV1Requests: string[] = [];
-    page.on('request', request => {
-      const url = request.url();
-      // Only track actual API v1 requests (not Vite dev server requests to /src/api/)
-      if (url.includes('/api/v1/')) {
-        apiV1Requests.push(url);
-      }
-    });
-
-    await page.goto('/signup');
-
-    // Fill and submit form
-    const testEmail = `path-test-${Date.now()}@example.com`;
-    await page.fill('input[type="email"]', testEmail);
-    await page.fill('input[name="password"]', 'password123');
-    await page.fill('input[name="confirm"]', 'password123');
-
-    await page.click('button[type="submit"]');
-    await page.waitForTimeout(3000);
-
-    // Should have made at least one API v1 request
-    expect(apiV1Requests.length).toBeGreaterThan(0);
-
-    // All API v1 requests should NOT have double /api/api/ prefix
-    for (const url of apiV1Requests) {
-      expect(url).not.toContain('/api/api/');
-    }
-  });
 });

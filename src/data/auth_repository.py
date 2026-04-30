@@ -18,6 +18,7 @@ from src.utils.token_hashing import hash_access_token
 
 class AuthenticationRepository(BaseRepository[AuthenticationToken]):
     """Repository for authentication token management."""
+
     REFRESH_TOKEN_TTL_SECONDS = 604800  # 7 days
     REFRESH_REPLAY_GRACE_SECONDS = 5
     _refresh_locks: dict[str, Lock] = {}
@@ -219,7 +220,11 @@ class AuthenticationRepository(BaseRepository[AuthenticationToken]):
                 new_refresh_token,
                 now + timedelta(seconds=self.REFRESH_REPLAY_GRACE_SECONDS),
             )
-            return existing_token, new_access_token, new_refresh_token  # hashed record + plaintext JWT + plaintext refresh token
+            return (
+                existing_token,
+                new_access_token,
+                new_refresh_token,
+            )  # hashed record + plaintext JWT + plaintext refresh token
 
     async def revoke_token_by_user_id(self, user_id: int) -> bool:
         """Revoke all tokens for a user (logout or account delete).
@@ -252,6 +257,4 @@ class AuthenticationRepository(BaseRepository[AuthenticationToken]):
         Args:
             user_id: The user ID to revoke tokens for
         """
-        await self.db.execute(
-            delete(AuthenticationToken).where(AuthenticationToken.user_id == user_id)
-        )
+        await self.db.execute(delete(AuthenticationToken).where(AuthenticationToken.user_id == user_id))

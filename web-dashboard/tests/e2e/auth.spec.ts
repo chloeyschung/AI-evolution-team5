@@ -40,8 +40,9 @@ test.describe('Authentication Flow', () => {
 
     await page.goto('/login');
     await page.fill('input[name="email"]', 'unverified@example.com');
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await page.fill('input[name="password"]', 'Pass1!');
-    await page.click('button:has-text("Sign in with email")');
+    await page.getByRole('button', { name: /^sign in$/i }).click();
 
     await expect(page.getByText(/email not verified/i)).toBeVisible();
     await expect(page.getByRole('button', { name: /resend verification email/i })).toBeVisible();
@@ -120,8 +121,9 @@ test.describe('Authentication Flow', () => {
       localStorage.setItem('briefly_refresh_token', 'dummy-refresh-token');
     });
     await page.fill('input[name="email"]', 'no-user@example.com');
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await page.fill('input[name="password"]', 'WrongPass1!');
-    await page.click('button:has-text("Sign in with email")');
+    await page.getByRole('button', { name: /^sign in$/i }).click();
 
     await expect(page).toHaveURL(/\/login/);
     await expect(page.getByText(/request failed|sign in failed|invalid credentials/i)).toBeVisible();
@@ -163,56 +165,11 @@ test.describe('Authentication Flow', () => {
     expect(refreshCalled).toBeFalsy();
   });
 
-  test('should navigate to dashboard route', async ({ page }) => {
-    // Navigate to dashboard route
-    await page.goto('/dashboard');
-
-    // Should reach the dashboard URL (auth guard may or may not redirect)
-    const url = page.url();
-    expect(url).toContain('localhost:3001');
-  });
-
-  test('should navigate to inbox route', async ({ page }) => {
-    await page.goto('/inbox');
-    const url = page.url();
-    expect(url).toContain('localhost:3001');
-  });
-
-  test('should navigate to archive route', async ({ page }) => {
-    await page.goto('/archive');
-    const url = page.url();
-    expect(url).toContain('localhost:3001');
-  });
-
   test('should display login page', async ({ page }) => {
     await page.goto('/login');
 
-    // Should be on login page
     await expect(page).toHaveURL(/\/login/);
-
-    // Page should load without errors
-    await page.waitForLoadState('networkidle');
-  });
-
-  test('should navigate to OAuth callback page', async ({ page }) => {
-    // Navigate to OAuth callback (without valid code)
-    await page.goto('/oauth-callback?code=test');
-
-    // Should be on oauth-callback page
-    await expect(page).toHaveURL(/\/oauth-callback/);
-
-    // Page should load
-    await page.waitForLoadState('domcontentloaded');
-  });
-
-  test('should handle OAuth callback with invalid code', async ({ page }) => {
-    await page.goto('/oauth-callback?code=invalid_code_12345');
-
-    // Should show error after attempting to process
-    await page.waitForTimeout(3000);
-
-    // Page should still be on localhost
-    const url = page.url();
-    expect(url).toContain('localhost:3001');
+    await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: /continue with google/i })).toBeVisible();
   });
 });

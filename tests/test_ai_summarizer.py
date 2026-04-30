@@ -1,20 +1,20 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+
+from src.ai.exceptions import APIConnectionError, InvalidResponseError, SummarizationError
 from src.ai.summarizer import Summarizer
-from src.ai.exceptions import SummarizationError, APIConnectionError, InvalidResponseError
+
 
 @pytest.fixture
 def summarizer():
     return Summarizer(api_key="test-key")
 
+
 @pytest.mark.asyncio
 async def test_summarize_success(summarizer):
     # Mocking the httpx response
-    mock_response_data = {
-        "content": [
-            {"type": "text", "text": "Line 1: Context\nLine 2: Action\nLine 3: Result"}
-        ]
-    }
+    mock_response_data = {"content": [{"type": "text", "text": "Line 1: Context\nLine 2: Action\nLine 3: Result"}]}
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value.status_code = 200
@@ -24,12 +24,14 @@ async def test_summarize_success(summarizer):
         result = await summarizer.summarize("Some long content")
 
         assert result == "Line 1: Context\nLine 2: Action\nLine 3: Result"
-        assert len(result.split('\n')) == 3
+        assert len(result.split("\n")) == 3
+
 
 @pytest.mark.asyncio
 async def test_summarize_empty_content(summarizer):
     with pytest.raises(SummarizationError, match="Input content is empty"):
         await summarizer.summarize("")
+
 
 @pytest.mark.asyncio
 async def test_summarize_api_failure(summarizer):
@@ -39,6 +41,7 @@ async def test_summarize_api_failure(summarizer):
 
         with pytest.raises(APIConnectionError, match="API request failed with status 500"):
             await summarizer.summarize("Some content")
+
 
 @pytest.mark.asyncio
 async def test_summarize_invalid_format(summarizer):
@@ -60,9 +63,7 @@ async def test_summarize_openai_format():
         model="gpt-4o-mini",
         provider="openai",
     )
-    mock_response_data = {
-        "choices": [{"message": {"content": "OpenAI line 1\nOpenAI line 2\nOpenAI line 3"}}]
-    }
+    mock_response_data = {"choices": [{"message": {"content": "OpenAI line 1\nOpenAI line 2\nOpenAI line 3"}}]}
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value.status_code = 200
@@ -93,13 +94,10 @@ async def test_summarize_gemini_format():
         result = await summarizer.summarize("Some content")
         assert result == "Gemini line 1\nGemini line 2\nGemini line 3"
 
+
 @pytest.mark.asyncio
 async def test_summarize_truncates_excess_lines(summarizer):
-    mock_response_data = {
-        "content": [
-            {"type": "text", "text": "Line 1\nLine 2\nLine 3\nLine 4\nLine 5"}
-        ]
-    }
+    mock_response_data = {"content": [{"type": "text", "text": "Line 1\nLine 2\nLine 3\nLine 4\nLine 5"}]}
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value.status_code = 200
@@ -107,7 +105,7 @@ async def test_summarize_truncates_excess_lines(summarizer):
 
         result = await summarizer.summarize("Some content", max_lines=3)
 
-        assert len(result.split('\n')) == 3
+        assert len(result.split("\n")) == 3
         assert result == "Line 1\nLine 2\nLine 3"
 
 
@@ -128,9 +126,7 @@ async def test_summarize_retries_on_5xx_error(summarizer):
             # Return success on 3rd attempt
             mock_response = MagicMock()
             mock_response.status_code = 200
-            mock_response.json = MagicMock(return_value={
-                "content": [{"type": "text", "text": "Success after retry"}]
-            })
+            mock_response.json = MagicMock(return_value={"content": [{"type": "text", "text": "Success after retry"}]})
             return mock_response
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:

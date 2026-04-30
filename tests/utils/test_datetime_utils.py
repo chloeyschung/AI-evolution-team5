@@ -1,6 +1,6 @@
 """Direct unit tests for datetime utility helpers."""
 
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 
 from src.utils.datetime_utils import serialize_datetime
 
@@ -22,7 +22,7 @@ def test_serialize_datetime_aware_utc_uses_z_not_offset():
 
 
 def test_serialize_datetime_plus_00_00_timezone_normalized_to_z():
-    value = datetime(2026, 4, 19, 12, 34, 56, tzinfo=timezone.utc)
+    value = datetime(2026, 4, 19, 12, 34, 56, tzinfo=UTC)
     result = serialize_datetime(value)
     assert result.endswith("Z")
     assert "+00:00" not in result

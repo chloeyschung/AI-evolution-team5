@@ -70,9 +70,14 @@ export function setAbortController(controller: AbortController | null): void {
   currentAbortController = controller;
 }
 
+export function normalizeApiBaseUrl(baseUrl: string): string {
+  const trimmed = baseUrl.trim().replace(/\/+$/, '');
+  return trimmed.endsWith('/api') ? trimmed.slice(0, -4) : trimmed;
+}
+
 function getApiBaseUrl(): string {
   // 1. Build-time env var wins (CI / Docker deployments)
-  const explicitBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').trim();
+  const explicitBaseUrl = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL || '');
   if (explicitBaseUrl) return explicitBaseUrl;
 
   // 2. User-set override in Settings (allows pointing at a different backend at runtime)
@@ -80,7 +85,7 @@ function getApiBaseUrl(): string {
     const raw = localStorage.getItem('briefly_settings');
     if (raw) {
       const stored = JSON.parse(raw).apiBaseUrl as string | undefined;
-      if (stored && stored.trim()) return stored.trim();
+      if (stored && stored.trim()) return normalizeApiBaseUrl(stored);
     }
   } catch {
     // ignore corrupt localStorage

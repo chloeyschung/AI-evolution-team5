@@ -103,7 +103,9 @@ class ContentResponse(BaseModel):
         return cls(
             id=metadata.id if hasattr(metadata, "id") else 0,
             platform=metadata.platform,
-            content_type=metadata.content_type.value if hasattr(metadata.content_type, "value") else metadata.content_type,
+            content_type=(
+                metadata.content_type.value if hasattr(metadata.content_type, "value") else metadata.content_type
+            ),
             url=metadata.url,
             title=metadata.title,
             author=metadata.author,

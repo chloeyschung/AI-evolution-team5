@@ -1,9 +1,9 @@
 """Content domain router — /content/* CRUD, /stats, /platforms, /search, /share."""
 
-import logging
-import os
 import hashlib
 import json
+import logging
+import os
 from datetime import timedelta
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Request, Response
@@ -543,16 +543,16 @@ async def restore_content(
     try:
         content = await content_repo.restore_content(content_id, user_id)
         return ContentResponse.from_content(content)
-    except ValueError:
+    except ValueError as exc:
         raise HTTPException(
             status_code=410,
             detail={"error": "recovery_window_expired", "message": "The 30-day recovery window has expired."},
-        )
-    except RuntimeError:
+        ) from exc
+    except RuntimeError as exc:
         raise HTTPException(
             status_code=404,
             detail={"error": ErrorCode.CONTENT_NOT_FOUND, "message": "Content not found."},
-        )
+        ) from exc
 
 
 @router.get("/stats", response_model=StatsResponse)
@@ -717,7 +717,9 @@ async def _background_summarize(
             content = await repo.get_by_id(content_id)
             if content and not bool(getattr(content, "is_ai_titled", False)):
                 try:
-                    generated_title = await summarizer.generate_title(_prepare_text_for_title(text_content), max_retries=1)
+                    generated_title = await summarizer.generate_title(
+                        _prepare_text_for_title(text_content), max_retries=1
+                    )
                     cleaned = _clean_generated_title(generated_title)
                     if cleaned:
                         await repo.update_title(content_id, user_id, cleaned)

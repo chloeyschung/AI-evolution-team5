@@ -2,20 +2,19 @@
 
 import pytest
 
-from src.ai.metadata_extractor import ContentMetadata
 from src.constants import ContentType
-from src.ingestion.share_processor import (
-    URLShareProcessor,
-    PlainTextProcessor,
-    DeepLinkProcessor,
-    ImageProcessor,
-)
-from src.ingestion.share_types import ShareDataType, ShareData
 from src.ingestion.exceptions import (
-    InvalidShareDataError,
     DeepLinkValidationError,
     ImageProcessingError,
+    InvalidShareDataError,
 )
+from src.ingestion.share_processor import (
+    DeepLinkProcessor,
+    ImageProcessor,
+    PlainTextProcessor,
+    URLShareProcessor,
+)
+from src.ingestion.share_types import ShareData, ShareDataType
 
 
 class TestURLShareProcessor:

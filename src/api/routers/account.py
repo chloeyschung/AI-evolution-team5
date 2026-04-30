@@ -8,7 +8,6 @@ from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...constants import ACCOUNT_DELETION_BLOCK_DAYS, ErrorCode
-from ...utils.datetime_utils import serialize_datetime
 from ...data.auth_repository import AuthenticationRepository
 from ...data.database import get_db
 from ...data.models import (
@@ -16,12 +15,11 @@ from ...data.models import (
     AuthenticationToken,
     Content,
     InterestTag,
-    SwipeHistory,
-    UserPreferences,
     UserProfile,
     utc_now,
 )
 from ...data.repository import AccountDeletionRepository, AuditRepository, UserProfileRepository
+from ...utils.datetime_utils import serialize_datetime
 from ..dependencies import get_current_user
 from ..schemas import (
     AccountDeleteRequest,
@@ -159,11 +157,7 @@ async def delete_account(
     )
 
     # 4. Soft-delete the UserProfile itself
-    await db.execute(
-        update(UserProfile)
-        .where(UserProfile.id == user_id)
-        .values(is_deleted=True, deleted_at=now)
-    )
+    await db.execute(update(UserProfile).where(UserProfile.id == user_id).values(is_deleted=True, deleted_at=now))
 
     # 5. Hard-delete session data (auth tokens — these are not recoverable)
     await db.execute(delete(AuthenticationToken).where(AuthenticationToken.user_id == user_id))

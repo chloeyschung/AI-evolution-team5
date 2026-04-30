@@ -5,9 +5,7 @@ All tests must FAIL initially, then PASS after implementation.
 """
 
 import re
-from datetime import UTC, datetime, timezone, timedelta
-
-import pytest
+from datetime import UTC, datetime, timedelta, timezone
 
 from src.utils.datetime_utils import serialize_datetime
 
@@ -75,9 +73,7 @@ class TestSerializeDatetimeFormat:
         dt = datetime(2024, 6, 15, 10, 30, 45, tzinfo=UTC)
         result = serialize_datetime(dt)
         pattern = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$"
-        assert re.match(pattern, result), (
-            f"Result {result!r} does not match ISO 8601 pattern {pattern!r}"
-        )
+        assert re.match(pattern, result), f"Result {result!r} does not match ISO 8601 pattern {pattern!r}"
 
     def test_serialize_datetime_no_microseconds(self):
         """Microseconds are stripped from output."""

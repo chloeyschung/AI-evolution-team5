@@ -1,15 +1,21 @@
 """Tests for user profile and preferences repository."""
 
-import pytest
-from datetime import datetime, timezone, timedelta, date
-from sqlalchemy import select, delete, func
+from datetime import UTC, datetime, timedelta
 
-from src.data.models import UserProfile, UserPreferences, InterestTag, SwipeHistory, SwipeAction, Content, Theme, DefaultSort
+import pytest
+
+from src.data.models import (
+    Content,
+    DefaultSort,
+    SwipeAction,
+    SwipeHistory,
+    Theme,
+    UserProfile,
+)
 from src.data.repository import UserProfileRepository
 
-
 # Import shared test fixtures from conftest
-from tests.conftest import test_async_engine, AsyncTestingSessionLocal, Base
+from tests.conftest import AsyncTestingSessionLocal
 
 
 @pytest.fixture(scope="function")
@@ -62,9 +68,7 @@ class TestUserProfileRepository:
 
         # Update profile
         updated = await repo.update_profile(
-            display_name="Test User",
-            avatar_url="https://example.com/avatar.jpg",
-            bio="Test bio"
+            display_name="Test User", avatar_url="https://example.com/avatar.jpg", bio="Test bio"
         )
 
         assert updated.display_name == "Test User"
@@ -78,7 +82,7 @@ class TestUserProfileRepository:
         repo = UserProfileRepository(db_session)
 
         # Create profile with some data
-        profile = await repo.update_profile(display_name="Original", bio="Original bio")
+        await repo.update_profile(display_name="Original", bio="Original bio")
 
         # Update only display_name
         updated = await repo.update_profile(display_name="Updated")
@@ -145,11 +149,7 @@ class TestUserPreferencesRepository:
 
         # Update preferences
         updated = await repo.update_preferences(
-            user_id=1,
-            theme=Theme.DARK,
-            notifications_enabled=False,
-            daily_goal=50,
-            default_sort=DefaultSort.PLATFORM
+            user_id=1, theme=Theme.DARK, notifications_enabled=False, daily_goal=50, default_sort=DefaultSort.PLATFORM
         )
 
         assert updated.theme == Theme.DARK
@@ -163,7 +163,7 @@ class TestUserPreferencesRepository:
         repo = UserProfileRepository(db_session)
 
         # Create preferences
-        preferences = await repo.get_preferences(user_id=1)
+        await repo.get_preferences(user_id=1)
 
         # Update only theme
         updated = await repo.update_preferences(user_id=1, theme=Theme.LIGHT)
@@ -199,12 +199,13 @@ class TestUserStatisticsRepository:
 
         # Create a user first (required for FK)
         from src.utils.datetime_utils import utc_now
+
         user = UserProfile(email="stat_test@example.com", created_at=utc_now(), updated_at=utc_now())
         db_session.add(user)
         await db_session.flush()
 
         # Create distinct content items — one per swipe (unique constraint per user+content)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         contents = []
         for i in range(3):
             c = Content(
@@ -221,9 +222,18 @@ class TestUserStatisticsRepository:
 
         # Create swipe history: 2 keep, 1 discard — one row per content
         swipes = [
-            SwipeHistory(content_id=contents[0].id, action=SwipeAction.KEEP, swiped_at=now - timedelta(hours=1), user_id=user.id),
-            SwipeHistory(content_id=contents[1].id, action=SwipeAction.KEEP, swiped_at=now - timedelta(hours=2), user_id=user.id),
-            SwipeHistory(content_id=contents[2].id, action=SwipeAction.DISCARD, swiped_at=now - timedelta(hours=3), user_id=user.id),
+            SwipeHistory(
+                content_id=contents[0].id, action=SwipeAction.KEEP, swiped_at=now - timedelta(hours=1), user_id=user.id
+            ),
+            SwipeHistory(
+                content_id=contents[1].id, action=SwipeAction.KEEP, swiped_at=now - timedelta(hours=2), user_id=user.id
+            ),
+            SwipeHistory(
+                content_id=contents[2].id,
+                action=SwipeAction.DISCARD,
+                swiped_at=now - timedelta(hours=3),
+                user_id=user.id,
+            ),
         ]
         db_session.add_all(swipes)
         await db_session.commit()
@@ -234,7 +244,7 @@ class TestUserStatisticsRepository:
         assert stats["total_swipes"] == 3
         assert stats["total_kept"] == 2
         assert stats["total_discarded"] == 1
-        assert stats["retention_rate"] == 2/3
+        assert stats["retention_rate"] == 2 / 3
         assert stats["streak_days"] >= 1
 
     async def test_get_statistics_retention_rate(self, db_session):
@@ -247,12 +257,13 @@ class TestUserStatisticsRepository:
 
         # Create a user first (required for FK)
         from src.utils.datetime_utils import utc_now
+
         user = UserProfile(email="retention_test@example.com", created_at=utc_now(), updated_at=utc_now())
         db_session.add(user)
         await db_session.flush()
 
         # Create 10 distinct content items (one per swipe — unique constraint)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         contents = []
         for i in range(10):
             c = Content(
@@ -269,19 +280,23 @@ class TestUserStatisticsRepository:
 
         # 6 keep, 4 discard — one row per content item
         for i in range(6):
-            db_session.add(SwipeHistory(
-                content_id=contents[i].id,
-                action=SwipeAction.KEEP,
-                swiped_at=now - timedelta(hours=i),
-                user_id=user.id,
-            ))
+            db_session.add(
+                SwipeHistory(
+                    content_id=contents[i].id,
+                    action=SwipeAction.KEEP,
+                    swiped_at=now - timedelta(hours=i),
+                    user_id=user.id,
+                )
+            )
         for i in range(4):
-            db_session.add(SwipeHistory(
-                content_id=contents[6 + i].id,
-                action=SwipeAction.DISCARD,
-                swiped_at=now - timedelta(hours=10+i),
-                user_id=user.id,
-            ))
+            db_session.add(
+                SwipeHistory(
+                    content_id=contents[6 + i].id,
+                    action=SwipeAction.DISCARD,
+                    swiped_at=now - timedelta(hours=10 + i),
+                    user_id=user.id,
+                )
+            )
         await db_session.commit()
 
         stats = await repo.get_statistics(user_id=user.id)

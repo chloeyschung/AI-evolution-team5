@@ -1,51 +1,65 @@
 """Shared pytest fixtures for all tests."""
 
-import pytest
-import httpx
-from httpx import ASGITransport
-from unittest.mock import AsyncMock
-from sqlalchemy import delete, text
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+# ruff: noqa: E402
 
-from src.ai.metadata_extractor import ContentMetadata
-from src.constants import ContentType
-from src.ingestion.extractor import ContentExtractor
-from src.ai.metadata_extractor import MetadataExtractor
+import os
+import tempfile
+from unittest.mock import AsyncMock
+
+os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-with-32-characters")
+os.environ.setdefault("ENCRYPTION_KEY", "0ar4QdmZ1ZOus3vEb0qS1-MWRWOqqx9J7vDSwTphJZw=")
+os.environ.setdefault("GOOGLE_CLIENT_ID", "test.apps.googleusercontent.com")
+os.environ.setdefault("GOOGLE_CLIENT_SECRET", "test-google-client-secret")
+os.environ.setdefault("GOOGLE_REDIRECT_URI", "http://localhost:3001/oauth-callback")
+os.environ.setdefault("EMAIL_LOOKUP_KEY", "test-email-lookup-key")
+os.environ.setdefault("SMTP_HOST", "localhost")
+os.environ.setdefault("APPLE_TEAM_ID", "ABCDE12345")
+
+import httpx
+import pytest
+from httpx import ASGITransport
+from sqlalchemy import delete
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from src.ai.metadata_extractor import ContentMetadata, MetadataExtractor
 from src.api.app import app
 from src.auth.tokens import create_access_token, create_refresh_token
+from src.constants import ContentType
+from src.data import database as db_module
 from src.data.models import (
     AccountDeletion,
+    AchievementDefinition,
     AuditLog,
+    AuthenticationToken,
     Base,
-    SwipeHistory,
     Content,
     ContentTag,
+    DeviceToken,
+    EmailVerificationToken,
     IdempotencyRecord,
-    UserProfile,
-    UserPreferences,
-    InterestTag,
-    IntegrationTokens,
     IntegrationSyncConfig,
     IntegrationSyncLog,
-    AchievementDefinition,
-    UserAchievement,
-    UserStreak,
-    ReminderPreference,
-    ReminderLog,
-    UserActivityPattern,
-    AuthenticationToken,
-    DeviceToken,
-    UserAuthMethod,
-    EmailVerificationToken,
+    IntegrationTokens,
+    InterestTag,
     PasswordResetToken,
+    ReminderLog,
+    ReminderPreference,
+    SwipeHistory,
+    UserAchievement,
+    UserActivityPattern,
+    UserAuthMethod,
+    UserPreferences,
+    UserProfile,
+    UserStreak,
 )
-from src.data import database as db_module
+from src.ingestion.extractor import ContentExtractor
 
 
 @pytest.fixture(autouse=True)
 def reset_rate_limiter():
     """Reset in-process rate limiter state between tests to prevent 429 contamination."""
     from src.middleware.rate_limiter import limiter
+
     limiter.reset()
     yield
     limiter.reset()
@@ -55,23 +69,13 @@ def reset_rate_limiter():
 # Shared Test Database Setup (for API integration tests only)
 # ============================================================================
 
-# Use file-based SQLite for reliable test isolation
-# File-based avoids issues with in-memory DB not persisting across connections
-import os
-
 # Use a temp-dir SQLite file so tests don't depend on repo mount permissions.
 # Some environments mount the repo path as read-only for SQLite write/locking.
-import tempfile
-
 TEST_DATABASE_PATH = os.path.join(tempfile.gettempdir(), "briefly_test_briefly.db")
 TEST_DATABASE_URL = f"sqlite+aiosqlite:///{TEST_DATABASE_PATH}"
 
-test_async_engine = create_async_engine(
-    TEST_DATABASE_URL, echo=False, connect_args={"check_same_thread": False}
-)
-AsyncTestingSessionLocal = async_sessionmaker(
-    test_async_engine, class_=AsyncSession, expire_on_commit=False
-)
+test_async_engine = create_async_engine(TEST_DATABASE_URL, echo=False, connect_args={"check_same_thread": False})
+AsyncTestingSessionLocal = async_sessionmaker(test_async_engine, class_=AsyncSession, expire_on_commit=False)
 
 
 async def async_get_db():
@@ -79,6 +83,10 @@ async def async_get_db():
     async with AsyncTestingSessionLocal() as db:
         try:
             yield db
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise
         finally:
             await db.close()
 
@@ -184,10 +192,11 @@ async def test_user(db, db_session: AsyncSession):
     Use this fixture when you need a user in the database for testing.
     Example: async def test_xxx(test_user: int): ...
     """
+    from datetime import timedelta
+
+    from src.constants import AuthProvider
     from src.utils.datetime_utils import utc_now
     from src.utils.token_hashing import hash_access_token
-    from src.constants import AuthProvider
-    from datetime import timedelta
 
     user = UserProfile(
         email="test@example.com",
@@ -225,13 +234,31 @@ async def test_user(db, db_session: AsyncSession):
 
 
 @pytest.fixture
-async def auth_token(test_user: int) -> str:
+async def auth_token(test_user: int, db_session: AsyncSession) -> str:
     """Generate a test JWT access token.
 
     Use this fixture when you need an authentication token for API calls.
     Example: async def test_xxx(auth_token: str): ...
     """
-    return create_access_token(test_user)
+    from datetime import timedelta
+
+    from sqlalchemy import select
+
+    from src.utils.datetime_utils import utc_now
+    from src.utils.token_hashing import hash_access_token
+
+    access_token = create_access_token(test_user)
+    result = await db_session.execute(select(AuthenticationToken).where(AuthenticationToken.user_id == test_user))
+    token_record = result.scalar_one_or_none()
+    if token_record is None:
+        token_record = AuthenticationToken(user_id=test_user)
+        db_session.add(token_record)
+    token_record.access_token = hash_access_token(access_token)
+    token_record.refresh_token = hash_access_token(create_refresh_token())
+    token_record.expires_at = utc_now() + timedelta(hours=1)
+    token_record.revoked_at = None
+    await db_session.commit()
+    return access_token
 
 
 @pytest.fixture
@@ -243,9 +270,7 @@ async def authenticated_client(db, auth_token: str):
     Example: async def test_xxx(authenticated_client): ...
     """
     async with httpx.AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test",
-        headers={"Authorization": f"Bearer {auth_token}"}
+        transport=ASGITransport(app=app), base_url="http://test", headers={"Authorization": f"Bearer {auth_token}"}
     ) as client:
         yield client
 
@@ -253,6 +278,7 @@ async def authenticated_client(db, auth_token: str):
 # ============================================================================
 # Mock Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def content_extractor_mock():

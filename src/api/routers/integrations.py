@@ -114,7 +114,13 @@ async def list_youtube_playlists(
     youtube_tokens = await repo.get_tokens(user_id, Provider.YOUTUBE.value)
 
     if not youtube_tokens:
-        raise HTTPException(status_code=401, detail={"error": ErrorCode.NOT_CONNECTED_TO_YOUTUBE, "message": "YouTube account is not connected. Please link your YouTube account first."})
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "error": ErrorCode.NOT_CONNECTED_TO_YOUTUBE,
+                "message": "YouTube account is not connected. Please link your YouTube account first.",
+            },
+        )
 
     # Create YouTube client and fetch playlists
     client = YouTubeClient(
@@ -128,7 +134,13 @@ async def list_youtube_playlists(
     except YouTubeAuthError:
         # Token expired, delete it
         await repo.delete_tokens(user_id, Provider.YOUTUBE.value)
-        raise HTTPException(status_code=401, detail={"error": ErrorCode.YOUTUBE_AUTH_EXPIRED, "message": "YouTube session has expired. Please reconnect your YouTube account."}) from None
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "error": ErrorCode.YOUTUBE_AUTH_EXPIRED,
+                "message": "YouTube session has expired. Please reconnect your YouTube account.",
+            },
+        ) from None
 
     return [
         YouTubePlaylistResponse(
@@ -170,7 +182,13 @@ async def create_youtube_sync_config(
     youtube_tokens = await repo.get_tokens(user_id, Provider.YOUTUBE.value)
 
     if not youtube_tokens:
-        raise HTTPException(status_code=401, detail={"error": ErrorCode.NOT_CONNECTED_TO_YOUTUBE, "message": "YouTube account is not connected. Please link your YouTube account first."})
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "error": ErrorCode.NOT_CONNECTED_TO_YOUTUBE,
+                "message": "YouTube account is not connected. Please link your YouTube account first.",
+            },
+        )
 
     # Create sync config
     config = await repo.save_sync_config(
@@ -285,7 +303,13 @@ async def update_youtube_sync_config(
             break
 
     if not existing:
-        raise HTTPException(status_code=404, detail={"error": ErrorCode.SYNC_CONFIG_NOT_FOUND, "message": "Sync configuration not found for this playlist."})
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": ErrorCode.SYNC_CONFIG_NOT_FOUND,
+                "message": "Sync configuration not found for this playlist.",
+            },
+        )
 
     # Update config
     new_name = data.playlist_name if data.playlist_name is not None else existing.playlist_name
@@ -347,7 +371,13 @@ async def delete_youtube_sync_config(
     deleted = await repo.delete_sync_config(user_id, Provider.YOUTUBE.value, playlist_id)
 
     if not deleted:
-        raise HTTPException(status_code=404, detail={"error": ErrorCode.SYNC_CONFIG_NOT_FOUND, "message": "Sync configuration not found for this playlist."})
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": ErrorCode.SYNC_CONFIG_NOT_FOUND,
+                "message": "Sync configuration not found for this playlist.",
+            },
+        )
 
     return {"message": "Sync configuration deleted successfully"}
 
@@ -413,17 +443,21 @@ async def trigger_youtube_sync(
         401: Not authenticated or not connected to YouTube.
     """
     from src.ai.summarizer import Summarizer
-    from src.data.repository import ContentRepository
     from src.integrations.repositories.integration import IntegrationRepository
     from src.integrations.youtube.client import YouTubeClient
-    from src.integrations.youtube.sync import YouTubeSyncService
 
     # Get YouTube tokens
     integration_repo = IntegrationRepository(db)
     youtube_tokens = await integration_repo.get_tokens(user_id, Provider.YOUTUBE.value)
 
     if not youtube_tokens:
-        raise HTTPException(status_code=401, detail={"error": ErrorCode.NOT_CONNECTED_TO_YOUTUBE, "message": "YouTube account is not connected. Please link your YouTube account first."})
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "error": ErrorCode.NOT_CONNECTED_TO_YOUTUBE,
+                "message": "YouTube account is not connected. Please link your YouTube account first.",
+            },
+        )
 
     # Create clients
     youtube_client = YouTubeClient(
@@ -432,20 +466,12 @@ async def trigger_youtube_sync(
         token_expires_at=youtube_tokens.expires_at,
     )
 
-    content_repo = ContentRepository(db)
-
     # Initialize summarizer with API key
     summarizer_api_key = os.getenv("ANTHROPIC_API_KEY")
     if not summarizer_api_key:
         raise HTTPException(status_code=500, detail="anthropic_api_key_not_configured")
 
     summarizer = Summarizer(api_key=summarizer_api_key)
-    sync_service = YouTubeSyncService(
-        youtube_client=youtube_client,
-        content_repo=content_repo,
-        integration_repo=integration_repo,
-        summarizer=summarizer,
-    )
 
     # Trigger sync (run in background to avoid blocking)
     async def do_sync(background_db, bg_integration_repo, bg_sync_service):
@@ -563,7 +589,13 @@ async def connect_youtube(
     # Get OAuth credentials
     client_id = os.getenv("YOUTUBE_CLIENT_ID")
     if not client_id:
-        raise HTTPException(status_code=500, detail={"error": ErrorCode.YOUTUBE_OAUTH_NOT_CONFIGURED, "message": "YouTube OAuth is not configured on this server."})
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": ErrorCode.YOUTUBE_OAUTH_NOT_CONFIGURED,
+                "message": "YouTube OAuth is not configured on this server.",
+            },
+        )
 
     # Build OAuth URL
     scope = "https://www.googleapis.com/auth/youtube.readonly"
@@ -622,14 +654,26 @@ async def youtube_callback(
     repo = IntegrationRepository(db)
     user_id = await repo.get_and_consume_oauth_state(state, Provider.YOUTUBE.value)
     if user_id is None:
-        raise HTTPException(status_code=400, detail={"error": ErrorCode.INVALID_STATE, "message": "Invalid or expired OAuth state token. Please restart the connection flow."})
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": ErrorCode.INVALID_STATE,
+                "message": "Invalid or expired OAuth state token. Please restart the connection flow.",
+            },
+        )
 
     # Get OAuth credentials
     client_id = os.getenv("YOUTUBE_CLIENT_ID")
     client_secret = os.getenv("YOUTUBE_CLIENT_SECRET")
 
     if not client_id or not client_secret:
-        raise HTTPException(status_code=500, detail={"error": ErrorCode.YOUTUBE_OAUTH_NOT_CONFIGURED, "message": "YouTube OAuth is not configured on this server."})
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": ErrorCode.YOUTUBE_OAUTH_NOT_CONFIGURED,
+                "message": "YouTube OAuth is not configured on this server.",
+            },
+        )
 
     redirect_uri = os.getenv("YOUTUBE_REDIRECT_URI", "http://localhost:8000/api/v1/integrations/youtube/callback")
 
@@ -648,7 +692,13 @@ async def youtube_callback(
         )
 
     if response.status_code != 200:
-        raise HTTPException(status_code=400, detail={"error": ErrorCode.YOUTUBE_AUTH_FAILED, "message": "Failed to authenticate with YouTube. Please try connecting again."})
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": ErrorCode.YOUTUBE_AUTH_FAILED,
+                "message": "Failed to authenticate with YouTube. Please try connecting again.",
+            },
+        )
 
     token_data = response.json()
 
@@ -660,7 +710,10 @@ async def youtube_callback(
         if existing_tokens is None:
             raise HTTPException(
                 status_code=400,
-                detail={"error": "missing_refresh_token", "message": "YouTube did not return a refresh token. Please disconnect and reconnect your account."},
+                detail={
+                    "error": "missing_refresh_token",
+                    "message": "YouTube did not return a refresh token. Please disconnect and reconnect your account.",
+                },
             )
         new_refresh_token = existing_tokens.get_refresh_token()
 
@@ -917,12 +970,20 @@ async def import_linkedin_post(
     # Fetch the content for response
     content_id = result.get("content_id")
     if not content_id:
-        raise HTTPException(status_code=500, detail={"error": ErrorCode.FAILED_TO_GET_CONTENT_ID, "message": "Content was imported but could not be retrieved. Please try again."})
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": ErrorCode.FAILED_TO_GET_CONTENT_ID,
+                "message": "Content was imported but could not be retrieved. Please try again.",
+            },
+        )
 
     content_repo = ContentRepository(db)
     content = await content_repo.get_by_id(content_id)
     if not content:
-        raise HTTPException(status_code=404, detail={"error": ErrorCode.CONTENT_NOT_FOUND, "message": "Content not found."})
+        raise HTTPException(
+            status_code=404, detail={"error": ErrorCode.CONTENT_NOT_FOUND, "message": "Content not found."}
+        )
 
     return ShareResponse(
         id=content.id,
