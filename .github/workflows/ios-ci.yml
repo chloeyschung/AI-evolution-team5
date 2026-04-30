@@ -58,8 +58,7 @@ jobs:
           xcodebuild build \
             -project Briefly.xcodeproj \
             -scheme Briefly \
-            -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
+            -destination 'platform=macOS,arch=arm64,variant=Designed for iPad' \
             -clonedSourcePackagesDirPath SourcePackages \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_ENTITLEMENTS="" \
