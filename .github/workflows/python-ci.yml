@@ -58,3 +58,5 @@ jobs:
           GOOGLE_REDIRECT_URI: "http://localhost:3001/oauth-callback"
           EMAIL_LOOKUP_KEY: "ci-test-email-lookup-key-at-least-32-chars"
           SMTP_HOST: "localhost"
+          APPLE_TEAM_ID: "ABCDE12345"
+          APPLE_BUNDLE_ID: "com.briefly.app"
