@@ -2,9 +2,9 @@ name: iOS CI
 
 on:
   push:
-    branches: [prototype-1]
+    branches: ['**']
   pull_request:
-    branches: [prototype-1]
+    branches: ['**']
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
