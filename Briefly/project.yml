@@ -37,7 +37,10 @@ targets:
         CFBundleVersion: "1"
         UILaunchScreen: {}
         NSAppTransportSecurity:
-          NSAllowsArbitraryLoads: true
+          NSAllowsArbitraryLoads: false
+          NSExceptionDomains:
+            localhost:
+              NSExceptionAllowsInsecureHTTPLoads: true
         CFBundleURLTypes:
           - CFBundleURLSchemes:
               - briefly
@@ -62,9 +65,11 @@ targets:
       - path: BrieflyShareExtension
         excludes:
           - "**/*.entitlements"
-      # SavedItem.swift와 StorageService.swift는 양쪽 타겟 공유
+      # 메인 앱과 공유하는 파일들 (양쪽 타겟 멤버십)
       - path: Briefly/Models/SavedItem.swift
       - path: Briefly/Services/StorageService.swift
+      - path: Briefly/Services/AuthTokenStore.swift
+      - path: Briefly/Services/BrieflyAPI.swift
     info:
       path: BrieflyShareExtension/Info.plist
       properties:
