@@ -16,6 +16,9 @@ const emailLoginBtn = document.getElementById('email-login-btn') as HTMLButtonEl
 const emailInput = document.getElementById('email-input') as HTMLInputElement;
 const passwordInput = document.getElementById('password-input') as HTMLInputElement;
 const saveCurrentPageBtn = document.getElementById('save-current-page') as HTMLButtonElement;
+const saveUrlForm = document.getElementById('save-url-form') as HTMLFormElement;
+const saveUrlInput = document.getElementById('save-url-input') as HTMLInputElement;
+const saveUrlBtn = document.getElementById('save-url-btn') as HTMLButtonElement;
 const openDashboardBtn = document.getElementById('open-dashboard') as HTMLButtonElement;
 const recentListEl = document.getElementById('recent-list') as HTMLUListElement;
 const logoutBtn = document.getElementById('logout-btn') as HTMLButtonElement;
@@ -282,6 +285,61 @@ async function getActiveTabMetadata(): Promise<PageMetadata> {
     };
   }
 }
+
+// http 또는 https 스킴을 가진 유효한 URL인지 확인
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+// URL 직접 입력 저장
+saveUrlForm.addEventListener('submit', async (e: Event) => {
+  e.preventDefault();
+
+  const rawUrl = saveUrlInput.value.trim();
+
+  if (!rawUrl) {
+    showError('URL을 입력해주세요.');
+    return;
+  }
+
+  if (!isValidHttpUrl(rawUrl)) {
+    showError('http:// 또는 https://로 시작하는 올바른 URL을 입력해주세요.');
+    return;
+  }
+
+  try {
+    saveUrlBtn.disabled = true;
+    saveUrlBtn.textContent = '저장 중…';
+
+    const metadata: PageMetadata = {
+      url: rawUrl,
+      title: null,
+      author: null,
+      description: null,
+      type: 'unknown',
+    };
+
+    await apiClient.shareContent(metadata);
+
+    saveUrlInput.value = '';
+    saveUrlBtn.textContent = '저장됨';
+    void loadRecentContent();
+    setTimeout(() => {
+      saveUrlBtn.textContent = 'URL로 저장';
+      saveUrlBtn.disabled = false;
+    }, 450);
+  } catch (error) {
+    console.error('URL 저장 오류:', error);
+    showError(error instanceof Error ? error.message : 'URL 저장에 실패했습니다. API URL과 연결을 확인해주세요.');
+    saveUrlBtn.textContent = 'URL로 저장';
+    saveUrlBtn.disabled = false;
+  }
+});
 
 // Save content
 saveCurrentPageBtn.addEventListener('click', async () => {
