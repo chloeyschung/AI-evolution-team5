@@ -5,10 +5,12 @@ on:
     branches: ['**']
     paths:
       - 'Briefly/**'
+      - '.github/workflows/ios-ci.yml'
   pull_request:
     branches: ['**']
     paths:
       - 'Briefly/**'
+      - '.github/workflows/ios-ci.yml'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
