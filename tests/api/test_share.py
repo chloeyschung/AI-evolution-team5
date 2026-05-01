@@ -1,7 +1,5 @@
 """Tests for Share API endpoints."""
 
-import pytest
-
 
 class TestShareEndpoint:
     """Tests for POST /share endpoint."""
@@ -43,8 +41,8 @@ class TestShareEndpoint:
 
         assert response.status_code == 422  # Validation error
 
-    async def test_share_duplicate_url(self, authenticated_client):
-        """Test sharing the same URL twice updates existing content."""
+    async def test_share_duplicate_url_creates_separate_items_for_later_deduplication(self, authenticated_client):
+        """Sharing the same URL twice preserves both saves for later duplicate review."""
         # First share
         response1 = await authenticated_client.post(
             "/api/v1/share",
@@ -61,8 +59,7 @@ class TestShareEndpoint:
         assert response2.status_code == 201
         second_id = response2.json()["id"]
 
-        # Should return the same ID (updated existing)
-        assert first_id == second_id
+        assert first_id != second_id
 
     async def test_share_with_platform(self, authenticated_client):
         """Test sharing content with platform metadata."""

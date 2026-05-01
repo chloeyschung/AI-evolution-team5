@@ -31,6 +31,7 @@ def assert_z_suffix(value: str, field: str) -> None:
     assert isinstance(value, str), f"{field}: expected str, got {type(value)}"
     assert value.endswith("Z"), f"{field}: got {value!r} — {Z_SUFFIX_MSG}"
 
+
 def _naive_utc_now():
     """Return current UTC time as naive datetime (matches SQLite storage format)."""
     return utc_now().replace(tzinfo=None)
@@ -199,11 +200,7 @@ async def test_restore_after_30_days_returns_410(authenticated_client: AsyncClie
 
     # Simulate 31-day-old deletion by back-dating deleted_at directly
     expired_at = _naive_utc_now() - timedelta(days=31)
-    await db_session.execute(
-        update(Content)
-        .where(Content.id == content["id"])
-        .values(deleted_at=expired_at)
-    )
+    await db_session.execute(update(Content).where(Content.id == content["id"]).values(deleted_at=expired_at))
     await db_session.commit()
 
     restore_resp = await authenticated_client.post(f"/api/v1/content/{content['id']}/restore")
@@ -219,11 +216,7 @@ async def test_restore_within_29_days_succeeds(authenticated_client: AsyncClient
 
     # Back-date deleted_at to 29 days ago (still within window)
     recent_at = _naive_utc_now() - timedelta(days=29)
-    await db_session.execute(
-        update(Content)
-        .where(Content.id == content["id"])
-        .values(deleted_at=recent_at)
-    )
+    await db_session.execute(update(Content).where(Content.id == content["id"]).values(deleted_at=recent_at))
     await db_session.commit()
 
     restore_resp = await authenticated_client.post(f"/api/v1/content/{content['id']}/restore")
@@ -296,9 +289,7 @@ async def test_account_delete_soft_deletes_interest_tags(
     assert resp2.status_code == 200
 
     # InterestTag rows should be soft-deleted (not hard-deleted)
-    result = await db_session.execute(
-        select(InterestTag).where(InterestTag.user_id == test_user)
-    )
+    result = await db_session.execute(select(InterestTag).where(InterestTag.user_id == test_user))
     tags = result.scalars().all()
     assert all(t.is_deleted is True for t in tags), "All tags should be soft-deleted"
 

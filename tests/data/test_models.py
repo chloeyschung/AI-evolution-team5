@@ -1,7 +1,6 @@
 """Tests for database models."""
 
-import pytest
-from src.data.models import Content, SwipeHistory, SwipeAction
+from src.data.models import Content, SwipeAction, SwipeHistory
 
 
 class TestSwipeAction:

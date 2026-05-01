@@ -3,6 +3,7 @@
 Provides credential hashing, email encryption, and token generation for
 the email_password auth provider.
 """
+
 import hashlib
 import hmac as _hmac
 import secrets
@@ -11,7 +12,7 @@ from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 
 from src.config import settings
-from src.utils.token_encryption import encrypt_token, decrypt_token
+from src.utils.token_encryption import decrypt_token, encrypt_token
 
 # Argon2id parameters — OWASP minimum for interactive login
 _ph = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=4)

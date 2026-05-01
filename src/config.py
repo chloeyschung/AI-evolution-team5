@@ -40,16 +40,12 @@ class Settings:
 
     _google_client_secret: str | None = os.getenv("GOOGLE_CLIENT_SECRET")
     if _google_client_secret is None:
-        raise RuntimeError(
-            "GOOGLE_CLIENT_SECRET environment variable is required for OAuth code exchange"
-        )
+        raise RuntimeError("GOOGLE_CLIENT_SECRET environment variable is required for OAuth code exchange")
     GOOGLE_CLIENT_SECRET: str = _google_client_secret
 
     _google_redirect_uri: str | None = os.getenv("GOOGLE_REDIRECT_URI")
     if _google_redirect_uri is None:
-        raise RuntimeError(
-            "GOOGLE_REDIRECT_URI environment variable is required for OAuth code exchange"
-        )
+        raise RuntimeError("GOOGLE_REDIRECT_URI environment variable is required for OAuth code exchange")
     GOOGLE_REDIRECT_URI: str = _google_redirect_uri
 
     # AUTH-005: Email/password auth settings
@@ -106,14 +102,10 @@ class Settings:
     # Comma-separated list of allowed origins; chrome-extension wildcard is handled
     # via ALLOWED_ORIGIN_REGEX because CORSMiddleware does not support glob wildcards
     # in allow_origins when allow_credentials=True.
-    _allowed_origins_raw: str = os.getenv(
-        "ALLOWED_ORIGINS", "http://localhost:5173"
-    )
+    _allowed_origins_raw: str = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173")
     ALLOWED_ORIGINS: list[str] = [o.strip() for o in _allowed_origins_raw.split(",") if o.strip()]
     # Regex covering all chrome-extension:// origins; set to "" to disable
-    ALLOWED_ORIGIN_REGEX: str = os.getenv(
-        "ALLOWED_ORIGIN_REGEX", r"chrome-extension://[a-z]{32}"
-    )
+    ALLOWED_ORIGIN_REGEX: str = os.getenv("ALLOWED_ORIGIN_REGEX", r"chrome-extension://[a-z]{32}")
 
 
 # Convenience access

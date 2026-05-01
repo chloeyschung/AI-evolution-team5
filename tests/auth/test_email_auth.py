@@ -1,13 +1,14 @@
 """Unit tests for email_auth utilities (AUTH-005)."""
+
 import hashlib
-import pytest
+
 from src.auth.email_auth import (
-    hash_password,
-    verify_password,
-    hmac_email,
-    encrypt_email,
     decrypt_email,
+    encrypt_email,
     generate_token,
+    hash_password,
+    hmac_email,
+    verify_password,
 )
 
 

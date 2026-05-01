@@ -9,7 +9,6 @@ All assertions check that:
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -53,9 +52,7 @@ async def test_get_content_detail_not_found_error_is_clean_code(authenticated_cl
     assert response.status_code == 404
     body = response.json()
     _assert_error_shape(body)
-    assert body["error"] == "content_not_found", (
-        f"error should be clean code, got: {body['error']!r}"
-    )
+    assert body["error"] == "content_not_found", f"error should be clean code, got: {body['error']!r}"
     # message must be a non-empty human-readable string
     assert len(body["message"]) > 0
     # error must NOT contain a colon (which would indicate the old prefixed format)
@@ -90,9 +87,7 @@ async def test_patch_content_status_400_has_clean_error_code(authenticated_clien
     assert response.status_code == 400
     body = response.json()
     _assert_error_shape(body)
-    assert body["error"] == "invalid_status_transition", (
-        f"expected 'invalid_status_transition', got: {body['error']!r}"
-    )
+    assert body["error"] == "invalid_status_transition", f"expected 'invalid_status_transition', got: {body['error']!r}"
     assert body["message"] != body["error"], "message should differ from error code"
 
 
@@ -114,9 +109,7 @@ async def test_patch_content_status_404_has_clean_error_code(authenticated_clien
     assert response.status_code == 404
     body = response.json()
     _assert_error_shape(body)
-    assert body["error"] == "content_not_found", (
-        f"expected 'content_not_found', got: {body['error']!r}"
-    )
+    assert body["error"] == "content_not_found", f"expected 'content_not_found', got: {body['error']!r}"
     assert body["message"] != body["error"], "message should be a human-readable description"
 
 
@@ -137,9 +130,9 @@ async def test_get_content_tags_not_found_has_message(authenticated_client):
     _assert_error_shape(body)
     assert body["error"] == "content_not_found"
     # message must be distinct from the error code
-    assert body["message"] != body["error"], (
-        f"message should be human-readable, not equal to error code: {body['message']!r}"
-    )
+    assert (
+        body["message"] != body["error"]
+    ), f"message should be human-readable, not equal to error code: {body['message']!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -158,9 +151,7 @@ async def test_categorize_content_not_found_has_message(authenticated_client):
     body = response.json()
     _assert_error_shape(body)
     assert body["error"] == "content_not_found"
-    assert body["message"] != body["error"], (
-        f"message should be human-readable: {body['message']!r}"
-    )
+    assert body["message"] != body["error"], f"message should be human-readable: {body['message']!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -179,9 +170,7 @@ async def test_delete_content_not_found_has_message(authenticated_client):
     body = response.json()
     _assert_error_shape(body)
     assert body["error"] == "content_not_found"
-    assert body["message"] != body["error"], (
-        f"message should be human-readable: {body['message']!r}"
-    )
+    assert body["message"] != body["error"], f"message should be human-readable: {body['message']!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -200,9 +189,7 @@ async def test_restore_content_not_found_has_message(authenticated_client):
     body = response.json()
     _assert_error_shape(body)
     assert body["error"] == "content_not_found"
-    assert body["message"] != body["error"], (
-        f"message should be human-readable: {body['message']!r}"
-    )
+    assert body["message"] != body["error"], f"message should be human-readable: {body['message']!r}"
 
 
 # ---------------------------------------------------------------------------

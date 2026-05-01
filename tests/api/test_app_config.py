@@ -1,7 +1,5 @@
 """Tests for GET /api/v1/config/app (iOS lifecycle config endpoint)."""
 
-import pytest
-
 
 async def test_app_config_returns_200(async_client, db):
     resp = await async_client.get("/api/v1/config/app")

@@ -38,18 +38,20 @@ macOS:
 ```bash
 git clone <repo-url> Briefly
 cd Briefly
-./scripts/run-stack.sh start
+./start-dev.sh setup
+./start-dev.sh seed-user
+./start-dev.sh start
 ```
 
-Windows:
+Makefile을 선호하면 같은 흐름을 다음처럼 실행할 수 있습니다.
 
-```bat
-git clone <repo-url> Briefly
-cd Briefly
-scripts\run-stack.bat start
+```bash
+make setup
+make seed-user
+make dev
 ```
 
-실행 후 브라우저에서 `http://localhost:3001`을 엽니다. API 상태는 `http://localhost:8000/health`에서 확인합니다.
+실행 후 브라우저에서 `http://localhost:3001`을 엽니다. API 상태는 `http://localhost:8000/health`에서 확인합니다. 기본 개발 로그인 계정은 `test@localhost / testpass123`입니다.
 
 ### 처음 준비해야 하는 것
 
@@ -60,7 +62,7 @@ scripts\run-stack.bat start
 5. Google OAuth Client ID, Google 로그인을 테스트할 경우
 6. 선택 사항: LM Studio 또는 Ollama 같은 로컬 LLM 서버
 
-`run-stack` 스크립트는 로컬 개발에 필요한 `.env` 기본값을 만들고, 빠진 의존성을 설치한 뒤 다음 프로세스를 실행합니다.
+`start-dev.sh`는 개발자가 눌러야 할 루트 진입점입니다. 내부적으로 `scripts/run-stack.sh`를 호출해서 로컬 개발에 필요한 `.env` 기본값을 만들고, 빠진 의존성을 설치한 뒤 다음 프로세스를 실행합니다.
 
 | 프로세스 | 명령 |
 |---|---|

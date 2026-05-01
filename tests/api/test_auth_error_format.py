@@ -7,11 +7,13 @@ The 'message' field must be a human-readable string — not a stringified dict
 like "{'error': 'invalid_credentials'}", which is what the Task 10 handler
 produces when a dict detail lacks a 'message' key.
 """
-import pytest
+
 from unittest.mock import patch
 
+import pytest
+
 from tests.conftest import AsyncTestingSessionLocal
-from tests.factories import make_user, make_unverified_user
+from tests.factories import make_user
 
 
 def _assert_api_error_shape(body: dict, expected_error: str | None = None) -> None:
@@ -29,18 +31,17 @@ def _assert_api_error_shape(body: dict, expected_error: str | None = None) -> No
     assert "detail" not in body, f"'detail' key still present: {body}"
     # message must not be a raw stringified dict
     msg = body["message"]
-    assert not (msg.startswith("{") and msg.endswith("}")), (
-        f"'message' is a stringified dict, expected human text: {msg!r}"
-    )
+    assert not (
+        msg.startswith("{") and msg.endswith("}")
+    ), f"'message' is a stringified dict, expected human text: {msg!r}"
     if expected_error is not None:
-        assert body["error"] == expected_error, (
-            f"expected error={expected_error!r}, got {body['error']!r}"
-        )
+        assert body["error"] == expected_error, f"expected error={expected_error!r}, got {body['error']!r}"
 
 
 # ---------------------------------------------------------------------------
 # /auth/refresh — was: ErrorCode enum as detail (StrEnum, but no 'message' key)
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_refresh_invalid_token_has_human_message(async_client):
@@ -57,13 +58,13 @@ async def test_refresh_invalid_token_has_human_message(async_client):
 # /auth/google — was: f-string detail like "invalid_google_token: <exc msg>"
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_google_login_invalid_token_has_human_message(async_client):
     """POST /auth/google with rejected Google token must have separate error + message."""
     from src.auth.google_oauth import GoogleTokenVerificationError
 
-    with patch("src.auth.google_oauth.verify_google_id_token",
-               side_effect=GoogleTokenVerificationError("bad token")):
+    with patch("src.auth.google_oauth.verify_google_id_token", side_effect=GoogleTokenVerificationError("bad token")):
         resp = await async_client.post(
             "/api/v1/auth/google",
             json={
@@ -80,14 +81,13 @@ async def test_google_login_invalid_token_has_human_message(async_client):
     body = resp.json()
     _assert_api_error_shape(body, expected_error="invalid_google_token")
     # message must NOT contain the error code (it was an f-string before)
-    assert body["message"] != body["error"], (
-        "message should be human text, not a copy of the error code"
-    )
+    assert body["message"] != body["error"], "message should be human text, not a copy of the error code"
 
 
 # ---------------------------------------------------------------------------
 # /auth/google/code — was: plain string "OAuth code is required"
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_google_code_missing_code_has_human_message(async_client):
@@ -104,13 +104,16 @@ async def test_google_code_missing_code_has_human_message(async_client):
 # /auth/google/code — was: f-string "invalid_google_token: <exc msg>"
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_google_code_exchange_failure_has_human_message(async_client):
     """POST /auth/google/code with exchange failure: error code and message are separate."""
     from src.auth.google_oauth import GoogleTokenVerificationError
 
-    with patch("src.auth.google_oauth.exchange_auth_code_for_tokens",
-               side_effect=GoogleTokenVerificationError("exchange failed")):
+    with patch(
+        "src.auth.google_oauth.exchange_auth_code_for_tokens",
+        side_effect=GoogleTokenVerificationError("exchange failed"),
+    ):
         resp = await async_client.post(
             "/api/v1/auth/google/code",
             json={"code": "some-valid-looking-code"},
@@ -125,11 +128,11 @@ async def test_google_code_exchange_failure_has_human_message(async_client):
 # /auth/google/code — was: plain string "Missing email or user ID from Google"
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_google_code_missing_user_info_has_human_message(async_client):
     """POST /auth/google/code when Google returns no email/sub: unified shape."""
-    with patch("src.auth.google_oauth.exchange_auth_code_for_tokens",
-               return_value=("fake_id_token", {})):
+    with patch("src.auth.google_oauth.exchange_auth_code_for_tokens", return_value=("fake_id_token", {})):
         resp = await async_client.post(
             "/api/v1/auth/google/code",
             json={"code": "some-code"},
@@ -142,6 +145,7 @@ async def test_google_code_missing_user_info_has_human_message(async_client):
 # /auth/verify-email — was: {"error": "invalid_or_expired_token"} — no message
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_verify_email_invalid_token_has_human_message(async_client):
     """POST /auth/verify-email invalid token: message must be human text, not dict repr."""
@@ -153,6 +157,7 @@ async def test_verify_email_invalid_token_has_human_message(async_client):
 # ---------------------------------------------------------------------------
 # /auth/login — was: {"error": "invalid_credentials"} — no message
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_login_unknown_user_has_human_message(async_client):
@@ -183,6 +188,7 @@ async def test_login_wrong_password_has_human_message(async_client, db):
 # /auth/password-reset/confirm — was: {"error": "invalid_or_expired_token"} — no message
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_password_reset_confirm_invalid_token_has_human_message(async_client):
     """POST /auth/password-reset/confirm bad token: message must be human text."""
@@ -198,6 +204,7 @@ async def test_password_reset_confirm_invalid_token_has_human_message(async_clie
 # /auth/link-account — was: {"error": "email_taken_by_another_account"} — no message
 #                       and: {"error": "already_linked"} — no message
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_link_account_email_taken_has_human_message(async_client, db):

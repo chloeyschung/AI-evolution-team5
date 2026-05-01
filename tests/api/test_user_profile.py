@@ -1,7 +1,7 @@
 """API tests for user profile and preferences endpoints (DAT-002)."""
 
-import pytest
 import httpx
+import pytest
 from httpx import ASGITransport
 
 from src.api.app import app
@@ -10,9 +10,7 @@ from src.api.app import app
 @pytest.fixture
 async def client(async_client):
     """Create async test client using shared fixture."""
-    async with httpx.AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         yield client
 
 
@@ -47,8 +45,7 @@ class TestProfileEndpoints:
         """Test PATCH /profile updates profile fields."""
         # Update profile
         response = await authenticated_client.patch(
-            "/api/v1/profile",
-            json={"display_name": "Test User", "bio": "Test bio"}
+            "/api/v1/profile", json={"display_name": "Test User", "bio": "Test bio"}
         )
 
         assert response.status_code == 200
@@ -61,14 +58,11 @@ class TestProfileEndpoints:
         # First create profile with all fields
         await authenticated_client.patch(
             "/api/v1/profile",
-            json={"display_name": "Original", "bio": "Original bio", "avatar_url": "https://example.com/avatar.jpg"}
+            json={"display_name": "Original", "bio": "Original bio", "avatar_url": "https://example.com/avatar.jpg"},
         )
 
         # Update only display_name
-        response = await authenticated_client.patch(
-            "/api/v1/profile",
-            json={"display_name": "Updated"}
-        )
+        response = await authenticated_client.patch("/api/v1/profile", json={"display_name": "Updated"})
 
         assert response.status_code == 200
         data = response.json()
@@ -95,7 +89,7 @@ class TestPreferencesEndpoints:
         """Test PATCH /preferences updates all fields."""
         response = await authenticated_client.patch(
             "/api/v1/preferences",
-            json={"theme": "dark", "notifications_enabled": False, "daily_goal": 50, "default_sort": "platform"}
+            json={"theme": "dark", "notifications_enabled": False, "daily_goal": 50, "default_sort": "platform"},
         )
 
         assert response.status_code == 200
@@ -111,10 +105,7 @@ class TestPreferencesEndpoints:
         await authenticated_client.get("/api/v1/preferences")
 
         # Update only theme
-        response = await authenticated_client.patch(
-            "/api/v1/preferences",
-            json={"theme": "light"}
-        )
+        response = await authenticated_client.patch("/api/v1/preferences", json={"theme": "light"})
 
         assert response.status_code == 200
         data = response.json()
@@ -124,10 +115,7 @@ class TestPreferencesEndpoints:
 
     async def test_update_preferences_invalid_daily_goal(self, authenticated_client):
         """Test PATCH /preferences rejects invalid daily_goal."""
-        response = await authenticated_client.patch(
-            "/api/v1/preferences",
-            json={"daily_goal": -10}
-        )
+        response = await authenticated_client.patch("/api/v1/preferences", json={"daily_goal": -10})
 
         assert response.status_code == 422  # Validation error
 
@@ -162,10 +150,7 @@ class TestInterestsEndpoints:
 
     async def test_add_interest(self, authenticated_client):
         """Test POST /interests adds a tag."""
-        response = await authenticated_client.post(
-            "/api/v1/interests",
-            json={"tag": "Technology"}
-        )
+        response = await authenticated_client.post("/api/v1/interests", json={"tag": "Technology"})
 
         assert response.status_code == 201
         data = response.json()
@@ -177,10 +162,7 @@ class TestInterestsEndpoints:
         await authenticated_client.post("/api/v1/interests", json={"tag": "Technology"})
 
         # Add same tag with different case
-        response = await authenticated_client.post(
-            "/api/v1/interests",
-            json={"tag": "TECHNOLOGY"}
-        )
+        response = await authenticated_client.post("/api/v1/interests", json={"tag": "TECHNOLOGY"})
 
         assert response.status_code == 201
         # Should return existing tag
@@ -188,10 +170,7 @@ class TestInterestsEndpoints:
 
     async def test_add_interest_trim_whitespace(self, authenticated_client):
         """Test POST /interests trims whitespace."""
-        response = await authenticated_client.post(
-            "/api/v1/interests",
-            json={"tag": "  Design  "}
-        )
+        response = await authenticated_client.post("/api/v1/interests", json={"tag": "  Design  "})
 
         assert response.status_code == 201
         assert response.json()["tag"] == "design"

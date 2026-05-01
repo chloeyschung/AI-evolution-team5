@@ -1,27 +1,27 @@
 """Tests for LinkedIn integration (INT-002)."""
 
-import pytest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from src.integrations.linkedin.client import (
-    LinkedInClient,
-    LinkedInAuthError,
-    LinkedInRateLimitError,
     LinkedInAPIError,
+    LinkedInAuthError,
+    LinkedInClient,
+    LinkedInRateLimitError,
 )
 from src.integrations.linkedin.models import LinkedInPost, LinkedInSavedItem, LinkedInSyncResult
 from src.integrations.linkedin.utils import (
-    parse_linkedin_date,
     extract_post_id_from_url,
-    normalize_linkedin_urn,
     is_linkedin_url,
+    normalize_linkedin_urn,
+    parse_linkedin_date,
 )
 from src.integrations.repositories.integration import IntegrationRepository
-from src.data.models import IntegrationTokens, IntegrationSyncConfig, IntegrationSyncLog
-
 
 # LinkedIn Client Tests
+
 
 @pytest.mark.asyncio
 async def test_linkedin_client_initialization():
@@ -44,6 +44,7 @@ async def test_linkedin_client_minimal():
 
 # LinkedIn Saved Items API Tests
 
+
 @pytest.mark.asyncio
 async def test_linkedin_client_get_saved_items_success():
     """Test getting saved items from LinkedIn API."""
@@ -55,7 +56,7 @@ async def test_linkedin_client_get_saved_items_success():
         "elements": [
             {
                 "urn": "urn:li:savedItem:123",
-                "savedAt": datetime.now(timezone.utc).isoformat(),
+                "savedAt": datetime.now(UTC).isoformat(),
                 "target": {"urn": "urn:li:share:456"},
             }
         ]
@@ -127,6 +128,7 @@ async def test_linkedin_client_get_saved_items_api_error():
 
 # LinkedIn Post from URL Tests
 
+
 @pytest.mark.asyncio
 async def test_linkedin_client_get_post_from_url_success():
     """Test extracting post data from LinkedIn URL."""
@@ -176,6 +178,7 @@ async def test_linkedin_client_get_post_from_url_not_found():
 
 # LinkedIn URN/URL Conversion Tests
 
+
 def test_linkedin_client_generate_post_url_from_share_urn():
     """Test generating URL from share URN."""
     client = LinkedInClient(access_token="test_token")
@@ -218,9 +221,10 @@ def test_linkedin_client_extract_urn_from_url_no_urn():
 
 # LinkedIn Model Tests
 
+
 def test_linkedin_saved_item_model():
     """Test LinkedInSavedItem model serialization."""
-    saved_at = datetime.now(timezone.utc)
+    saved_at = datetime.now(UTC)
     item = LinkedInSavedItem(
         urn="urn:li:savedItem:123",
         saved_at=saved_at,
@@ -238,7 +242,7 @@ def test_linkedin_post_model():
         title="Test Post",
         author="John Doe",
         author_urn="urn:li:member:456",
-        published_at=datetime.now(timezone.utc),
+        published_at=datetime.now(UTC),
         content_type="text",
         text_content="This is the post content",
         image_url="https://example.com/image.jpg",
@@ -285,27 +289,28 @@ def test_linkedin_sync_result_empty():
 
 # LinkedIn Utility Function Tests
 
+
 def test_parse_linkedin_date_milliseconds():
     """Test parsing LinkedIn date in milliseconds."""
-    timestamp = int(datetime.now(timezone.utc).timestamp() * 1000)
+    timestamp = int(datetime.now(UTC).timestamp() * 1000)
     result = parse_linkedin_date(str(timestamp))
     assert result is not None
-    assert result.tzinfo == timezone.utc
+    assert result.tzinfo == UTC
 
 
 def test_parse_linkedin_date_iso():
     """Test parsing LinkedIn date in ISO format."""
-    dt = datetime.now(timezone.utc)
+    dt = datetime.now(UTC)
     result = parse_linkedin_date(dt.isoformat())
     assert result is not None
-    assert result.tzinfo == timezone.utc
+    assert result.tzinfo == UTC
 
 
 def test_parse_linkedin_date_iso_with_z():
     """Test parsing LinkedIn date in ISO format with Z suffix."""
     result = parse_linkedin_date("2024-01-15T10:30:00Z")
     assert result is not None
-    assert result.tzinfo == timezone.utc
+    assert result.tzinfo == UTC
 
 
 def test_parse_linkedin_date_invalid():
@@ -399,11 +404,12 @@ def test_is_linkedin_url_not_linkedin():
 
 # Integration Repository Tests for LinkedIn
 
+
 @pytest.mark.asyncio
 async def test_integration_repo_linkedin_tokens(db_session):
     """Test saving and getting LinkedIn OAuth tokens."""
     repo = IntegrationRepository(db_session)
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    expires_at = datetime.now(UTC) + timedelta(hours=1)
 
     # Save tokens
     token = await repo.save_tokens(
@@ -473,7 +479,7 @@ async def test_integration_repo_linkedin_sync_log(db_session):
 async def test_integration_repo_linkedin_delete_tokens(db_session):
     """Test deleting LinkedIn OAuth tokens."""
     repo = IntegrationRepository(db_session)
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    expires_at = datetime.now(UTC) + timedelta(hours=1)
 
     # Save tokens
     await repo.save_tokens(

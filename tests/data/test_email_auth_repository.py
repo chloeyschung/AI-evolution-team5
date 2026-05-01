@@ -1,6 +1,8 @@
 """Integration tests for EmailAuthRepository (AUTH-005)."""
-import pytest
+
 from datetime import timedelta
+
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.constants import AuthProvider

@@ -30,10 +30,15 @@ test.describe('Circle 3: DB-to-Backend-to-Frontend', () => {
     });
 
     expect(backendResponse.status()).toBe(200);
-    const backendItems = (await backendResponse.json()) as Array<{ id: number; title: string }>;
+    const backendPayload = (await backendResponse.json()) as {
+      items: Array<{ id: number; title: string }>;
+      has_more: boolean;
+    };
+    const backendItems = backendPayload.items;
     expect(backendItems.some((item) => item.title === 'Circle 3: DB to Backend to Frontend')).toBeTruthy();
 
     await page.addInitScript((data) => {
+      localStorage.setItem('briefly_access_token', data.access_token);
       localStorage.setItem(
         'briefly_auth_state',
         JSON.stringify({
@@ -47,11 +52,19 @@ test.describe('Circle 3: DB-to-Backend-to-Frontend', () => {
       );
     }, seed);
 
+    await page.route('**/api/v1/auth/status', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ is_authenticated: true, user_id: seed.user_id, email: seed.email }),
+      });
+    });
+
     await page.route('**/api/v1/content**', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(backendItems),
+        body: JSON.stringify({ items: backendItems, has_more: backendPayload.has_more }),
       });
     });
 

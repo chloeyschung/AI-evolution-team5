@@ -1,7 +1,5 @@
 """Tests for Idempotency-Key header on POST /share."""
 
-import pytest
-
 
 async def test_share_with_idempotency_key_returns_same_id(authenticated_client, db):
     """Two POST /share requests with the same Idempotency-Key must return the same content id."""

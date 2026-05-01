@@ -1,31 +1,31 @@
 """Tests for smart reminder engine (ADV-003)."""
 
+from datetime import UTC, datetime, timedelta
+from datetime import time as time_type
+
 import pytest
-from datetime import UTC, datetime, timedelta, time as time_type
 from sqlalchemy import select
 
+from src.ai.reminder_engine import (
+    ActivityPatternLearner,
+    ReminderEngine,
+    ReminderPriority,
+    ReminderType,
+)
 from src.data.models import (
     Content,
-    SwipeHistory,
-    SwipeAction,
-    UserStreak,
-    ReminderPreference,
-    ReminderLog,
-    UserActivityPattern,
     ContentStatus,
-)
-from src.ai.reminder_engine import (
-    ReminderEngine,
-    ActivityPatternLearner,
-    ReminderType,
-    ReminderPriority,
+    ReminderLog,
+    SwipeAction,
+    SwipeHistory,
+    UserActivityPattern,
+    UserStreak,
 )
 from src.data.remind_repository import (
-    ReminderPreferenceRepository,
     ReminderLogRepository,
+    ReminderPreferenceRepository,
     UserActivityPatternRepository,
 )
-
 
 # ============================================================================
 # Repository Tests
@@ -51,7 +51,7 @@ async def test_reminder_preference_repository_update(db_session):
     repo = ReminderPreferenceRepository(db_session)
 
     # Create
-    preference = await repo.create(
+    await repo.create(
         user_id=1,
         is_enabled=1,
         frequency="weekly",
@@ -98,9 +98,7 @@ async def test_reminder_log_repository_mark_action_taken(db_session):
     assert success is True
 
     # Verify
-    result = await db_session.execute(
-        select(ReminderLog).where(ReminderLog.id == log.id)
-    )
+    result = await db_session.execute(select(ReminderLog).where(ReminderLog.id == log.id))
     updated_log = result.scalar_one()
     assert updated_log.action_taken == 1
     assert updated_log.action_taken_at is not None
@@ -122,9 +120,7 @@ async def test_reminder_log_repository_mark_dismissed(db_session):
     assert success is True
 
     # Verify
-    result = await db_session.execute(
-        select(ReminderLog).where(ReminderLog.id == log.id)
-    )
+    result = await db_session.execute(select(ReminderLog).where(ReminderLog.id == log.id))
     updated_log = result.scalar_one()
     assert updated_log.dismissed_at is not None
 
@@ -304,9 +300,7 @@ async def test_log_reminder_sent(db_session):
     assert log_id > 0
 
     # Verify
-    result = await db_session.execute(
-        select(ReminderLog).where(ReminderLog.id == log_id)
-    )
+    result = await db_session.execute(select(ReminderLog).where(ReminderLog.id == log_id))
     log = result.scalar_one()
     assert log.reminder_type == "backlog"
     assert log.message == "Test message"
@@ -333,7 +327,7 @@ async def test_log_action_taken(db_session):
 @pytest.mark.asyncio
 async def test_quiet_hours_check(db_session):
     """Test quiet hours suppression."""
-    from datetime import datetime, time as time_type
+    from datetime import datetime
 
     engine = ReminderEngine(db_session)
 
@@ -447,7 +441,7 @@ async def test_count_by_hour(db_session):
     # Create swipes at specific hours
     swipes = []
     hours = [10, 10, 10, 14, 14, 18]
-    for idx, h in enumerate(hours):
+    for idx, _h in enumerate(hours):
         content = Content(
             platform="YouTube",
             content_type="video",
@@ -494,7 +488,7 @@ async def test_count_by_day(db_session):
     base_date = datetime(2024, 1, 8)  # Monday
     day_offsets = [0, 0, 2, 2, 2, 5]  # Mon, Wed, Sat
 
-    for idx, offset in enumerate(day_offsets):
+    for idx, _offset in enumerate(day_offsets):
         content = Content(
             platform="YouTube",
             content_type="video",
@@ -578,8 +572,6 @@ async def test_full_reminder_flow(db_session):
     assert success is True
 
     # Verify
-    result = await db_session.execute(
-        select(ReminderLog).where(ReminderLog.id == log_id)
-    )
+    result = await db_session.execute(select(ReminderLog).where(ReminderLog.id == log_id))
     log = result.scalar_one()
     assert log.action_taken == 1

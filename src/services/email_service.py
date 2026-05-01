@@ -1,4 +1,5 @@
 """SMTP email service for verification and reset emails (AUTH-005)."""
+
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText

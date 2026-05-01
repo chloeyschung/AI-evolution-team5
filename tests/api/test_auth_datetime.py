@@ -5,15 +5,14 @@ not "+00:00". They are written BEFORE the fix and should FAIL initially.
 """
 
 from datetime import timedelta
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch
 
-from tests.conftest import AsyncTestingSessionLocal
-from tests.factories import make_user
 from src.auth.tokens import create_access_token, create_refresh_token
+from src.data.models import AuthenticationToken, UserProfile
 from src.utils.datetime_utils import utc_now
 from src.utils.token_hashing import hash_access_token
-from src.data.models import AuthenticationToken, UserProfile
-
+from tests.conftest import AsyncTestingSessionLocal
+from tests.factories import make_user
 
 # ---------------------------------------------------------------------------
 # Helpers

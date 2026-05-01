@@ -8,9 +8,9 @@ import asyncio
 
 import pytest
 
+from src.data.auth_repository import AuthenticationRepository
 from tests.conftest import AsyncTestingSessionLocal
 from tests.factories import make_user
-from src.data.auth_repository import AuthenticationRepository
 
 
 async def _login_and_get_refresh_token(async_client, email: str, password: str = "Pass1!") -> str:
@@ -49,9 +49,7 @@ async def test_refresh_token_is_invalidated_after_first_use(async_client, db):
         "/api/v1/auth/refresh",
         json={"refresh_token": refresh_token_v1},
     )
-    assert resp2.status_code == 401, (
-        f"Expected 401 for consumed refresh token, got {resp2.status_code}: {resp2.json()}"
-    )
+    assert resp2.status_code == 401, f"Expected 401 for consumed refresh token, got {resp2.status_code}: {resp2.json()}"
 
 
 async def test_concurrent_refresh_replays_rotated_token_during_grace(async_client, db):

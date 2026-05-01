@@ -3,6 +3,7 @@
 Each provider is an AsyncOAuth2Client config. Google is active; others
 are scaffolded for future implementation.
 """
+
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 
 from src.config import settings

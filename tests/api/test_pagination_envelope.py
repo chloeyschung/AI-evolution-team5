@@ -5,9 +5,6 @@ They assert that these endpoints return PaginatedContentResponse shape:
   { items: list, has_more: bool, total: int, next_offset: int | None, next_cursor: str | None }
 """
 
-import pytest
-
-
 PAGINATION_KEYS = {"items", "has_more", "total", "next_offset", "next_cursor"}
 
 
@@ -19,9 +16,7 @@ class TestPendingPaginatedEnvelope:
         response = await authenticated_client.get("/api/v1/content/pending")
         assert response.status_code == 200
         data = response.json()
-        assert PAGINATION_KEYS <= data.keys(), (
-            f"Missing keys: {PAGINATION_KEYS - data.keys()}"
-        )
+        assert PAGINATION_KEYS <= data.keys(), f"Missing keys: {PAGINATION_KEYS - data.keys()}"
 
     async def test_pending_items_is_list(self, authenticated_client):
         """items must be a list."""
@@ -102,9 +97,7 @@ class TestPendingPaginatedEnvelope:
         assert page1.status_code == 200
         page1_data = page1.json()
 
-        page2 = await authenticated_client.get(
-            f"/api/v1/content/pending?limit=2&cursor={page1_data['next_cursor']}"
-        )
+        page2 = await authenticated_client.get(f"/api/v1/content/pending?limit=2&cursor={page1_data['next_cursor']}")
         assert page2.status_code == 200
         page2_data = page2.json()
         assert page2_data["next_offset"] is None
@@ -122,9 +115,7 @@ class TestKeptPaginatedEnvelope:
         response = await authenticated_client.get("/api/v1/content/kept")
         assert response.status_code == 200
         data = response.json()
-        assert PAGINATION_KEYS <= data.keys(), (
-            f"Missing keys: {PAGINATION_KEYS - data.keys()}"
-        )
+        assert PAGINATION_KEYS <= data.keys(), f"Missing keys: {PAGINATION_KEYS - data.keys()}"
 
     async def test_kept_items_is_list(self, authenticated_client):
         """items must be a list."""
@@ -173,9 +164,7 @@ class TestDiscardedPaginatedEnvelope:
         response = await authenticated_client.get("/api/v1/content/discarded")
         assert response.status_code == 200
         data = response.json()
-        assert PAGINATION_KEYS <= data.keys(), (
-            f"Missing keys: {PAGINATION_KEYS - data.keys()}"
-        )
+        assert PAGINATION_KEYS <= data.keys(), f"Missing keys: {PAGINATION_KEYS - data.keys()}"
 
     async def test_discarded_items_is_list(self, authenticated_client):
         """items must be a list."""
@@ -224,9 +213,7 @@ class TestSearchPaginatedEnvelope:
         response = await authenticated_client.get("/api/v1/search?q=test")
         assert response.status_code == 200
         data = response.json()
-        assert PAGINATION_KEYS <= data.keys(), (
-            f"Missing keys: {PAGINATION_KEYS - data.keys()}"
-        )
+        assert PAGINATION_KEYS <= data.keys(), f"Missing keys: {PAGINATION_KEYS - data.keys()}"
 
     async def test_search_items_is_list(self, authenticated_client):
         """items must be a list."""
@@ -256,9 +243,7 @@ class TestSearchPaginatedEnvelope:
                 },
             )
 
-        response = await authenticated_client.get(
-            "/api/v1/search?q=SearchEnvelopeTest&limit=1"
-        )
+        response = await authenticated_client.get("/api/v1/search?q=SearchEnvelopeTest&limit=1")
         assert response.status_code == 200
         data = response.json()
         assert data["total"] >= 3
@@ -276,9 +261,7 @@ class TestSearchPaginatedEnvelope:
                 },
             )
 
-        response = await authenticated_client.get(
-            "/api/v1/search?q=SearchNextOffsetTest&limit=2&offset=0"
-        )
+        response = await authenticated_client.get("/api/v1/search?q=SearchNextOffsetTest&limit=2&offset=0")
         assert response.status_code == 200
         data = response.json()
         assert data["has_more"] is True

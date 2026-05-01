@@ -1,12 +1,16 @@
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import httpx
-from src.ingestion.extractor import ContentExtractor
+import pytest
+
 from src.ingestion.exceptions import ExtractionError
+from src.ingestion.extractor import ContentExtractor
+
 
 @pytest.fixture
 def extractor():
     return ContentExtractor(timeout=1.0)
+
 
 @pytest.mark.asyncio
 async def test_extract_text_invalid_url_format(extractor):
@@ -22,6 +26,7 @@ async def test_extract_text_invalid_url_format(extractor):
     for invalid_url in invalid_urls:
         with pytest.raises(ExtractionError, match="Invalid URL format|URL must be a non-empty string"):
             await extractor.extract_text(invalid_url)
+
 
 @pytest.mark.asyncio
 async def test_extract_text_exceeds_size_limit(extractor):
@@ -76,6 +81,7 @@ async def test_extract_text_success(extractor):
         assert "Link" not in result
         assert "console.log" not in result
 
+
 @pytest.mark.asyncio
 async def test_extract_text_http_error(extractor):
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
@@ -89,6 +95,7 @@ async def test_extract_text_http_error(extractor):
         with pytest.raises(ExtractionError, match="HTTP error occurred: 404"):
             await extractor.extract_text("https://example.com/404")
 
+
 @pytest.mark.asyncio
 async def test_extract_text_invalid_url(extractor):
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
@@ -96,6 +103,7 @@ async def test_extract_text_invalid_url(extractor):
 
         with pytest.raises(ExtractionError, match="An error occurred while requesting"):
             await extractor.extract_text("https://invalid-url.com")
+
 
 @pytest.mark.asyncio
 async def test_extract_text_empty_content(extractor):
@@ -108,6 +116,7 @@ async def test_extract_text_empty_content(extractor):
 
         with pytest.raises(ExtractionError, match="Received empty HTML content"):
             await extractor.extract_text("https://example.com/empty")
+
 
 @pytest.mark.asyncio
 async def test_extract_text_no_meaningful_content(extractor):
