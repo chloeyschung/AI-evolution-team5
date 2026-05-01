@@ -3,7 +3,7 @@ options:
   bundleIdPrefix: com.briefly
   deploymentTarget:
     iOS: "16.0"
-  xcodeVersion: "15.0"
+  xcodeVersion: "16.2"
 
 settings:
   base:
@@ -13,6 +13,9 @@ packages:
   SwiftSoup:
     url: https://github.com/scinfu/SwiftSoup
     from: "2.7.0"
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    from: "8.0.0"
 
 targets:
 
@@ -25,6 +28,8 @@ targets:
       - target: BrieflyShareExtension
         embed: true
       - package: SwiftSoup
+      - package: GoogleSignIn
+        product: GoogleSignIn
     sources:
       - path: Briefly
         excludes:
@@ -37,11 +42,18 @@ targets:
         CFBundleVersion: "1"
         UILaunchScreen: {}
         NSAppTransportSecurity:
-          NSAllowsArbitraryLoads: true
+          NSAllowsArbitraryLoads: false
+          NSExceptionDomains:
+            localhost:
+              NSExceptionAllowsInsecureHTTPLoads: true
+        GIDClientID: "742261948942-9s5t6mftmpp5bpi9slul3dd2ubbr049m.apps.googleusercontent.com"
         CFBundleURLTypes:
           - CFBundleURLSchemes:
               - briefly
             CFBundleURLName: com.briefly-ai.app
+          - CFBundleURLSchemes:
+              - com.googleusercontent.apps.742261948942-9s5t6mftmpp5bpi9slul3dd2ubbr049m
+            CFBundleURLName: com.googleusercontent.apps.742261948942-9s5t6mftmpp5bpi9slul3dd2ubbr049m
     entitlements:
       path: Briefly/Briefly.entitlements
       properties:
@@ -62,9 +74,11 @@ targets:
       - path: BrieflyShareExtension
         excludes:
           - "**/*.entitlements"
-      # SavedItem.swift와 StorageService.swift는 양쪽 타겟 공유
+      # 메인 앱과 공유하는 파일들 (양쪽 타겟 멤버십)
       - path: Briefly/Models/SavedItem.swift
       - path: Briefly/Services/StorageService.swift
+      - path: Briefly/Services/AuthTokenStore.swift
+      - path: Briefly/Services/BrieflyAPI.swift
     info:
       path: BrieflyShareExtension/Info.plist
       properties:

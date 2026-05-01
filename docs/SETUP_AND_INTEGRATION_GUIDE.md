@@ -443,6 +443,46 @@ formatter.locale = Locale(identifier: "en_US_POSIX")
 decoder.dateDecodingStrategy = .formatted(formatter)
 ```
 
+### 10. iOS 시뮬레이터 로컬 테스트 (IOS-001)
+
+iOS 시뮬레이터는 Mac의 `localhost`를 그대로 공유하므로, 백엔드를 `./scripts/run-stack.sh start`로 띄운 뒤 별도 IP 설정 없이 바로 연결됩니다.
+
+#### 사전 인증 개발 계정 생성
+
+```bash
+# 이메일 인증 없이 즉시 로그인 가능한 개발 계정 생성 (최초 1회)
+uv run python scripts/seed_dev_user.py
+# 이미 존재하면 "Dev user already exists" 출력 후 종료
+```
+
+생성된 계정:
+
+| 이메일 | 비밀번호 |
+|--------|---------|
+| `test@localhost` | `testpass123` |
+
+#### 추가 테스트 계정 생성 (컨텍스트별)
+
+```bash
+uv run python scripts/create_test_user.py "기능명-또는-버그명"
+# 예: uv run python scripts/create_test_user.py "ios-share-ext-test"
+# 출력: debug-ios-share-ext-test-20260430-01@test.com / testtest
+```
+
+#### 시뮬레이터 테스트 절차
+
+1. 백엔드 실행: `./scripts/run-stack.sh start`
+2. Xcode에서 Briefly 스킴 선택 → 시뮬레이터 빌드 및 실행
+3. 앱의 **Account** 탭 이동
+4. 이메일: `test@localhost`, 비밀번호: `testpass123` 입력 → 로그인 버튼
+5. 로그인 성공 시 이메일 표시 확인, 로그아웃 후 폼으로 복귀 확인
+
+#### 유의 사항
+
+- `Info.plist`에 `localhost` HTTP ATS 예외가 설정되어 있습니다. 실기기(실제 기기)에서는 HTTPS 서버가 필요합니다.
+- 토큰은 App Group UserDefaults(`group.com.briefly.shared`)에 저장되어 Share Extension과 공유됩니다.
+- 현재는 토큰 만료 시 재로그인이 필요합니다 (자동 갱신은 IOS-004에서 구현 예정).
+
 ### 11. Project Management Framework 문서 업데이트 규칙
 
 `docs/PROJECT-MANAGEMENT-FRAMEWORK.md`는 어떤 문서가 현재 상태를 대표하고, 어떤 문서가 과거 기록인지 구분합니다.
@@ -909,6 +949,46 @@ formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
 formatter.locale = Locale(identifier: "en_US_POSIX")
 decoder.dateDecodingStrategy = .formatted(formatter)
 ```
+
+### 10. iOS Simulator Local Testing (IOS-001)
+
+The iOS Simulator shares the Mac's `localhost`, so no additional IP configuration is needed. Start the backend with `./scripts/run-stack.sh start` before running the simulator.
+
+#### Create a pre-verified dev account
+
+```bash
+# Creates a dev account that skips email verification (run once)
+uv run python scripts/seed_dev_user.py
+# Prints "Dev user already exists" if already present
+```
+
+Credentials:
+
+| Email | Password |
+|-------|----------|
+| `test@localhost` | `testpass123` |
+
+#### Create additional test accounts (per context)
+
+```bash
+uv run python scripts/create_test_user.py "feature-or-bug-name"
+# Example: uv run python scripts/create_test_user.py "ios-share-ext-test"
+# Output: debug-ios-share-ext-test-20260430-01@test.com / testtest
+```
+
+#### Simulator test procedure
+
+1. Start the backend: `./scripts/run-stack.sh start`
+2. In Xcode, select the Briefly scheme → build and run in the Simulator
+3. Navigate to the **Account** tab
+4. Enter email `test@localhost` and password `testpass123` → tap Login
+5. Confirm the email address appears; tap Logout and confirm the form returns
+
+#### Notes
+
+- `Info.plist` includes an ATS exception for `localhost` HTTP only. A physical device requires an HTTPS backend.
+- Tokens are stored in App Group UserDefaults (`group.com.briefly.shared`), shared with the Share Extension.
+- Token expiry currently requires manual re-login (automatic refresh is planned for IOS-004).
 
 ### 11. Project Management Framework Documentation Rules
 

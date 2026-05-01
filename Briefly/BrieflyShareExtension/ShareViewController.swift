@@ -69,6 +69,14 @@ final class ShareViewController: UIViewController {
     private func saveAndShow(url: URL) {
         let item = SavedItem(url: url, title: nil)
         StorageService.shared.appendToInbox(item)
+
+        // 로그인된 경우 백엔드에도 전송 (실패해도 로컬 저장은 유지)
+        if let token = AuthTokenStore.shared.accessToken {
+            Task {
+                try? await BrieflyAPI.shared.share(url: url, token: token)
+            }
+        }
+
         DispatchQueue.main.async {
             self.showConfirmation(success: true, savedURL: url)
         }
