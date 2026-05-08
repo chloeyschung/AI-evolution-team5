@@ -126,13 +126,35 @@ struct ItemDetailView: View {
         StorageService.shared.updateItemById(updated)
 
         let itemId = currentItem.id
+        let itemURL = currentItem.url
         if let token = AuthTokenStore.shared.accessToken {
             Task {
-                let contentId = StorageService.shared.loadAll()
+                var contentId = StorageService.shared.loadAll()
                     .first(where: { $0.id == itemId })?.serverContentId
                     ?? currentItem.serverContentId
+                // serverContentId가 없으면 먼저 서버에 업로드해서 id를 받아온 후 swipe
+                if contentId == nil {
+                    print("[Keep] serverContentId 없음 — share 먼저 시도: \(itemURL)")
+                    do {
+                        let result = try await BrieflyAPI.shared.share(url: itemURL, token: token)
+                        contentId = result.id
+                        var synced = updated
+                        synced.serverContentId = result.id
+                        StorageService.shared.updateItemById(synced)
+                        print("[Keep] share 성공: contentId=\(result.id)")
+                    } catch {
+                        print("[Keep] share 실패: \(error.localizedDescription)")
+                    }
+                }
                 if let contentId {
-                    try? await BrieflyAPI.shared.swipe(contentId: contentId, action: .keep, token: token)
+                    do {
+                        try await BrieflyAPI.shared.swipe(contentId: contentId, action: .keep, token: token)
+                        print("[Keep] swipe 성공: contentId=\(contentId)")
+                    } catch {
+                        print("[Keep] swipe 실패: \(error.localizedDescription)")
+                    }
+                } else {
+                    print("[Keep] contentId 없음 — swipe 스킵")
                 }
             }
         }
@@ -149,13 +171,35 @@ struct ItemDetailView: View {
         StorageService.shared.updateItemById(updated)
 
         let itemId = currentItem.id
+        let itemURL = currentItem.url
         if let token = AuthTokenStore.shared.accessToken {
             Task {
-                let contentId = StorageService.shared.loadAll()
+                var contentId = StorageService.shared.loadAll()
                     .first(where: { $0.id == itemId })?.serverContentId
                     ?? currentItem.serverContentId
+                // serverContentId가 없으면 먼저 서버에 업로드해서 id를 받아온 후 swipe
+                if contentId == nil {
+                    print("[Delete] serverContentId 없음 — share 먼저 시도: \(itemURL)")
+                    do {
+                        let result = try await BrieflyAPI.shared.share(url: itemURL, token: token)
+                        contentId = result.id
+                        var synced = updated
+                        synced.serverContentId = result.id
+                        StorageService.shared.updateItemById(synced)
+                        print("[Delete] share 성공: contentId=\(result.id)")
+                    } catch {
+                        print("[Delete] share 실패: \(error.localizedDescription)")
+                    }
+                }
                 if let contentId {
-                    try? await BrieflyAPI.shared.swipe(contentId: contentId, action: .discard, token: token)
+                    do {
+                        try await BrieflyAPI.shared.swipe(contentId: contentId, action: .discard, token: token)
+                        print("[Delete] swipe 성공: contentId=\(contentId)")
+                    } catch {
+                        print("[Delete] swipe 실패: \(error.localizedDescription)")
+                    }
+                } else {
+                    print("[Delete] contentId 없음 — swipe 스킵")
                 }
             }
         }

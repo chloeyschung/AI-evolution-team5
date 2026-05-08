@@ -34,12 +34,16 @@ struct ContentView: View {
             .tabItem { Label("Account", systemImage: "person.fill") }
             .tag(3)
         }
+        .onAppear {
+            Task { await SyncService.shared.syncLocalItemsToServer() }
+        }
         .onChange(of: scenePhase) { newPhase in
             if newPhase == .active {
                 viewModel.reload()
                 Task {
                     await FetchCoordinator.shared.fetchIfNeeded(for: viewModel.items)
                 }
+                Task { await SyncService.shared.syncLocalItemsToServer() }
             }
         }
         .onOpenURL { url in

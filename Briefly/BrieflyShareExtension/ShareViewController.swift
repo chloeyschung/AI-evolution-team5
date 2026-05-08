@@ -72,12 +72,19 @@ final class ShareViewController: UIViewController {
 
         // 로그인된 경우 백엔드에도 전송하고 serverContentId를 저장
         if let token = AuthTokenStore.shared.accessToken {
+            print("[ShareExt] 로그인 상태 — 서버 업로드 시도: \(url)")
             Task {
-                if let result = try? await BrieflyAPI.shared.share(url: url, token: token) {
+                do {
+                    let result = try await BrieflyAPI.shared.share(url: url, token: token)
+                    print("[ShareExt] 업로드 성공: contentId=\(result.id)")
                     item.serverContentId = result.id
                     StorageService.shared.updateItemById(item)
+                } catch {
+                    print("[ShareExt] 업로드 실패 (메인 앱 열 때 SyncService가 재시도합니다): \(error.localizedDescription)")
                 }
             }
+        } else {
+            print("[ShareExt] 비로그인 상태 — 로컬에만 저장")
         }
 
         DispatchQueue.main.async {
