@@ -52,7 +52,10 @@ struct ContentView: View {
                 // Library 탭으로 전환 후 해당 아이템 상세 화면으로 이동
                 viewModel.reload()
                 selectedTab = 1
-                NotificationCenter.default.post(name: .brieflyOpenItem, object: articleURL)
+                // Library 탭이 렌더링되어 onReceive를 등록할 시간을 줌 (콜드 스타트 대응)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    NotificationCenter.default.post(name: .brieflyOpenItem, object: articleURL)
+                }
             }
         }
     }

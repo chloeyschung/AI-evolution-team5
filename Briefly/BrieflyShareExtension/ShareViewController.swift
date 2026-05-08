@@ -127,13 +127,18 @@ final class ShareViewController: UIViewController {
 
     private func openMainApp(articleURL: URL) {
         autoDismissTimer?.cancel()
-        let encoded = articleURL.absoluteString
-            .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        guard let brieflyURL = URL(string: "briefly://item?url=\(encoded)") else {
+        var comps = URLComponents()
+        comps.scheme = "briefly"
+        comps.host = "item"
+        comps.queryItems = [URLQueryItem(name: "url", value: articleURL.absoluteString)]
+        guard let brieflyURL = comps.url else {
             completeRequest()
             return
         }
-        extensionContext?.open(brieflyURL) { [weak self] _ in
+        extensionContext?.open(brieflyURL) { [weak self] success in
+            if !success {
+                print("[ShareViewController] extensionContext.open 실패 — 시뮬레이터 제한일 수 있음")
+            }
             self?.completeRequest()
         }
     }
