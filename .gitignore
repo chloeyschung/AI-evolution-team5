@@ -46,6 +46,7 @@ node_modules/
 .local/
 .python-version
 .gitignore
+.stack.pids
 
 # Logs & docs (local-only)
 logs/
