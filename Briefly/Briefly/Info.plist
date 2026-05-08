@@ -28,11 +28,23 @@
 				<string>briefly</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.googleusercontent.apps.742261948942-9s5t6mftmpp5bpi9slul3dd2ubbr049m</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.742261948942-9s5t6mftmpp5bpi9slul3dd2ubbr049m</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>GIDClientID</key>
+	<string>742261948942-9s5t6mftmpp5bpi9slul3dd2ubbr049m.apps.googleusercontent.com</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
 		<key>NSExceptionDomains</key>
 		<dict>
 			<key>localhost</key>
@@ -41,8 +53,6 @@
 				<true/>
 			</dict>
 		</dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<false/>
 	</dict>
 	<key>UILaunchScreen</key>
 	<dict/>
