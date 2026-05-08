@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/useAuthStore';
 import { loginWithGoogleCode } from '../api/endpoints';
@@ -9,8 +9,12 @@ export default function OAuthCallback() {
   const location = useLocation();
   const authStore = useAuthStore();
   const [error, setError] = useState<string | null>(null);
+  const hasRun = useRef(false);
 
   useEffect(() => {
+    if (hasRun.current) return;
+    hasRun.current = true;
+
     const search = location.search;
 
     const handleCallback = async () => {
