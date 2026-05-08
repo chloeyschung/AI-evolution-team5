@@ -69,6 +69,33 @@ final class StorageService {
         }
     }
 
+    /// inbox + main 전체 항목을 반환합니다. (로그인 후 동기화용)
+    func loadAll() -> [SavedItem] {
+        guard let defaults else { return [] }
+        let main = decode(from: defaults, key: mainKey)
+        let inbox = decode(from: defaults, key: inboxKey)
+        return main + inbox
+    }
+
+    /// inbox 또는 main 어디에 있든 항목을 업데이트합니다.
+    /// Share Extension에서 serverContentId를 나중에 기록할 때 사용합니다.
+    func updateItemById(_ item: SavedItem) {
+        guard let defaults else { return }
+
+        var inbox = decode(from: defaults, key: inboxKey)
+        if let idx = inbox.firstIndex(where: { $0.id == item.id }) {
+            inbox[idx] = item
+            encode(inbox, to: defaults, key: inboxKey)
+            return
+        }
+
+        var main = decode(from: defaults, key: mainKey)
+        if let idx = main.firstIndex(where: { $0.id == item.id }) {
+            main[idx] = item
+            encode(main, to: defaults, key: mainKey)
+        }
+    }
+
     // MARK: - Private helpers
 
     private func decode(from defaults: UserDefaults, key: String) -> [SavedItem] {

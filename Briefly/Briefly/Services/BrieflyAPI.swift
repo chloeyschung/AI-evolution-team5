@@ -46,6 +46,40 @@ actor BrieflyAPI {
         return try await post("/share", body: body, token: token)
     }
 
+    // MARK: - Swipe (Keep / Delete)
+
+    enum SwipeAction: String, Encodable {
+        case keep
+        case discard
+    }
+
+    struct SwipePayload: Encodable {
+        let contentId: Int
+        let action: SwipeAction
+
+        enum CodingKeys: String, CodingKey {
+            case contentId = "content_id"
+            case action
+        }
+    }
+
+    struct SwipeResult: Decodable {
+        let id: Int
+        let contentId: Int
+        let action: String
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case contentId = "content_id"
+            case action
+        }
+    }
+
+    func swipe(contentId: Int, action: SwipeAction, token: String) async throws -> SwipeResult {
+        let body = SwipePayload(contentId: contentId, action: action)
+        return try await post("/swipe", body: body, token: token)
+    }
+
     // MARK: - Auth: Email / Password
 
     struct EmailLoginPayload: Encodable {
