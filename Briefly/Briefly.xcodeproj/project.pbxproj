@@ -14,6 +14,7 @@
 		7AACECED2D07BA6B59A2318F /* AuthTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A41256433228601E7B9BB91 /* AuthTokenStore.swift */; };
 		7B0F060504B44AE2BD72DE2B /* BrieflyAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0EFA09CE7092B90638E712 /* BrieflyAPI.swift */; };
 		8108F6AA30CE9972C27C0F50 /* AccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72A891290C780ECCDB5D44CF /* AccountView.swift */; };
+		86642ACD9F2E01D043A701F8 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 47E40E7E3AA293E1D6B84810 /* GoogleSignIn */; };
 		8D73C7E5707E71FD177EE613 /* BrieflyShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 66016B6BAD71BE0F78929843 /* BrieflyShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		910A954D5B910DAA2EB1E138 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D58FF26BA17DDD9DD860E525 /* SearchView.swift */; };
 		914DF7A63D9ECA0A9C711C89 /* StorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 257C96DD188F1DBFBF572F80 /* StorageService.swift */; };
@@ -94,6 +95,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E245736905FFB017AECF64B5 /* SwiftSoup in Frameworks */,
+				86642ACD9F2E01D043A701F8 /* GoogleSignIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -221,6 +223,7 @@
 			name = Briefly;
 			packageProductDependencies = (
 				71E58649A4389F4E72B2D6D6 /* SwiftSoup */,
+				47E40E7E3AA293E1D6B84810 /* GoogleSignIn */,
 			);
 			productName = Briefly;
 			productReference = B613613FFDC08358178A03DD /* Briefly.app */;
@@ -264,6 +267,7 @@
 			mainGroup = A6BB9FC36BD3E171E80828A2;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				08510996995C6FD4636C964F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 				8505773BF3F166D044C3E385 /* XCRemoteSwiftPackageReference "SwiftSoup" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -600,6 +604,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		08510996995C6FD4636C964F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.0.0;
+			};
+		};
 		8505773BF3F166D044C3E385 /* XCRemoteSwiftPackageReference "SwiftSoup" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/scinfu/SwiftSoup";
@@ -611,6 +623,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		47E40E7E3AA293E1D6B84810 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 08510996995C6FD4636C964F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
 		71E58649A4389F4E72B2D6D6 /* SwiftSoup */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 8505773BF3F166D044C3E385 /* XCRemoteSwiftPackageReference "SwiftSoup" */;
