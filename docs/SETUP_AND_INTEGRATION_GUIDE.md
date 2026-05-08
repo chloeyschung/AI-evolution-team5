@@ -443,45 +443,55 @@ formatter.locale = Locale(identifier: "en_US_POSIX")
 decoder.dateDecodingStrategy = .formatted(formatter)
 ```
 
-### 10. iOS 시뮬레이터 로컬 테스트 (IOS-001)
+### 10. Google OAuth 설정
 
-iOS 시뮬레이터는 Mac의 `localhost`를 그대로 공유하므로, 백엔드를 `./scripts/run-stack.sh start`로 띄운 뒤 별도 IP 설정 없이 바로 연결됩니다.
+Google 로그인용 OAuth 클라이언트는 팀에서 이미 발급되어 있습니다. 개인별 발급 없이 아래 값을 `.env`에 입력하면 됩니다. **실제 값은 팀 공유 채널(Slack 등)에서 확인하세요.**
 
-#### 사전 인증 개발 계정 생성
+#### 10-1. 환경 변수 설정
 
-```bash
-# 이메일 인증 없이 즉시 로그인 가능한 개발 계정 생성 (최초 1회)
-uv run python scripts/seed_dev_user.py
-# 이미 존재하면 "Dev user already exists" 출력 후 종료
+루트 `.env`:
+```env
+GOOGLE_CLIENT_ID=<Google OAuth Client ID — 팀 채널 확인>
+GOOGLE_CLIENT_SECRET=<Google OAuth Client Secret — 팀 채널 확인>
+GOOGLE_REDIRECT_URI=http://localhost:3001/oauth-callback
 ```
 
-생성된 계정:
-
-| 이메일 | 비밀번호 |
-|--------|---------|
-| `test@localhost` | `testpass123` |
-
-#### 추가 테스트 계정 생성 (컨텍스트별)
-
-```bash
-uv run python scripts/create_test_user.py "기능명-또는-버그명"
-# 예: uv run python scripts/create_test_user.py "ios-share-ext-test"
-# 출력: debug-ios-share-ext-test-20260430-01@test.com / testtest
+`web-dashboard/.env`:
+```env
+VITE_GOOGLE_CLIENT_ID=<Google OAuth Client ID — 팀 채널 확인>
 ```
 
-#### 시뮬레이터 테스트 절차
+`browser-extension/.env`:
+```env
+VITE_GOOGLE_CLIENT_ID=<Google OAuth Client ID — 팀 채널 확인>
+VITE_API_BASE_URL=http://localhost:8000
+```
 
-1. 백엔드 실행: `./scripts/run-stack.sh start`
-2. Xcode에서 Briefly 스킴 선택 → 시뮬레이터 빌드 및 실행
-3. 앱의 **Account** 탭 이동
-4. 이메일: `test@localhost`, 비밀번호: `testpass123` 입력 → 로그인 버튼
-5. 로그인 성공 시 이메일 표시 확인, 로그아웃 후 폼으로 복귀 확인
+> **보안 주의**: Client ID와 Client Secret은 절대 코드나 이 문서에 직접 기재하지 마세요. 공개 레포지토리에 노출될 경우 즉시 탈취 위험이 있습니다.
 
-#### 유의 사항
+#### 10-2. 웹 대시보드 Google 로그인
 
-- `Info.plist`에 `localhost` HTTP ATS 예외가 설정되어 있습니다. 실기기(실제 기기)에서는 HTTPS 서버가 필요합니다.
-- 토큰은 App Group UserDefaults(`group.com.briefly.shared`)에 저장되어 Share Extension과 공유됩니다.
-- 현재는 토큰 만료 시 재로그인이 필요합니다 (자동 갱신은 IOS-004에서 구현 예정).
+위 환경 변수 설정 후 스택을 재시작하면 `http://localhost:3001`에서 Google 로그인이 동작합니다.
+
+```bash
+./scripts/run-stack.sh stop
+./scripts/run-stack.sh start
+```
+
+#### 10-3. 브라우저 익스텐션 Google 로그인 (개발자별 1회 설정 필요)
+
+익스텐션은 각 개발자 컴퓨터마다 다른 익스텐션 ID가 생성되므로, 본인의 ID를 Google Cloud Console에 한 번 등록해야 합니다.
+
+1. `chrome://extensions/`에서 익스텐션 Load unpacked 후 **ID 복사**
+2. [Google Cloud Console 인증 정보 페이지](https://console.cloud.google.com/apis/credentials) 접속 (팀 Google 계정으로 로그인)
+3. Web 클라이언트 편집 → 승인된 리디렉션 URI에 추가:
+   ```
+   https://본인익스텐션ID.chromiumapp.org/
+   ```
+4. 저장 (적용까지 최대 5분 소요)
+5. 익스텐션 🔄 새로고침 후 로그인 시도
+
+> Chrome 웹 스토어 배포 후에는 ID가 고정되어 이 과정이 불필요합니다.
 
 ### 11. Project Management Framework 문서 업데이트 규칙
 
@@ -950,45 +960,55 @@ formatter.locale = Locale(identifier: "en_US_POSIX")
 decoder.dateDecodingStrategy = .formatted(formatter)
 ```
 
-### 10. iOS Simulator Local Testing (IOS-001)
+### 10. Google OAuth Setup
 
-The iOS Simulator shares the Mac's `localhost`, so no additional IP configuration is needed. Start the backend with `./scripts/run-stack.sh start` before running the simulator.
+The Google OAuth client is already set up for the team. No individual issuance needed — just copy the values into your `.env` files. **Get the actual values from the team shared channel (Slack etc.).**
 
-#### Create a pre-verified dev account
+#### 10-1. Environment Variables
 
-```bash
-# Creates a dev account that skips email verification (run once)
-uv run python scripts/seed_dev_user.py
-# Prints "Dev user already exists" if already present
+Root `.env`:
+```env
+GOOGLE_CLIENT_ID=<Google OAuth Client ID — see team channel>
+GOOGLE_CLIENT_SECRET=<Google OAuth Client Secret — see team channel>
+GOOGLE_REDIRECT_URI=http://localhost:3001/oauth-callback
 ```
 
-Credentials:
-
-| Email | Password |
-|-------|----------|
-| `test@localhost` | `testpass123` |
-
-#### Create additional test accounts (per context)
-
-```bash
-uv run python scripts/create_test_user.py "feature-or-bug-name"
-# Example: uv run python scripts/create_test_user.py "ios-share-ext-test"
-# Output: debug-ios-share-ext-test-20260430-01@test.com / testtest
+`web-dashboard/.env`:
+```env
+VITE_GOOGLE_CLIENT_ID=<Google OAuth Client ID — see team channel>
 ```
 
-#### Simulator test procedure
+`browser-extension/.env`:
+```env
+VITE_GOOGLE_CLIENT_ID=<Google OAuth Client ID — see team channel>
+VITE_API_BASE_URL=http://localhost:8000
+```
 
-1. Start the backend: `./scripts/run-stack.sh start`
-2. In Xcode, select the Briefly scheme → build and run in the Simulator
-3. Navigate to the **Account** tab
-4. Enter email `test@localhost` and password `testpass123` → tap Login
-5. Confirm the email address appears; tap Logout and confirm the form returns
+> **Security**: Never write the Client ID or Client Secret directly in code or this document. Exposing them in a public repository creates an immediate theft risk.
 
-#### Notes
+#### 10-2. Web Dashboard Google Login
 
-- `Info.plist` includes an ATS exception for `localhost` HTTP only. A physical device requires an HTTPS backend.
-- Tokens are stored in App Group UserDefaults (`group.com.briefly.shared`), shared with the Share Extension.
-- Token expiry currently requires manual re-login (automatic refresh is planned for IOS-004).
+After setting the env vars above, restart the stack. Google login will work at `http://localhost:3001`.
+
+```bash
+./scripts/run-stack.sh stop
+./scripts/run-stack.sh start
+```
+
+#### 10-3. Browser Extension Google Login (one-time setup per developer)
+
+Each developer's machine generates a unique extension ID, so you need to register yours in Google Cloud Console once.
+
+1. Load unpacked from `browser-extension/dist/` in `chrome://extensions/` and **copy your extension ID**
+2. Go to [Google Cloud Console Credentials](https://console.cloud.google.com/apis/credentials) (sign in with the team Google account)
+3. Edit the Web client → add to Authorized redirect URIs:
+   ```
+   https://YOUR_EXTENSION_ID.chromiumapp.org/
+   ```
+4. Save (may take up to 5 minutes to apply)
+5. Reload the extension and try signing in
+
+> Once published to the Chrome Web Store the ID is fixed and this step is not needed.
 
 ### 11. Project Management Framework Documentation Rules
 
