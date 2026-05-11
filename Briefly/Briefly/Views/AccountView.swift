@@ -128,6 +128,7 @@ final class AuthViewModel: ObservableObject {
     @Published var showError = false
     @Published var errorMessage: String?
 
+
     func login() {
         guard !emailInput.isEmpty, !passwordInput.isEmpty else { return }
         isLoading = true
@@ -148,6 +149,7 @@ final class AuthViewModel: ObservableObject {
                 loggedInEmail = result.email
                 isLoggedIn = true
                 passwordInput = ""
+                Task { await SyncService.shared.syncLocalItemsToServer() }
             } catch let error as BrieflyAPI.APIError {
                 switch error {
                 case .httpError(401, _):
@@ -192,6 +194,7 @@ final class AuthViewModel: ObservableObject {
                 )
                 loggedInEmail = loginResult.user.email
                 isLoggedIn = true
+                Task { await SyncService.shared.syncLocalItemsToServer() }
             } catch let error as NSError
                 where error.domain == "com.google.GIDSignIn" && error.code == -5 {
                 // 사용자 취소 — 에러 없이 무시

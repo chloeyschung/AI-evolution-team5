@@ -46,6 +46,40 @@ actor BrieflyAPI {
         return try await post("/share", body: body, token: token)
     }
 
+    // MARK: - Swipe (Keep / Delete)
+
+    enum SwipeAction: String, Encodable {
+        case keep
+        case discard
+    }
+
+    struct SwipePayload: Encodable {
+        let contentId: Int
+        let action: SwipeAction
+
+        enum CodingKeys: String, CodingKey {
+            case contentId = "content_id"
+            case action
+        }
+    }
+
+    struct SwipeResult: Decodable {
+        let id: Int
+        let contentId: Int
+        let action: String
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case contentId = "content_id"
+            case action
+        }
+    }
+
+    func swipe(contentId: Int, action: SwipeAction, token: String) async throws -> SwipeResult {
+        let body = SwipePayload(contentId: contentId, action: action)
+        return try await post("/swipe", body: body, token: token)
+    }
+
     // MARK: - Auth: Email / Password
 
     struct EmailLoginPayload: Encodable {
@@ -159,6 +193,25 @@ actor BrieflyAPI {
     func refreshToken(refreshToken: String) async throws -> RefreshResult {
         let body = RefreshPayload(refreshToken: refreshToken)
         return try await post("/auth/refresh", body: body, token: nil)
+    }
+
+    /// 저장된 refreshToken으로 accessToken을 갱신하고 AuthTokenStore에 저장합니다.
+    /// 성공하면 새 accessToken을 반환, 실패하면 nil을 반환합니다.
+    func refreshCurrentToken() async -> String? {
+        guard let rt = AuthTokenStore.shared.refreshToken else {
+            print("[BrieflyAPI] refreshToken 없음 — 재로그인 필요")
+            return nil
+        }
+        do {
+            let result = try await refreshToken(refreshToken: rt)
+            AuthTokenStore.shared.accessToken = result.accessToken
+            AuthTokenStore.shared.refreshToken = result.refreshToken
+            print("[BrieflyAPI] 토큰 갱신 성공")
+            return result.accessToken
+        } catch {
+            print("[BrieflyAPI] 토큰 갱신 실패: \(error.localizedDescription)")
+            return nil
+        }
     }
 
     // MARK: - Device Token

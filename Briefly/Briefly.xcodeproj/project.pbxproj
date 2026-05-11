@@ -27,6 +27,7 @@
 		B57599B2EF23F86EA09D4EAB /* SavedItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2763857774C813192716324F /* SavedItem.swift */; };
 		C408824DDA61A293E39AD688 /* SafariBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBD3BB00F8972C23F3FE6293 /* SafariBrowserView.swift */; };
 		D572BDFFAE67F6A8D8C8608B /* MetadataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 393CF4824EFF8B015B9BEF35 /* MetadataService.swift */; };
+		E1A2B3C4D5E6F7A8B9C0D1E2 /* SyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C4D5E6F7A8B9C0D1E2 /* SyncService.swift */; };
 		D8332E5D9162A13AC99682EF /* BrieflyAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0EFA09CE7092B90638E712 /* BrieflyAPI.swift */; };
 		E245736905FFB017AECF64B5 /* SwiftSoup in Frameworks */ = {isa = PBXBuildFile; productRef = 71E58649A4389F4E72B2D6D6 /* SwiftSoup */; };
 		F6C0D5177D57462EE9E27E5F /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E4D1DFF8124BDD536CE34B8 /* LibraryView.swift */; };
@@ -87,6 +88,7 @@
 		EBD3BB00F8972C23F3FE6293 /* SafariBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariBrowserView.swift; sourceTree = "<group>"; };
 		FBCE49D658971632424D9A88 /* ArticleService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArticleService.swift; sourceTree = "<group>"; };
 		FFE332E4A1B94830A31BB8EB /* WebContentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebContentService.swift; sourceTree = "<group>"; };
+		F1A2B3C4D5E6F7A8B9C0D1E2 /* SyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -127,6 +129,7 @@
 				9BBC275060D37FDF35718C0B /* FetchCoordinator.swift */,
 				393CF4824EFF8B015B9BEF35 /* MetadataService.swift */,
 				257C96DD188F1DBFBF572F80 /* StorageService.swift */,
+				F1A2B3C4D5E6F7A8B9C0D1E2 /* SyncService.swift */,
 				FFE332E4A1B94830A31BB8EB /* WebContentService.swift */,
 			);
 			path = Services;
@@ -321,6 +324,7 @@
 				37842A4E40B7F305415DDD89 /* SavedItemsView.swift in Sources */,
 				910A954D5B910DAA2EB1E138 /* SearchView.swift in Sources */,
 				965F9DB85DF04980B9EFC48B /* StorageService.swift in Sources */,
+				E1A2B3C4D5E6F7A8B9C0D1E2 /* SyncService.swift in Sources */,
 				960BE20A93F5BBEC5ACFE33A /* WebContentService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
