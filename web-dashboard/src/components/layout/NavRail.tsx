@@ -76,10 +76,15 @@ export default function NavRail() {
   return (
     <aside className={styles.rail} data-testid="nav-rail">
       <div className={styles.brand}>
-        <svg className={styles.logo} viewBox="0 0 32 32" aria-hidden="true">
-          <rect x="1" y="1" width="30" height="30" rx="9" fill="var(--color-signal)" />
-          <path d="M9 10.5 C 9 9.67 9.67 9 10.5 9 H 17.2 C 20.4 9 22.6 10.8 22.6 13.6 C 22.6 15.2 21.7 16.4 20.4 17 C 22.1 17.6 23.2 19 23.2 20.9 C 23.2 23.9 20.8 26 17.2 26 H 10.5 C 9.67 26 9 25.33 9 24.5 Z M 13 12.5 V 16 H 16.5 C 17.8 16 18.6 15.3 18.6 14.25 C 18.6 13.2 17.8 12.5 16.5 12.5 Z M 13 19 V 22.5 H 17 C 18.4 22.5 19.2 21.75 19.2 20.75 C 19.2 19.75 18.4 19 17 19 Z" fill="var(--color-signal-on)" />
-        </svg>
+        <div className={styles.logoWrap}>
+          <svg className={styles.logo} viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="10.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <line x1="14" y1="78" x2="86" y2="78" />
+            <path d="M 14 78 V 50 a 18 18 0 0 1 36 0 V 78" />
+            <path d="M 50 78 V 46 a 18 18 0 0 1 36 0 V 78" />
+            <line x1="22" y1="62" x2="42" y2="62" strokeWidth="4.725" opacity="0.55" />
+            <line x1="58" y1="62" x2="78" y2="62" strokeWidth="4.725" opacity="0.55" />
+          </svg>
+        </div>
         <div className={styles.brandText}>
           <strong>Briefly</strong>
           <span>Consume, don&apos;t hoard</span>
