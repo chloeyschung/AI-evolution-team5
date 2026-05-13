@@ -1,9 +1,13 @@
+import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import NavRail from './NavRail';
 import TopBar from './TopBar';
+import OnboardingModal, { hasSeenOnboarding } from '../ui/OnboardingModal';
 import styles from './AppShell.module.css';
 
 export default function AppShell() {
+  const [showOnboarding, setShowOnboarding] = useState(!hasSeenOnboarding());
+
   return (
     <div className={styles.shell}>
       <NavRail />
@@ -15,6 +19,9 @@ export default function AppShell() {
           </div>
         </main>
       </div>
+      {showOnboarding && (
+        <OnboardingModal onClose={() => setShowOnboarding(false)} />
+      )}
     </div>
   );
 }
