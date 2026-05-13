@@ -18,15 +18,32 @@
   font-family: var(--font-body);
 }
 
-/* ── Kicker + heading ───────────────────────────────────── */
-.kicker {
-  margin: 0;
-  color: var(--color-signal);
-  font-size: var(--text-micro);
-  font-family: var(--font-mono);
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+/* ── Logo ────────────────────────────────────────────────── */
+.logoWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-6) var(--space-5);
+  background: var(--color-primary-600);
+  border-radius: var(--radius-md);
+  color: #FFFFFF;
+}
+
+.loginLogoIcon {
+  width: 72px;
+  height: 72px;
+  display: block;
+  flex-shrink: 0;
+}
+
+.loginLogoText {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: #FFFFFF;
+  line-height: 1;
 }
 
 .card h1 {
