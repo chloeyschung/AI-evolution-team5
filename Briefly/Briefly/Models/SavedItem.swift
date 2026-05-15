@@ -9,6 +9,9 @@ struct SavedItem: Codable, Identifiable, Hashable {
     let savedAt: Date
     var status: Status
 
+    // 서버 content_id — POST /api/v1/swipe 호출 시 사용
+    var serverContentId: Int?
+
     // Phase 2a — 크롤링 결과
     var ogTitle: String?
     var ogImageURL: URL?
@@ -19,6 +22,8 @@ struct SavedItem: Codable, Identifiable, Hashable {
 
     enum Status: String, Codable {
         case unread, read, discarded
+        case kept       // Keep 선택 → Archived 탭
+        case deleted    // Delete 선택 → Deleted 탭
     }
 
     enum FetchStatus: String, Codable {

@@ -443,6 +443,56 @@ formatter.locale = Locale(identifier: "en_US_POSIX")
 decoder.dateDecodingStrategy = .formatted(formatter)
 ```
 
+### 10. Google OAuth 설정
+
+Google 로그인용 OAuth 클라이언트는 팀에서 이미 발급되어 있습니다. 개인별 발급 없이 아래 값을 `.env`에 입력하면 됩니다. **실제 값은 팀 공유 채널(Slack 등)에서 확인하세요.**
+
+#### 10-1. 환경 변수 설정
+
+루트 `.env`:
+```env
+GOOGLE_CLIENT_ID=<Google OAuth Client ID — 팀 채널 확인>
+GOOGLE_CLIENT_SECRET=<Google OAuth Client Secret — 팀 채널 확인>
+GOOGLE_REDIRECT_URI=http://localhost:3001/oauth-callback
+```
+
+`web-dashboard/.env`:
+```env
+VITE_GOOGLE_CLIENT_ID=<Google OAuth Client ID — 팀 채널 확인>
+```
+
+`browser-extension/.env`:
+```env
+VITE_GOOGLE_CLIENT_ID=<Google OAuth Client ID — 팀 채널 확인>
+VITE_API_BASE_URL=http://localhost:8000
+```
+
+> **보안 주의**: Client ID와 Client Secret은 절대 코드나 이 문서에 직접 기재하지 마세요. 공개 레포지토리에 노출될 경우 즉시 탈취 위험이 있습니다.
+
+#### 10-2. 웹 대시보드 Google 로그인
+
+위 환경 변수 설정 후 스택을 재시작하면 `http://localhost:3001`에서 Google 로그인이 동작합니다.
+
+```bash
+./scripts/run-stack.sh stop
+./scripts/run-stack.sh start
+```
+
+#### 10-3. 브라우저 익스텐션 Google 로그인 (개발자별 1회 설정 필요)
+
+익스텐션은 각 개발자 컴퓨터마다 다른 익스텐션 ID가 생성되므로, 본인의 ID를 Google Cloud Console에 한 번 등록해야 합니다.
+
+1. `chrome://extensions/`에서 익스텐션 Load unpacked 후 **ID 복사**
+2. [Google Cloud Console 인증 정보 페이지](https://console.cloud.google.com/apis/credentials) 접속 (팀 Google 계정으로 로그인)
+3. Web 클라이언트 편집 → 승인된 리디렉션 URI에 추가:
+   ```
+   https://본인익스텐션ID.chromiumapp.org/
+   ```
+4. 저장 (적용까지 최대 5분 소요)
+5. 익스텐션 🔄 새로고침 후 로그인 시도
+
+> Chrome 웹 스토어 배포 후에는 ID가 고정되어 이 과정이 불필요합니다.
+
 ### 11. Project Management Framework 문서 업데이트 규칙
 
 `docs/PROJECT-MANAGEMENT-FRAMEWORK.md`는 어떤 문서가 현재 상태를 대표하고, 어떤 문서가 과거 기록인지 구분합니다.
@@ -909,6 +959,56 @@ formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
 formatter.locale = Locale(identifier: "en_US_POSIX")
 decoder.dateDecodingStrategy = .formatted(formatter)
 ```
+
+### 10. Google OAuth Setup
+
+The Google OAuth client is already set up for the team. No individual issuance needed — just copy the values into your `.env` files. **Get the actual values from the team shared channel (Slack etc.).**
+
+#### 10-1. Environment Variables
+
+Root `.env`:
+```env
+GOOGLE_CLIENT_ID=<Google OAuth Client ID — see team channel>
+GOOGLE_CLIENT_SECRET=<Google OAuth Client Secret — see team channel>
+GOOGLE_REDIRECT_URI=http://localhost:3001/oauth-callback
+```
+
+`web-dashboard/.env`:
+```env
+VITE_GOOGLE_CLIENT_ID=<Google OAuth Client ID — see team channel>
+```
+
+`browser-extension/.env`:
+```env
+VITE_GOOGLE_CLIENT_ID=<Google OAuth Client ID — see team channel>
+VITE_API_BASE_URL=http://localhost:8000
+```
+
+> **Security**: Never write the Client ID or Client Secret directly in code or this document. Exposing them in a public repository creates an immediate theft risk.
+
+#### 10-2. Web Dashboard Google Login
+
+After setting the env vars above, restart the stack. Google login will work at `http://localhost:3001`.
+
+```bash
+./scripts/run-stack.sh stop
+./scripts/run-stack.sh start
+```
+
+#### 10-3. Browser Extension Google Login (one-time setup per developer)
+
+Each developer's machine generates a unique extension ID, so you need to register yours in Google Cloud Console once.
+
+1. Load unpacked from `browser-extension/dist/` in `chrome://extensions/` and **copy your extension ID**
+2. Go to [Google Cloud Console Credentials](https://console.cloud.google.com/apis/credentials) (sign in with the team Google account)
+3. Edit the Web client → add to Authorized redirect URIs:
+   ```
+   https://YOUR_EXTENSION_ID.chromiumapp.org/
+   ```
+4. Save (may take up to 5 minutes to apply)
+5. Reload the extension and try signing in
+
+> Once published to the Chrome Web Store the ID is fixed and this step is not needed.
 
 ### 11. Project Management Framework Documentation Rules
 

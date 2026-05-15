@@ -9,12 +9,7 @@
   padding: 18px 20px 14px;
   border: 1px solid var(--color-border-muted);
   border-radius: var(--radius-lg);
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--color-primary) 5%, #ffffff 95%),
-      color-mix(in srgb, var(--color-surface-muted) 78%, #ffffff 22%)
-    );
+  background: var(--color-surface);
   box-shadow: var(--shadow-sm);
 }
 

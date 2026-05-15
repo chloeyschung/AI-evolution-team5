@@ -44,7 +44,7 @@ actor ArticleService {
         }
 
         // 폴백: <body> 전체 <p> 태그
-        if let body = try? doc.body() {
+        if let body = doc.body() {
             let text = paragraphText(from: body)
             return text.isEmpty ? nil : text
         }

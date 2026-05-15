@@ -150,3 +150,103 @@ async def test_summarize_gives_up_after_max_retries(summarizer):
 
         # Should have been called exactly 2 times (max_retries)
         assert mock_post.call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# C4: new-parameter coverage
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_extra_headers_forwarded_to_request():
+    """extra_headers passed to Summarizer are included in the HTTP request."""
+    summarizer = Summarizer(
+        api_key="",
+        base_url="https://foo.modal.run/v1/chat/completions",
+        model="qwen3",
+        provider="openai",
+        extra_headers={"Modal-Key": "test-key-id", "Modal-Secret": "test-key-secret"},
+    )
+    mock_response_data = {"choices": [{"message": {"content": "• Test result"}}]}
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json = MagicMock(return_value=mock_response_data)
+        mock_post.return_value.text = "OK"
+
+        await summarizer.summarize("Some content")
+
+        headers = mock_post.call_args.kwargs.get("headers", {})
+        assert headers.get("Modal-Key") == "test-key-id"
+        assert headers.get("Modal-Secret") == "test-key-secret"
+
+
+@pytest.mark.asyncio
+async def test_custom_timeout_passed_to_request():
+    """Timeout value set on Summarizer is forwarded to client.post()."""
+    summarizer = Summarizer(api_key="key", timeout=120.0)
+    mock_response_data = {"content": [{"type": "text", "text": "Line 1\nLine 2\nLine 3"}]}
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json = MagicMock(return_value=mock_response_data)
+        mock_post.return_value.text = "OK"
+
+        await summarizer.summarize("Some content")
+
+        assert mock_post.call_args.kwargs.get("timeout") == 120.0
+
+
+@pytest.mark.asyncio
+async def test_modal_token_path_no_authorization_header():
+    """Modal path: empty api_key produces no Authorization header; Modal tokens forwarded."""
+    summarizer = Summarizer(
+        api_key="",
+        base_url="https://foo.modal.run/v1/chat/completions",
+        model="qwen3",
+        provider="openai",
+        extra_headers={"Modal-Key": "tok-id", "Modal-Secret": "tok-secret"},
+        timeout=120.0,
+    )
+    mock_response_data = {"choices": [{"message": {"content": "• Modal summary"}}]}
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json = MagicMock(return_value=mock_response_data)
+        mock_post.return_value.text = "OK"
+
+        result = await summarizer.summarize("Some content")
+
+        assert result == "• Modal summary"
+        headers = mock_post.call_args.kwargs.get("headers", {})
+        assert "Authorization" not in headers
+        assert headers.get("Modal-Key") == "tok-id"
+        assert headers.get("Modal-Secret") == "tok-secret"
+
+
+def test_resolved_provider_bare_v1_url_detected_as_openai():
+    """Auto-detect: bare /v1 endpoint (vLLM style) is routed to openai provider."""
+    s = Summarizer(api_key="", base_url="https://foo.modal.run/v1", provider="auto")
+    assert s._resolved_provider() == "openai"
+
+
+def test_resolved_provider_anthropic_v1_messages_not_rerouted():
+    """Auto-detect: Anthropic canonical URL keeps anthropic provider despite /v1 in path."""
+    s = Summarizer(api_key="key", base_url="https://api.anthropic.com/v1/messages", provider="auto")
+    assert s._resolved_provider() == "anthropic"
+
+
+@pytest.mark.asyncio
+async def test_api_error_message_excludes_response_body(summarizer):
+    """Non-200 error message contains only the status code, not the response body."""
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value.status_code = 401
+        mock_post.return_value.text = "Modal-Key: leaked-secret\nModal-Secret: another-secret"
+
+        with pytest.raises(APIConnectionError) as exc_info:
+            await summarizer.summarize("Some content")
+
+        error_msg = str(exc_info.value)
+        assert "401" in error_msg
+        assert "leaked-secret" not in error_msg
+        assert "another-secret" not in error_msg

@@ -3,8 +3,24 @@ import SwiftUI
 // MARK: - Filter
 
 enum LibraryFilter: String, CaseIterable {
-    case inbox   = "Inbox"
-    case archive = "Archive"
+    case inbox    = "Inbox"
+    case archived = "Archived"
+    case deleted  = "Deleted"
+}
+
+// Inbox 카드 리더 진입 시 전체 목록과 시작 인덱스를 함께 전달
+struct InboxNavigation: Hashable {
+    let items: [SavedItem]
+    let startIndex: Int
+
+    static func == (lhs: InboxNavigation, rhs: InboxNavigation) -> Bool {
+        lhs.startIndex == rhs.startIndex && lhs.items.map(\.id) == rhs.items.map(\.id)
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(startIndex)
+        items.forEach { hasher.combine($0.id) }
+    }
 }
 
 // MARK: - LibraryView
@@ -18,8 +34,9 @@ struct LibraryView: View {
 
     private var filteredItems: [SavedItem] {
         switch selectedFilter {
-        case .inbox:   return viewModel.items.filter { $0.status == .unread }
-        case .archive: return viewModel.items.filter { $0.status != .unread }
+        case .inbox:    return viewModel.items.filter { $0.status == .unread }
+        case .archived: return viewModel.items.filter { $0.status == .kept || $0.status == .read || $0.status == .discarded }
+        case .deleted:  return viewModel.items.filter { $0.status == .deleted }
         }
     }
 
@@ -27,8 +44,10 @@ struct LibraryView: View {
         switch selectedFilter {
         case .inbox:
             return filteredItems.isEmpty ? "Inbox" : "Inbox \(filteredItems.count)"
-        case .archive:
-            return "Archive"
+        case .archived:
+            return "Archived"
+        case .deleted:
+            return "Deleted"
         }
     }
 
@@ -42,11 +61,18 @@ struct LibraryView: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 0) {
-                            ForEach(filteredItems) { item in
-                                NavigationLink(value: item) {
-                                    LibraryCardView(item: item)
+                            ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
+                                if selectedFilter == .inbox {
+                                    NavigationLink(value: InboxNavigation(items: filteredItems, startIndex: index)) {
+                                        LibraryCardView(item: item)
+                                    }
+                                    .buttonStyle(.plain)
+                                } else {
+                                    NavigationLink(value: item) {
+                                        LibraryCardView(item: item)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
 
                                 Divider()
                                     .padding(.leading, 16)
@@ -67,7 +93,7 @@ struct LibraryView: View {
                             Text(filter.rawValue)
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(selectedFilter == filter ? .primary : .secondary)
-                                .padding(.horizontal, 24)
+                                .padding(.horizontal, 14)
                                 .padding(.vertical, 9)
                                 .background(
                                     selectedFilter == filter
@@ -85,18 +111,20 @@ struct LibraryView: View {
             }
             .navigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(.large)
+            .navigationDestination(for: InboxNavigation.self) { nav in
+                ItemDetailView(items: nav.items, startIndex: nav.startIndex, showActions: true)
+            }
             .navigationDestination(for: SavedItem.self) { item in
-                ItemDetailView(item: item)
+                ItemDetailView(items: [item], startIndex: 0, showActions: false)
             }
             .onAppear { viewModel.reload() }
             .onChange(of: scenePhase) { newPhase in
                 if newPhase == .active { viewModel.reload() }
             }
             .onChange(of: viewModel.items) { items in
-                // 딥링크로 열려야 할 아이템이 아직 로드 안됐다가 이제 로드된 경우
                 if let url = pendingDeepLinkURL,
                    let item = items.first(where: { $0.url == url }) {
-                    path.append(item)
+                    openItemAsInboxReader(item)
                     pendingDeepLinkURL = nil
                 }
             }
@@ -107,23 +135,44 @@ struct LibraryView: View {
                 guard let url = notification.object as? URL else { return }
                 viewModel.reload()
                 if let item = viewModel.items.first(where: { $0.url == url }) {
-                    path.append(item)
+                    openItemAsInboxReader(item)
                 } else {
-                    // 아직 items에 없으면 (drainInbox 완료 전) 대기
                     pendingDeepLinkURL = url
                 }
             }
         }
     }
 
+    private func openItemAsInboxReader(_ item: SavedItem) {
+        guard item.status == .unread else {
+            path.append(item)
+            return
+        }
+        let inboxItems = viewModel.items.filter { $0.status == .unread }
+        guard !inboxItems.isEmpty else { path.append(item); return }
+        let startIndex = inboxItems.firstIndex(where: { $0.id == item.id }) ?? 0
+        path.append(InboxNavigation(items: inboxItems, startIndex: startIndex))
+    }
+
     private var emptyView: some View {
-        VStack(spacing: 16) {
-            Image(systemName: selectedFilter == .inbox ? "tray" : "archivebox")
+        let (icon, title, subtitle): (String, String, String) = {
+            switch selectedFilter {
+            case .inbox:
+                return ("tray", "Inbox가 비어있어요", "공유하기 → Save Document to Briefly 로\n링크를 저장해보세요")
+            case .archived:
+                return ("archivebox", "Archived가 비어있어요", "Inbox에서 Keep한 링크가 여기에 표시됩니다")
+            case .deleted:
+                return ("trash", "Deleted가 비어있어요", "Inbox에서 Delete한 링크가 여기에 표시됩니다")
+            }
+        }()
+
+        return VStack(spacing: 16) {
+            Image(systemName: icon)
                 .font(.system(size: 60))
                 .foregroundStyle(.secondary)
-            Text(selectedFilter == .inbox ? "Inbox가 비어있어요" : "Archive가 비어있어요")
+            Text(title)
                 .font(.headline)
-            Text("공유하기 → Save Document to Briefly 로\n링크를 저장해보세요")
+            Text(subtitle)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

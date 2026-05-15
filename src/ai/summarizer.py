@@ -42,6 +42,10 @@ class Summarizer:
             return "gemini"
         if "/chat/completions" in base or "/v1/responses" in base:
             return "openai"
+        # vLLM and other OpenAI-compatible servers commonly expose /v1 as the root path.
+        # Anthropic's canonical URL ends with /v1/messages, not bare /v1.
+        if base.rstrip("/").endswith("/v1") and "anthropic.com" not in base:
+            return "openai"
         return "anthropic"
 
     def _anthropic_request(self, prompt: str) -> tuple[str, dict[str, str], dict]:
@@ -204,7 +208,7 @@ class Summarizer:
 
                     if response.status_code != 200:
                         raise APIConnectionError(
-                            f"API request failed with status {response.status_code}: {response.text}"
+                            f"API request failed with status {response.status_code}"
                         )
 
                     data = response.json()
@@ -274,7 +278,7 @@ class Summarizer:
                         continue
                     if response.status_code != 200:
                         raise APIConnectionError(
-                            f"API request failed with status {response.status_code}: {response.text}"
+                            f"API request failed with status {response.status_code}"
                         )
                     data = response.json()
                     title = self._extract_summary(data, provider)

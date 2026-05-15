@@ -55,6 +55,20 @@ This document tracks all identified features for the **Briefly** project, catego
 - [x] **[ADV-002] Gamified Achievement System** (F-025): Visualizing "Knowledge Gained" to encourage daily consumption. ✅ Implemented (Backend API)
 - [x] **[ADV-003] Smart Reminders** (F-026): Push notifications triggered by user-defined "knowledge consumption windows." ✅ Implemented (Backend API)
 
+## iOS App
+
+### iOS Backend Integration (IOS)
+- [x] **[IOS-001] iOS ↔ 백엔드 API 연동 — 이메일 로그인 + Share Extension**: 이메일/비밀번호로 로그인, 토큰을 App Group UserDefaults에 저장(Share Extension 공유), Share Extension URL 저장 시 백엔드에 자동 전송. ✅ Implemented (suyoung-v1, 2026-04-30)
+  - `AuthTokenStore` — App Group UserDefaults 기반 토큰 저장소 (양 타겟 공유)
+  - `BrieflyAPI` — URLSession actor 기반 API 클라이언트, `#if DEBUG` localhost URL 분리
+  - `AccountView` — 이메일 로그인 폼 + `AuthViewModel`, 로그인 상태 UI 전환
+  - Share Extension — 로그인 시 `POST /api/v1/share` 자동 전송 (실패 시 로컬 저장 유지)
+  - **Depends on**: AUTH-001, AUTH-005, ING-001
+  - **ADR**: ARCH-017 (인증 방식), ARCH-018 (iOS 네트워킹)
+- [ ] **[IOS-002] Google Sign-In for iOS**: GoogleSignIn SDK 연동. Apple App Store 정책상 Google 로그인 추가 시 Apple Sign-In도 함께 구현 필요. 🔲 대기
+- [ ] **[IOS-003] 다기기 읽기 동기화**: `GET /api/v1/content` 서버 데이터 읽기 + 로컬 병합. 🔲 대기
+- [ ] **[IOS-004] 토큰 자동 갱신**: `POST /api/v1/auth/refresh` 미들웨어 (현재는 재로그인 필요). 🔲 대기
+
 ## Security & Infrastructure
 
 ### Security (SEC)

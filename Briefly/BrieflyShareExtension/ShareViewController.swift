@@ -67,8 +67,26 @@ final class ShareViewController: UIViewController {
     }
 
     private func saveAndShow(url: URL) {
-        let item = SavedItem(url: url, title: nil)
+        var item = SavedItem(url: url, title: nil)
         StorageService.shared.appendToInbox(item)
+
+        // 로그인된 경우 백엔드에도 전송하고 serverContentId를 저장
+        if let token = AuthTokenStore.shared.accessToken {
+            print("[ShareExt] 로그인 상태 — 서버 업로드 시도: \(url)")
+            Task {
+                do {
+                    let result = try await BrieflyAPI.shared.share(url: url, token: token)
+                    print("[ShareExt] 업로드 성공: contentId=\(result.id)")
+                    item.serverContentId = result.id
+                    StorageService.shared.updateItemById(item)
+                } catch {
+                    print("[ShareExt] 업로드 실패 (메인 앱 열 때 SyncService가 재시도합니다): \(error.localizedDescription)")
+                }
+            }
+        } else {
+            print("[ShareExt] 비로그인 상태 — 로컬에만 저장")
+        }
+
         DispatchQueue.main.async {
             self.showConfirmation(success: true, savedURL: url)
         }
@@ -116,13 +134,18 @@ final class ShareViewController: UIViewController {
 
     private func openMainApp(articleURL: URL) {
         autoDismissTimer?.cancel()
-        let encoded = articleURL.absoluteString
-            .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        guard let brieflyURL = URL(string: "briefly://item?url=\(encoded)") else {
+        var comps = URLComponents()
+        comps.scheme = "briefly"
+        comps.host = "item"
+        comps.queryItems = [URLQueryItem(name: "url", value: articleURL.absoluteString)]
+        guard let brieflyURL = comps.url else {
             completeRequest()
             return
         }
-        extensionContext?.open(brieflyURL) { [weak self] _ in
+        extensionContext?.open(brieflyURL) { [weak self] success in
+            if !success {
+                print("[ShareViewController] extensionContext.open 실패 — 시뮬레이터 제한일 수 있음")
+            }
             self?.completeRequest()
         }
     }
