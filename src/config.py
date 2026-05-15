@@ -81,6 +81,11 @@ class Settings:
     SUMMARY_BASE_URL: str = os.getenv("SUMMARY_BASE_URL", "")
     SUMMARY_MODEL: str = os.getenv("SUMMARY_MODEL", "")
 
+    # Modal Serverless GPU (optional — only used when both tokens present)
+    MODAL_ENDPOINT: str = os.getenv("MODAL_ENDPOINT", "")
+    MODAL_PROXY_TOKEN_ID: str = os.getenv("MODAL_PROXY_TOKEN_ID", "")
+    MODAL_PROXY_TOKEN_SECRET: str = os.getenv("MODAL_PROXY_TOKEN_SECRET", "")
+
     # iOS Universal Links — Apple App Site Association
     # 10-character Team ID from developer.apple.com/account → Membership.
     # Optional at startup; /.well-known/apple-app-site-association returns 503 until set.

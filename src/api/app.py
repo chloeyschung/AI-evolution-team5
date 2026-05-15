@@ -97,14 +97,29 @@ async def lifespan(app: FastAPI):
     await init_db()
 
     # Initialize ShareHandler with dependencies (Task #11: DI pattern)
+    modal_tokens_ok = bool(settings.MODAL_PROXY_TOKEN_ID and settings.MODAL_PROXY_TOKEN_SECRET)
     summarizer_api_key = settings.SUMMARY_API_KEY or os.getenv("ANTHROPIC_API_KEY")
     summarizer: Summarizer | None = None
-    if summarizer_api_key:
+    if summarizer_api_key or modal_tokens_ok:
+        extra_headers: dict = {}
+        if modal_tokens_ok:
+            extra_headers["Modal-Key"] = settings.MODAL_PROXY_TOKEN_ID
+            extra_headers["Modal-Secret"] = settings.MODAL_PROXY_TOKEN_SECRET
+        # When MODAL_ENDPOINT is set but SUMMARY_BASE_URL is omitted, construct the
+        # OpenAI-compatible chat completions URL from the bare endpoint so Modal tokens
+        # don't accidentally hit the Anthropic server.
+        _modal_base_url = (
+            f"{settings.MODAL_ENDPOINT.rstrip('/')}/v1/chat/completions"
+            if modal_tokens_ok and settings.MODAL_ENDPOINT
+            else ""
+        )
         summarizer = Summarizer(
-            api_key=summarizer_api_key,
-            base_url=settings.SUMMARY_BASE_URL or settings.ANTHROPIC_BASE_URL,
+            api_key=summarizer_api_key or "",
+            base_url=settings.SUMMARY_BASE_URL or _modal_base_url or settings.ANTHROPIC_BASE_URL,
             model=settings.SUMMARY_MODEL or settings.ANTHROPIC_MODEL,
             provider=settings.SUMMARY_PROVIDER,
+            extra_headers=extra_headers,
+            timeout=120.0 if modal_tokens_ok else None,
         )
 
     content_extractor = ContentExtractor()
