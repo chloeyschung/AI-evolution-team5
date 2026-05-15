@@ -22,12 +22,16 @@ class Summarizer:
         base_url: str = "https://api.anthropic.com/v1/messages",
         model: str | None = None,
         provider: str = "auto",
+        extra_headers: dict | None = None,
+        timeout: float | None = None,
     ):
         self.api_key = api_key
         self.base_url = base_url
         self.model = model or self.DEFAULT_MODEL
         provider = provider.strip().lower()
         self.provider = provider if provider in self.PROVIDERS else "auto"
+        self.extra_headers = extra_headers or {}
+        self.timeout = timeout if timeout is not None else self.DEFAULT_TIMEOUT
 
     def _resolved_provider(self) -> str:
         if self.provider != "auto":
@@ -46,6 +50,7 @@ class Summarizer:
             "anthropic-version": self.ANTHROPIC_VERSION,
             "content-type": self.CONTENT_TYPE_JSON,
         }
+        headers.update(self.extra_headers)
         payload = {
             "model": self.model,
             "max_tokens": self.DEFAULT_MAX_TOKENS,
@@ -59,6 +64,7 @@ class Summarizer:
         }
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
+        headers.update(self.extra_headers)
         payload = {
             "model": self.model,
             "max_tokens": self.DEFAULT_MAX_TOKENS,
@@ -78,6 +84,7 @@ class Summarizer:
             url = f"{url}{sep}{urlencode({'key': self.api_key})}"
 
         headers = {"content-type": self.CONTENT_TYPE_JSON}
+        headers.update(self.extra_headers)
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {"maxOutputTokens": self.DEFAULT_MAX_TOKENS},
@@ -188,7 +195,7 @@ class Summarizer:
                         request_url,
                         headers=headers,
                         json=payload,
-                        timeout=self.DEFAULT_TIMEOUT,
+                        timeout=self.timeout,
                     )
 
                     if response.status_code >= 500 and attempt < max_retries - 1:
@@ -260,7 +267,7 @@ class Summarizer:
                         request_url,
                         headers=headers,
                         json=payload,
-                        timeout=self.DEFAULT_TIMEOUT,
+                        timeout=self.timeout,
                     )
                     if response.status_code >= 500 and attempt < max_retries - 1:
                         await asyncio.sleep(2**attempt)
