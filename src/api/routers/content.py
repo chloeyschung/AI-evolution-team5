@@ -10,7 +10,9 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, 
 from fastapi import Request as FastAPIRequest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...constants import ErrorCode
+from ...ai import auto_tagger
+from ...config import settings
+from ...constants import AUTO_TAG_CATEGORIES, ErrorCode
 from ...data.database import AsyncSessionLocal, get_db
 from ...data.models import ContentStatus
 from ...data.repository import (
@@ -62,11 +64,22 @@ def _etag_for_payload(payload: dict) -> str:
     return f'"{hashlib.sha256(serialized.encode()).hexdigest()}"'
 
 
+# Share handler dependency - initialized in app.py (Task #11: DI pattern)
+def get_share_handler(request: FastAPIRequest) -> ShareHandler:
+    """Get the share handler instance from app.state."""
+    share_handler = request.app.state.share_handler
+    if share_handler is None:
+        raise RuntimeError("ShareHandler not initialized. Configure it in app.py.")
+    return share_handler
+
+
 @router.post("/content", status_code=201, response_model=ContentResponse)
 async def create_content(
     data: ContentCreate,
+    background_tasks: BackgroundTasks,
     user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    share_handler: ShareHandler = Depends(get_share_handler),
 ) -> ContentResponse:
     """Save new content metadata.
 
@@ -82,6 +95,16 @@ async def create_content(
         user_id=user_id,
     )
 
+    if share_handler._summarizer or settings.GEMINI_API_KEY:
+        background_tasks.add_task(
+            _background_summarize,
+            content.id,
+            user_id,
+            data.url,
+            share_handler._content_extractor,
+            share_handler._summarizer,
+        )
+
     return ContentResponse.from_content(content)
 
 
@@ -96,13 +119,14 @@ async def list_content(
     platform: str | None = Query(None),
     sort: str = Query("recency", pattern="^(recency|platform|title|status)$"),
     order: str = Query("desc", pattern="^(asc|desc)$"),
+    category: str | None = Query(None, description="Filter by auto-tag category"),
     user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> PaginatedContentResponse:
     """List all content for the authenticated user.
 
     Returns a pagination wrapper with items, has_more, total, and next_offset (DAT-001 FR-6).
-    Supports filtering by status (inbox/archived) and platform.
+    Supports filtering by status (inbox/archived), platform, and auto-tag category.
     has_more is True when len(items) == limit, indicating there may be more pages.
     next_offset is offset + len(items) when has_more is True, else None.
     """
@@ -112,6 +136,16 @@ async def list_content(
         status_filter = ContentStatus.INBOX
     elif status == "archived":
         status_filter = ContentStatus.ARCHIVED
+
+    # Validate category value against fixed list
+    category_filter: str | None = None
+    if category is not None:
+        if category not in AUTO_TAG_CATEGORIES:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": "invalid_category", "message": f"category must be one of {AUTO_TAG_CATEGORIES}"},
+            )
+        category_filter = category
 
     is_cursor_mode = cursor is not None and sort == "recency"
     if is_cursor_mode:
@@ -132,6 +166,7 @@ async def list_content(
             platform=platform,
             sort=sort,
             order=order,
+            category=category_filter,
         )
     else:
         contents = await repo.get_all_ordered(
@@ -142,9 +177,10 @@ async def list_content(
             platform=platform,
             sort=sort,
             order=order,
+            category=category_filter,
         )
 
-    total = await repo.count_all(user_id=user_id, status=status_filter, platform=platform)
+    total = await repo.count_all(user_id=user_id, status=status_filter, platform=platform, category=category_filter)
     has_more = len(contents) == limit
     next_cursor = None
     next_offset = offset + len(contents) if has_more else None
@@ -318,6 +354,10 @@ async def get_content_detail(
         swipe_history=swipe_history,
         created_at=serialize_datetime(content.created_at),
         updated_at=serialize_datetime(content.updated_at),
+        auto_tag_status=getattr(content, "auto_tag_status", None),
+        auto_tag_category=getattr(content, "auto_tag_category", None),
+        auto_tag_keywords_en=json.loads(content.auto_tag_keywords_en) if getattr(content, "auto_tag_keywords_en", None) else [],
+        auto_tag_keywords_original=json.loads(content.auto_tag_keywords_original) if getattr(content, "auto_tag_keywords_original", None) else [],
     )
 
 
@@ -666,22 +706,13 @@ async def search_content(
     )
 
 
-# Share handler dependency - initialized in app.py (Task #11: DI pattern)
-def get_share_handler(request: FastAPIRequest) -> ShareHandler:
-    """Get the share handler instance from app.state."""
-
-    share_handler = request.app.state.share_handler
-    if share_handler is None:
-        raise RuntimeError("ShareHandler not initialized. Configure it in app.py.")
-    return share_handler
-
-
 async def _background_summarize(
     content_id: int,
     user_id: int,
     url: str,
     content_extractor,
     summarizer,
+    page_text: str | None = None,
 ) -> None:
     """Fetch page text and summarize it, then persist the result — runs after response is sent."""
     import re
@@ -700,31 +731,68 @@ async def _background_summarize(
         return text[:6000]
 
     try:
-        _, text_content = await content_extractor.fetch_html_and_text(url)
-        if not text_content:
-            return
+        # Fetch page text — use pre-extracted text from client if provided (e.g. LinkedIn, Facebook),
+        # otherwise fall back to server-side fetch. Failure is non-fatal.
+        text_content = ""
+        if page_text:
+            text_content = page_text
+        else:
+            try:
+                _, text_content = await content_extractor.fetch_html_and_text(url)
+            except Exception as exc:  # noqa: BLE001
+                logging.warning("Content extraction failed for content %s: %s", content_id, exc)
+
         async with AsyncSessionLocal() as db:
             repo = ContentRepository(db)
             content = await repo.get_by_id(content_id)
             if not content:
                 return
-            # AI enrichment runs once per item to avoid repeated rewriting.
-            if bool(getattr(content, "is_ai_summarized", False)) or content.summary:
-                return
 
-            summary = await summarizer.summarize(text_content, max_retries=1)
-            await repo.update_summary(content_id, user_id, summary)
-            content = await repo.get_by_id(content_id)
-            if content and not bool(getattr(content, "is_ai_titled", False)):
-                try:
-                    generated_title = await summarizer.generate_title(
-                        _prepare_text_for_title(text_content), max_retries=1
-                    )
-                    cleaned = _clean_generated_title(generated_title)
-                    if cleaned:
-                        await repo.update_title(content_id, user_id, cleaned)
-                except Exception as exc:  # noqa: BLE001
-                    logging.warning("Background title generation failed for content %s: %s", content_id, exc)
+            summary = content.summary  # may already exist from a prior run
+            final_title = content.title or ""
+
+            # Summarization + title generation — only when text was fetched and not yet done.
+            already_summarized = bool(getattr(content, "is_ai_summarized", False)) or bool(content.summary)
+            if text_content and summarizer is not None and not already_summarized:
+                summary = await summarizer.summarize(text_content, max_retries=1)
+                await repo.update_summary(content_id, user_id, summary)
+                content = await repo.get_by_id(content_id)
+                final_title = content.title or ""
+                if content and not bool(getattr(content, "is_ai_titled", False)):
+                    try:
+                        generated_title = await summarizer.generate_title(
+                            _prepare_text_for_title(text_content), max_retries=1
+                        )
+                        cleaned = _clean_generated_title(generated_title)
+                        if cleaned:
+                            await repo.update_title(content_id, user_id, cleaned)
+                            final_title = cleaned
+                    except Exception as exc:  # noqa: BLE001
+                        logging.warning("Background title generation failed for content %s: %s", content_id, exc)
+
+            # Auto-tagging via Gemini 2.5 Flash — runs even without summary, using title alone.
+            # Skip only if already tagged/failed from a previous run.
+            already_tagged = getattr(content, "auto_tag_status", None) in ("tagged", "failed", "untagged")
+            if settings.GEMINI_API_KEY and not already_tagged:
+                if not final_title and not summary:
+                    await repo.update_auto_tags(content_id, user_id, "untagged")
+                else:
+                    try:
+                        result = await auto_tagger.tag(final_title or "", summary, settings.GEMINI_API_KEY)
+                        if result is not None:
+                            await repo.update_auto_tags(
+                                content_id,
+                                user_id,
+                                "tagged",
+                                category=result.category,
+                                keywords_en=result.keywords_en,
+                                keywords_original=result.keywords_original,
+                            )
+                        else:
+                            await repo.update_auto_tags(content_id, user_id, "failed")
+                    except Exception as exc:  # noqa: BLE001
+                        logging.warning("Auto-tagging failed for content %s: %s", content_id, exc)
+                        await repo.update_auto_tags(content_id, user_id, "failed")
     except Exception as exc:
         logging.warning("Background summarization failed for content %s: %s", content_id, exc)
 
@@ -791,7 +859,7 @@ async def share_content(
         await idempotency_repo.create(user_id, idempotency_key, content.id)
 
     # Schedule summarization to run after the response is sent
-    if auto_summarize and share_handler._summarizer and data.content:
+    if auto_summarize and data.content and (share_handler._summarizer or settings.GEMINI_API_KEY):
         background_tasks.add_task(
             _background_summarize,
             content.id,
@@ -799,6 +867,7 @@ async def share_content(
             data.content,
             share_handler._content_extractor,
             share_handler._summarizer,
+            data.page_text,
         )
 
     return ShareResponse(

@@ -5,18 +5,21 @@ import ContentTable from '../components/content/ContentTable';
 import { removeDuplicates } from '../api/endpoints';
 import styles from './Inbox.module.css';
 
+const AUTO_TAG_CATEGORIES = ['Tech', 'Business', 'Essays', 'Research', 'Lifestyle', 'News', 'Culture', 'Other'];
+
 export default function Inbox() {
   const contentStore = useContentStore();
   const [selectedPlatform, setSelectedPlatform] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedContentId, setSelectedContentId] = useState<number | null>(null);
   const [isRemovingDuplicates, setIsRemovingDuplicates] = useState(false);
 
   useEffect(() => {
-    contentStore.updateFilters({ status: 'all' });
+    contentStore.updateFilters({ status: 'all', category: null });
     void contentStore.loadContent(1);
     void contentStore.loadPlatforms();
     return () => {
-      contentStore.updateFilters({ platform: null });
+      contentStore.updateFilters({ platform: null, category: null });
     };
   }, []);
 
@@ -32,6 +35,12 @@ export default function Inbox() {
     const platform = e.target.value || undefined;
     setSelectedPlatform(e.target.value);
     contentStore.updateFilters({ platform });
+  };
+
+  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const category = e.target.value || null;
+    setSelectedCategory(e.target.value);
+    contentStore.updateFilters({ category });
   };
 
   const handleSortChange = (option: 'recency' | 'platform' | 'title' | 'status') => {
@@ -73,6 +82,18 @@ export default function Inbox() {
             <option key={platform.platform} value={platform.platform}>
               {platform.platform} ({platform.count})
             </option>
+          ))}
+        </select>
+        <label htmlFor="category-filter">Category</label>
+        <select
+          id="category-filter"
+          value={selectedCategory}
+          onChange={handleCategoryChange}
+          className={styles.select}
+        >
+          <option value="">All categories</option>
+          {AUTO_TAG_CATEGORIES.map((cat) => (
+            <option key={cat} value={cat}>{cat}</option>
           ))}
         </select>
         <button

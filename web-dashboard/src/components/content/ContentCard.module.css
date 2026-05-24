@@ -8,7 +8,7 @@
   background: var(--color-surface);
   box-shadow: var(--elevation-01);
   display: grid;
-  grid-template-rows: auto auto 1fr auto auto;
+  grid-template-rows: auto auto 1fr auto auto auto;
   gap: 12px;
   min-height: 360px; /* anchors empty cards so rows don't collapse */
   transition:
@@ -349,6 +349,33 @@
 .deleteBtn:hover {
   background: var(--color-surface);
   color: var(--color-ink-primary);
+}
+
+.tagRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.categoryBadge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-signal) 14%, var(--color-surface));
+  color: var(--color-signal);
+  border: 1px solid color-mix(in srgb, var(--color-signal) 28%, var(--color-border));
+  letter-spacing: 0.02em;
+}
+
+.keyword {
+  font-size: 0.7rem;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--color-surface-muted);
+  color: var(--color-ink-muted);
+  border: 1px solid var(--color-border-muted);
 }
 
 .footerRow {

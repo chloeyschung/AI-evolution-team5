@@ -16,6 +16,10 @@ export interface Content {
   status: 'inbox' | 'archived';
   created_at: string;
   updated_at: string | null;
+  auto_tag_status: string | null;
+  auto_tag_category: string | null;
+  auto_tag_keywords_en: string[];
+  auto_tag_keywords_original: string[];
 }
 
 export interface SwipeAction {
@@ -69,6 +73,7 @@ export interface ContentFilters {
   platform: string | null;
   dateFrom: string | null;
   dateTo: string | null;
+  category: string | null;
 }
 
 export interface ContentSort {

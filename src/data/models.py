@@ -77,6 +77,12 @@ class Content(Base):
     is_deleted = Column(Boolean, default=False, nullable=False, index=True)
     deleted_at = Column(DateTime, nullable=True)
 
+    # Auto-tagging (Gemini 2.5 Flash)
+    auto_tag_status = Column(String(20), nullable=True, index=True)
+    auto_tag_category = Column(String(50), nullable=True, index=True)
+    auto_tag_keywords_en = Column(Text, nullable=True)
+    auto_tag_keywords_original = Column(Text, nullable=True)
+
     # Relationship to swipe history
     swipe_history = relationship("SwipeHistory", back_populates="content")
     user = relationship("UserProfile", back_populates="content")

@@ -201,6 +201,31 @@ class ContentRepository(BaseRepository[Content]):
         )
         await self.session.commit()
 
+    async def update_auto_tags(
+        self,
+        content_id: int,
+        user_id: int,
+        status: str,
+        category: str | None = None,
+        keywords_en: list[str] | None = None,
+        keywords_original: list[str] | None = None,
+    ) -> None:
+        """Persist Gemini auto-tag result for a content row the user owns."""
+        import json
+
+        await self.session.execute(
+            update(Content)
+            .where(Content.id == content_id, Content.user_id == user_id)
+            .values(
+                auto_tag_status=status,
+                auto_tag_category=category,
+                auto_tag_keywords_en=json.dumps(keywords_en) if keywords_en is not None else None,
+                auto_tag_keywords_original=json.dumps(keywords_original) if keywords_original is not None else None,
+                updated_at=utc_now(),
+            )
+        )
+        await self.session.commit()
+
     async def remove_duplicates(self, user_id: int) -> int:
         """Remove duplicate rows and keep the newest row per duplicate_group_key."""
         result = await self.session.execute(
@@ -666,6 +691,7 @@ class ContentRepository(BaseRepository[Content]):
         user_id: int,
         status: ContentStatus | None = None,
         platform: str | None = None,
+        category: str | None = None,
     ) -> int:
         """Count total non-deleted content rows for a user.
 
@@ -673,6 +699,7 @@ class ContentRepository(BaseRepository[Content]):
             user_id: User ID to count content for.
             status: Optional status filter.
             platform: Optional platform filter (case-insensitive).
+            category: Optional auto-tag category filter (exact match).
 
         Returns:
             Total count of non-deleted content rows.
@@ -682,6 +709,8 @@ class ContentRepository(BaseRepository[Content]):
             query = query.where(Content.status == status)
         if platform:
             query = query.where(Content.platform.ilike(platform))
+        if category:
+            query = query.where(Content.auto_tag_category == category)
         result = await self.session.execute(query)
         return result.scalar_one()
 
@@ -783,6 +812,7 @@ class ContentRepository(BaseRepository[Content]):
         platform: str | None = None,
         sort: str = "recency",
         order: str = "desc",
+        category: str | None = None,
     ) -> list[Content]:
         """Get all content ordered by creation date (newest first).
 
@@ -792,6 +822,7 @@ class ContentRepository(BaseRepository[Content]):
             offset: Pagination offset.
             status: Optional status filter (INBOX, ARCHIVED).
             platform: Optional platform filter (case-insensitive).
+            category: Optional auto-tag category filter (exact match).
 
         Returns:
             List of Content objects ordered by created_at descending.
@@ -823,6 +854,8 @@ class ContentRepository(BaseRepository[Content]):
             query = query.where(Content.status == status)
         if platform:
             query = query.where(Content.platform.ilike(platform))
+        if category:
+            query = query.where(Content.auto_tag_category == category)
         result = await self.session.execute(query)
         return list(result.scalars().all())
 

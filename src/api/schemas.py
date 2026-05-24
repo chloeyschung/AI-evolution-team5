@@ -1,5 +1,6 @@
 """Pydantic schemas for API request/response validation."""
 
+import json
 from datetime import datetime
 from typing import Any, Literal
 
@@ -53,6 +54,10 @@ class ContentResponse(BaseModel):
     status: ContentStatus = ContentStatus.INBOX
     created_at: str
     updated_at: str | None = None
+    auto_tag_status: str | None = None
+    auto_tag_category: str | None = None
+    auto_tag_keywords_en: list[str] = []
+    auto_tag_keywords_original: list[str] = []
 
     @classmethod
     def from_content(cls, content: Any) -> "ContentResponse":
@@ -67,6 +72,14 @@ class ContentResponse(BaseModel):
         created_at = serialize_datetime(content.created_at)
         if created_at is None:
             raise ValueError(f"Content {content.id} has no created_at timestamp")
+
+        def _parse_keywords(raw: Any) -> list[str]:
+            if not raw:
+                return []
+            try:
+                return json.loads(raw)
+            except Exception:
+                return []
 
         return cls(
             id=content.id,
@@ -84,6 +97,10 @@ class ContentResponse(BaseModel):
             status=content.status,
             created_at=created_at,
             updated_at=serialize_datetime(content.updated_at),
+            auto_tag_status=getattr(content, "auto_tag_status", None),
+            auto_tag_category=getattr(content, "auto_tag_category", None),
+            auto_tag_keywords_en=_parse_keywords(getattr(content, "auto_tag_keywords_en", None)),
+            auto_tag_keywords_original=_parse_keywords(getattr(content, "auto_tag_keywords_original", None)),
         )
 
     @classmethod
@@ -118,6 +135,10 @@ class ContentResponse(BaseModel):
             status=ContentStatus.INBOX,
             created_at=created_at,
             updated_at=None,
+            auto_tag_status=None,
+            auto_tag_category=None,
+            auto_tag_keywords_en=[],
+            auto_tag_keywords_original=[],
         )
 
 
@@ -187,6 +208,7 @@ class ShareRequest(BaseModel):
     platform: str | None = None
     metadata: dict[str, Any] | None = None
     options: dict[str, Any] | None = None
+    page_text: str | None = Field(None, description="Pre-extracted page text from the client (skips server-side fetch)")
 
 
 class ShareResponse(BaseModel):
@@ -243,6 +265,10 @@ class ContentDetailResponse(BaseModel):
     swipe_history: SwipeHistoryResponse | None = None
     created_at: str
     updated_at: str | None = None
+    auto_tag_status: str | None = None
+    auto_tag_category: str | None = None
+    auto_tag_keywords_en: list[str] = []
+    auto_tag_keywords_original: list[str] = []
 
 
 # DAT-002: User Profile & Preferences schemas
