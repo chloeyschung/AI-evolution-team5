@@ -13,31 +13,35 @@ export class PageExtractor {
   }
 
   extractPageText(): string | null {
-    const clone = document.body.cloneNode(true) as HTMLElement;
+    try {
+      const clone = document.body.cloneNode(true) as HTMLElement;
 
-    const noiseSelectors = [
-      'script', 'style', 'nav', 'footer', 'header', 'aside',
-      'form', 'iframe', 'noscript', '[role="navigation"]',
-      '[role="banner"]', '[aria-hidden="true"]',
-    ];
-    for (const sel of noiseSelectors) {
-      clone.querySelectorAll(sel).forEach((el) => el.remove());
+      const noiseSelectors = [
+        'script', 'style', 'nav', 'footer', 'header', 'aside',
+        'form', 'iframe', 'noscript', '[role="navigation"]',
+        '[role="banner"]', '[aria-hidden="true"]',
+      ];
+      for (const sel of noiseSelectors) {
+        clone.querySelectorAll(sel).forEach((el) => el.remove());
+      }
+
+      const main =
+        clone.querySelector('article') ??
+        clone.querySelector('main') ??
+        clone.querySelector('[role="main"]') ??
+        clone;
+
+      const raw = main.textContent ?? '';
+      const cleaned = raw
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0)
+        .join('\n');
+
+      return cleaned.length > 0 ? cleaned.slice(0, 8000) : null;
+    } catch {
+      return null;
     }
-
-    const main =
-      clone.querySelector('article') ??
-      clone.querySelector('main') ??
-      clone.querySelector('[role="main"]') ??
-      clone;
-
-    const raw = main.textContent ?? '';
-    const cleaned = raw
-      .split('\n')
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0)
-      .join('\n');
-
-    return cleaned.length > 0 ? cleaned.slice(0, 8000) : null;
   }
 
   private extractTitle(): string | null {
