@@ -49,6 +49,7 @@ export class APIClient {
       options: {
         auto_summarize: settings.autoSummarize,
       },
+      ...(metadata.pageText ? { page_text: metadata.pageText } : {}),
     };
 
     const controller = new AbortController();

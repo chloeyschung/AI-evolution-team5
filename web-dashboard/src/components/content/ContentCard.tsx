@@ -108,6 +108,15 @@ export default function ContentCard({ content, onDelete, onSwipe }: ContentCardP
         )}
       </div>
 
+      {content.auto_tag_category ? (
+        <div className={styles.tagRow}>
+          <span className={styles.categoryBadge}>{content.auto_tag_category}</span>
+          {content.auto_tag_keywords_en?.slice(0, 3).map((kw) => (
+            <span key={kw} className={styles.keyword}>{kw}</span>
+          ))}
+        </div>
+      ) : null}
+
       <div className={styles.footerRow}>
         <span className={styles.date}>{createdAt}</span>
         <button

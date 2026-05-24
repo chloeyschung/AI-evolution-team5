@@ -99,6 +99,9 @@ export async function getContent(
   if (filters.platform) {
     params.platform = filters.platform;
   }
+  if (filters.category) {
+    params.category = filters.category;
+  }
   if (sort.option) {
     params.sort = sort.option;
   }

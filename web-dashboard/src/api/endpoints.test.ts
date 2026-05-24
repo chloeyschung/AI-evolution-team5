@@ -36,7 +36,7 @@ describe('content endpoint helpers', () => {
     });
 
     const result = await getContent(
-      { status: 'all', platform: null, dateFrom: null, dateTo: null },
+      { status: 'all', platform: null, dateFrom: null, dateTo: null, category: null },
       { option: 'recency', order: 'desc' },
       2,
       20

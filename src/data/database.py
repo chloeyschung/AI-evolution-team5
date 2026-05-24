@@ -39,6 +39,7 @@ async def init_db() -> None:
         await conn.run_sync(Base.metadata.create_all)
         await _ensure_user_profile_timezone_column(conn)
         await _ensure_content_ai_columns(conn)
+        await _ensure_content_auto_tag_columns(conn)
 
 
 async def _ensure_user_profile_timezone_column(conn) -> None:
@@ -75,3 +76,21 @@ async def _ensure_content_ai_columns(conn) -> None:
         await conn.execute(text("ALTER TABLE content ADD COLUMN duplicate_group_key VARCHAR(1024)"))
     if "duplicate_index" not in existing_columns:
         await conn.execute(text("ALTER TABLE content ADD COLUMN duplicate_index INTEGER"))
+
+
+async def _ensure_content_auto_tag_columns(conn) -> None:
+    """Backfill auto-tag columns added for Gemini auto-tagging feature."""
+    if not DATABASE_URL.startswith("sqlite"):
+        return
+
+    result = await conn.execute(text("PRAGMA table_info(content)"))
+    existing_columns = {row[1] for row in result.fetchall()}
+
+    if "auto_tag_status" not in existing_columns:
+        await conn.execute(text("ALTER TABLE content ADD COLUMN auto_tag_status VARCHAR(20)"))
+    if "auto_tag_category" not in existing_columns:
+        await conn.execute(text("ALTER TABLE content ADD COLUMN auto_tag_category VARCHAR(50)"))
+    if "auto_tag_keywords_en" not in existing_columns:
+        await conn.execute(text("ALTER TABLE content ADD COLUMN auto_tag_keywords_en TEXT"))
+    if "auto_tag_keywords_original" not in existing_columns:
+        await conn.execute(text("ALTER TABLE content ADD COLUMN auto_tag_keywords_original TEXT"))

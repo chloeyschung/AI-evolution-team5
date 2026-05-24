@@ -80,7 +80,6 @@ class Settings:
     SUMMARY_API_KEY: str = os.getenv("SUMMARY_API_KEY", "")
     SUMMARY_BASE_URL: str = os.getenv("SUMMARY_BASE_URL", "")
     SUMMARY_MODEL: str = os.getenv("SUMMARY_MODEL", "")
-
     # Modal Serverless GPU (optional — only used when both tokens present)
     MODAL_ENDPOINT: str = os.getenv("MODAL_ENDPOINT", "")
     MODAL_PROXY_TOKEN_ID: str = os.getenv("MODAL_PROXY_TOKEN_ID", "")

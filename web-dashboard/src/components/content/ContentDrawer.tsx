@@ -67,6 +67,18 @@ export default function ContentDrawer({ contentId, onClose }: ContentDrawerProps
             </dl>
           </section>
 
+          {detail.auto_tag_category ? (
+            <section className={styles.section}>
+              <h3>Auto-tag</h3>
+              <dl className={styles.metaList}>
+                <div><dt>Category</dt><dd>{detail.auto_tag_category}</dd></div>
+                {detail.auto_tag_keywords_en?.length > 0 ? (
+                  <div><dt>Keywords</dt><dd>{detail.auto_tag_keywords_en.join(', ')}</dd></div>
+                ) : null}
+              </dl>
+            </section>
+          ) : null}
+
           <section className={styles.section}>
             <h3>Source</h3>
             <a href={detail.url} target="_blank" rel="noreferrer">Open original content</a>

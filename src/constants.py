@@ -110,6 +110,21 @@ MIN_CONTENT_SUMMARY_LENGTH = 50
 MAX_TAGS_PER_CONTENT = 3
 MAX_TAG_LENGTH = 50
 
+# Auto-tag categories (fixed list — stored as string, not FK)
+AUTO_TAG_CATEGORIES: list[str] = [
+    "Tech", "Business", "Essays", "Research",
+    "Lifestyle", "News", "Culture", "Other",
+]
+
+
+class AutoTagStatus(StrEnum):
+    """Processing state for Gemini auto-tagging."""
+
+    PENDING = "pending"
+    TAGGED = "tagged"
+    FAILED = "failed"
+    UNTAGGED = "untagged"
+
 # Trend analyzer limits
 TREND_FEED_MAX_LIMIT = 1000  # Hard limit to prevent memory issues
 TREND_FEED_SAMPLE_SIZE = 50  # Sample size for scoring
