@@ -174,7 +174,9 @@ async def test_category_filter_combined_with_status_filter(
 
 @pytest.mark.asyncio
 async def test_background_summarize_writes_tagged_status(db_session, test_user):
-    """After summarization, auto_tag_status becomes 'tagged' when Gemini succeeds."""
+    """After summarization, auto_tag_status becomes 'tagged' when auto-tagger succeeds."""
+    from contextlib import asynccontextmanager
+
     from tests.conftest import AsyncTestingSessionLocal
 
     from src.api.routers.content import _background_summarize
@@ -190,22 +192,31 @@ async def test_background_summarize_writes_tagged_status(db_session, test_user):
     mock_extractor = MagicMock()
     mock_extractor.fetch_html_and_text = AsyncMock(return_value=("<html/>", "Full article text here"))
 
-    mock_gemini_response = MagicMock()
-    mock_gemini_response.status_code = 200
-    mock_gemini_response.json = MagicMock(return_value={
-        "candidates": [{"content": {"parts": [{"text": json.dumps({
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.text = ""
+    mock_response.json = MagicMock(return_value={
+        "choices": [{"message": {"content": json.dumps({
             "category": "Tech",
             "keywords_en": ["AI", "NLP"],
             "keywords_original": ["인공지능", "자연어처리"],
-        })}]}}]
+        })}}]
     })
+
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    @asynccontextmanager
+    async def mock_ctx():
+        yield mock_client
 
     # Patch AsyncSessionLocal used inside _background_summarize to use the test DB
     with patch("src.api.routers.content.AsyncSessionLocal", AsyncTestingSessionLocal), \
          patch("src.api.routers.content.settings") as mock_settings, \
-         patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
-        mock_settings.GEMINI_API_KEY = "test-gemini-key"
-        mock_post.return_value = mock_gemini_response
+         patch("src.ai.auto_tagger.async_client_context", mock_ctx):
+        mock_settings.SUMMARY_API_KEY = "test-key"
+        mock_settings.SUMMARY_BASE_URL = "https://api.example.com"
+        mock_settings.SUMMARY_MODEL = "test-model"
 
         await _background_summarize(
             content_id=content_id,
@@ -225,10 +236,12 @@ async def test_background_summarize_writes_tagged_status(db_session, test_user):
 
 
 @pytest.mark.asyncio
-async def test_background_summarize_writes_failed_status_when_gemini_fails(
+async def test_background_summarize_writes_failed_status_when_autotag_fails(
     db_session, test_user
 ):
-    """auto_tag_status becomes 'failed' when Gemini returns an error."""
+    """auto_tag_status becomes 'failed' when the auto-tag endpoint returns an error."""
+    from contextlib import asynccontextmanager
+
     from tests.conftest import AsyncTestingSessionLocal
 
     from src.api.routers.content import _background_summarize
@@ -244,15 +257,24 @@ async def test_background_summarize_writes_failed_status_when_gemini_fails(
     mock_extractor = MagicMock()
     mock_extractor.fetch_html_and_text = AsyncMock(return_value=("<html/>", "Article text"))
 
-    mock_gemini_500 = MagicMock()
-    mock_gemini_500.status_code = 500
+    mock_response_500 = MagicMock()
+    mock_response_500.status_code = 500
+    mock_response_500.text = ""
+
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response_500)
+
+    @asynccontextmanager
+    async def mock_ctx():
+        yield mock_client
 
     with patch("src.api.routers.content.AsyncSessionLocal", AsyncTestingSessionLocal), \
          patch("src.api.routers.content.settings") as mock_settings, \
-         patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post, \
+         patch("src.ai.auto_tagger.async_client_context", mock_ctx), \
          patch("asyncio.sleep", new_callable=AsyncMock):
-        mock_settings.GEMINI_API_KEY = "test-gemini-key"
-        mock_post.return_value = mock_gemini_500
+        mock_settings.SUMMARY_API_KEY = "test-key"
+        mock_settings.SUMMARY_BASE_URL = "https://api.example.com"
+        mock_settings.SUMMARY_MODEL = "test-model"
 
         await _background_summarize(
             content_id=content_id,
@@ -270,10 +292,10 @@ async def test_background_summarize_writes_failed_status_when_gemini_fails(
 
 
 @pytest.mark.asyncio
-async def test_background_summarize_skips_tagging_when_no_gemini_key(
+async def test_background_summarize_skips_tagging_when_no_api_key(
     db_session, test_user
 ):
-    """No auto-tag DB write when GEMINI_API_KEY is empty."""
+    """No auto-tag DB write when SUMMARY_API_KEY is empty."""
     from tests.conftest import AsyncTestingSessionLocal
 
     from src.api.routers.content import _background_summarize
@@ -290,9 +312,10 @@ async def test_background_summarize_skips_tagging_when_no_gemini_key(
     mock_extractor.fetch_html_and_text = AsyncMock(return_value=("<html/>", "Article text"))
 
     with patch("src.api.routers.content.AsyncSessionLocal", AsyncTestingSessionLocal), \
-         patch("src.api.routers.content.settings") as mock_settings, \
-         patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
-        mock_settings.GEMINI_API_KEY = ""  # no key
+         patch("src.api.routers.content.settings") as mock_settings:
+        mock_settings.SUMMARY_API_KEY = ""
+        mock_settings.MODAL_PROXY_TOKEN_ID = ""
+        mock_settings.MODAL_PROXY_TOKEN_SECRET = ""
 
         await _background_summarize(
             content_id=content_id,
@@ -301,7 +324,6 @@ async def test_background_summarize_skips_tagging_when_no_gemini_key(
             content_extractor=mock_extractor,
             summarizer=mock_summarizer,
         )
-        assert mock_post.call_count == 0  # Gemini never called
 
     async with AsyncTestingSessionLocal() as verify_session:
         repo = ContentRepository(verify_session)

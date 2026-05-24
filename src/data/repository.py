@@ -5,6 +5,7 @@ TODO #4 (2026-04-14): Fix limit=None handling in get_pending, get_kept, get_disc
 TODO #6 (2026-04-14): Fix timezone handling inconsistencies in get_statistics method
 """
 
+import json
 import unicodedata
 from datetime import date, datetime, timedelta
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
@@ -210,9 +211,7 @@ class ContentRepository(BaseRepository[Content]):
         keywords_en: list[str] | None = None,
         keywords_original: list[str] | None = None,
     ) -> None:
-        """Persist Gemini auto-tag result for a content row the user owns."""
-        import json
-
+        """Persist auto-tag result for a content row the user owns."""
         await self.session.execute(
             update(Content)
             .where(Content.id == content_id, Content.user_id == user_id)

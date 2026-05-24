@@ -95,7 +95,7 @@ async def create_content(
         user_id=user_id,
     )
 
-    if share_handler._summarizer or settings.GEMINI_API_KEY:
+    if share_handler._summarizer or settings.SUMMARY_API_KEY:
         background_tasks.add_task(
             _background_summarize,
             content.id,
@@ -706,6 +706,38 @@ async def search_content(
     )
 
 
+async def _background_autotag(
+    content_id: int,
+    user_id: int,
+    title: str,
+    summary: str | None,
+) -> None:
+    """Tag content via the Modal/vLLM endpoint — called from _background_summarize."""
+    if not title and not summary:
+        async with AsyncSessionLocal() as db:
+            await ContentRepository(db).update_auto_tags(content_id, user_id, "untagged")
+        return
+    try:
+        result = await auto_tagger.tag(title, summary, settings)
+        async with AsyncSessionLocal() as db:
+            repo = ContentRepository(db)
+            if result is not None:
+                await repo.update_auto_tags(
+                    content_id,
+                    user_id,
+                    "tagged",
+                    category=result.category,
+                    keywords_en=result.keywords_en,
+                    keywords_original=result.keywords_original,
+                )
+            else:
+                await repo.update_auto_tags(content_id, user_id, "failed")
+    except Exception as exc:  # noqa: BLE001
+        logging.warning("Auto-tagging failed for content %s: %s", content_id, exc)
+        async with AsyncSessionLocal() as db:
+            await ContentRepository(db).update_auto_tags(content_id, user_id, "failed")
+
+
 async def _background_summarize(
     content_id: int,
     user_id: int,
@@ -770,29 +802,12 @@ async def _background_summarize(
                     except Exception as exc:  # noqa: BLE001
                         logging.warning("Background title generation failed for content %s: %s", content_id, exc)
 
-            # Auto-tagging via Gemini 2.5 Flash — runs even without summary, using title alone.
+            # Auto-tagging — runs even without summary, using title alone.
             # Skip only if already tagged/failed from a previous run.
             already_tagged = getattr(content, "auto_tag_status", None) in ("tagged", "failed", "untagged")
-            if settings.GEMINI_API_KEY and not already_tagged:
-                if not final_title and not summary:
-                    await repo.update_auto_tags(content_id, user_id, "untagged")
-                else:
-                    try:
-                        result = await auto_tagger.tag(final_title or "", summary, settings.GEMINI_API_KEY)
-                        if result is not None:
-                            await repo.update_auto_tags(
-                                content_id,
-                                user_id,
-                                "tagged",
-                                category=result.category,
-                                keywords_en=result.keywords_en,
-                                keywords_original=result.keywords_original,
-                            )
-                        else:
-                            await repo.update_auto_tags(content_id, user_id, "failed")
-                    except Exception as exc:  # noqa: BLE001
-                        logging.warning("Auto-tagging failed for content %s: %s", content_id, exc)
-                        await repo.update_auto_tags(content_id, user_id, "failed")
+            _modal_ok = bool(settings.MODAL_PROXY_TOKEN_ID and settings.MODAL_PROXY_TOKEN_SECRET)
+            if (settings.SUMMARY_API_KEY or _modal_ok) and not already_tagged:
+                await _background_autotag(content_id, user_id, final_title or "", summary)
     except Exception as exc:
         logging.warning("Background summarization failed for content %s: %s", content_id, exc)
 
@@ -859,7 +874,7 @@ async def share_content(
         await idempotency_repo.create(user_id, idempotency_key, content.id)
 
     # Schedule summarization to run after the response is sent
-    if auto_summarize and data.content and (share_handler._summarizer or settings.GEMINI_API_KEY):
+    if auto_summarize and data.content and (share_handler._summarizer or settings.SUMMARY_API_KEY):
         background_tasks.add_task(
             _background_summarize,
             content.id,
