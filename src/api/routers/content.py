@@ -43,6 +43,8 @@ from ..schemas import (
     PlatformCount,
     ShareRequest,
     ShareResponse,
+    CategoryStatsResponse,
+    CategoryKeptStat,
     StatsResponse,
     SwipeHistoryResponse,
     TrendFeedItem,
@@ -611,6 +613,19 @@ async def get_content_stats(
         pending=stats["pending"],
         kept=stats["kept"],
         discarded=stats["discarded"],
+    )
+
+
+@router.get("/stats/categories", response_model=CategoryStatsResponse)
+async def get_category_kept_stats(
+    user_id: int = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> CategoryStatsResponse:
+    """Get kept content count per auto-tag category for the authenticated user."""
+    repo = ContentRepository(db)
+    rows = await repo.get_category_kept_stats(user_id=user_id)
+    return CategoryStatsResponse(
+        categories=[CategoryKeptStat(category=r["category"], total=r["total"], kept=r["kept"]) for r in rows]
     )
 
 

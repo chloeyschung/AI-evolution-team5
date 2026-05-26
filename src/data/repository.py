@@ -685,6 +685,36 @@ class ContentRepository(BaseRepository[Content]):
             "discarded": discarded_count,
         }
 
+    async def get_category_kept_stats(self, user_id: int | None = None) -> list[dict]:
+        """Return total and kept (archived) count per auto_tag_category, sorted by total desc."""
+        from src.constants import ContentStatus
+
+        base_where = [
+            Content.is_deleted == False,  # noqa: E712
+            Content.auto_tag_category.is_not(None),
+        ]
+        if user_id is not None:
+            base_where.append(Content.user_id == user_id)
+
+        total_q = (
+            select(Content.auto_tag_category, func.count().label("total"))
+            .where(*base_where)
+            .group_by(Content.auto_tag_category)
+        )
+        kept_q = (
+            select(Content.auto_tag_category, func.count().label("kept"))
+            .where(*base_where, Content.status == ContentStatus.ARCHIVED)
+            .group_by(Content.auto_tag_category)
+        )
+
+        total_map = {row[0]: row[1] for row in (await self.session.execute(total_q)).all()}
+        kept_map = {row[0]: row[1] for row in (await self.session.execute(kept_q)).all()}
+
+        return [
+            {"category": cat, "total": total, "kept": kept_map.get(cat, 0)}
+            for cat, total in sorted(total_map.items(), key=lambda x: -x[1])
+        ]
+
     async def count_all(
         self,
         user_id: int,
