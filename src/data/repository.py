@@ -703,7 +703,7 @@ class ContentRepository(BaseRepository[Content]):
         )
         kept_q = (
             select(Content.auto_tag_category, func.count().label("kept"))
-            .where(*base_where, Content.status == ContentStatus.ARCHIVED)
+            .where(*base_where, func.upper(Content.status) == "ARCHIVED")
             .group_by(Content.auto_tag_category)
         )
 
