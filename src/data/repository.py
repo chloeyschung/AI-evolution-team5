@@ -686,29 +686,39 @@ class ContentRepository(BaseRepository[Content]):
         }
 
     async def get_category_kept_stats(self, user_id: int | None = None) -> list[dict]:
-        """Return total and kept (archived) count per auto_tag_category, sorted by total desc."""
-        from src.constants import ContentStatus
+        """Return total and kept (archived) count per auto_tag_category.
 
-        base_where = [
-            Content.is_deleted == False,  # noqa: E712
-            Content.auto_tag_category.is_not(None),
-        ]
-        if user_id is not None:
-            base_where.append(Content.user_id == user_id)
+        Uses raw SQL because auto_tag_category is a DB column not yet mapped
+        onto the ORM model (added via migration after initial model definition).
+        """
+        from sqlalchemy import text
 
-        total_q = (
-            select(Content.auto_tag_category, func.count().label("total"))
-            .where(*base_where)
-            .group_by(Content.auto_tag_category)
-        )
-        kept_q = (
-            select(Content.auto_tag_category, func.count().label("kept"))
-            .where(*base_where, func.upper(Content.status) == "ARCHIVED")
-            .group_by(Content.auto_tag_category)
-        )
+        user_clause = "AND user_id = :uid" if user_id is not None else ""
+        params: dict = {"uid": user_id} if user_id is not None else {}
 
-        total_map = {row[0]: row[1] for row in (await self.session.execute(total_q)).all()}
-        kept_map = {row[0]: row[1] for row in (await self.session.execute(kept_q)).all()}
+        total_rows = (await self.session.execute(
+            text(f"""
+                SELECT auto_tag_category, COUNT(*) AS total
+                FROM content
+                WHERE is_deleted = 0 AND auto_tag_category IS NOT NULL {user_clause}
+                GROUP BY auto_tag_category
+            """),
+            params,
+        )).all()
+
+        kept_rows = (await self.session.execute(
+            text(f"""
+                SELECT auto_tag_category, COUNT(*) AS kept
+                FROM content
+                WHERE is_deleted = 0 AND auto_tag_category IS NOT NULL
+                  AND UPPER(status) = 'ARCHIVED' {user_clause}
+                GROUP BY auto_tag_category
+            """),
+            params,
+        )).all()
+
+        total_map = {row[0]: row[1] for row in total_rows}
+        kept_map = {row[0]: row[1] for row in kept_rows}
 
         return [
             {"category": cat, "total": total, "kept": kept_map.get(cat, 0)}
