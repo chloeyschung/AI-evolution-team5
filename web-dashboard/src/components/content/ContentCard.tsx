@@ -11,6 +11,7 @@ interface ContentCardProps {
 
 export default function ContentCard({ content, onDelete, onSwipe }: ContentCardProps) {
   const [copyFeedback, setCopyFeedback] = useState('');
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
   const copyFeedbackTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -53,25 +54,49 @@ export default function ContentCard({ content, onDelete, onSwipe }: ContentCardP
     }
   };
 
-  const summaryText =
+  const rawSummary =
     content.summary || 'No summary yet. Open it once and Briefly will produce your bite-sized takeaway.';
-  const summaryLines = summaryText
+  const hasBulletSummary =
+    rawSummary.includes('\n') || rawSummary.trim().startsWith('•') || rawSummary.includes('\n•');
+
+  const allBullets = rawSummary
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => line.replace(/^[•*-]\s*/, ''));
-  const hasBulletSummary = summaryText.includes('\n') || summaryText.trim().startsWith('•') || summaryText.includes('\n•');
+
+  const fullText = hasBulletSummary ? allBullets.join(' ') : rawSummary;
+  const needsExpansion = fullText.length > 150;
+
+  // 접힌 상태: 누적 150자 이내 bullet만 표시
+  const collapsedBullets = (() => {
+    let acc = 0;
+    const result: string[] = [];
+    for (const b of allBullets) {
+      if (acc + b.length > 150 && result.length > 0) break;
+      result.push(b);
+      acc += b.length;
+    }
+    return result;
+  })();
+
+  const visibleBullets = summaryExpanded ? allBullets : collapsedBullets;
+  const summaryText = hasBulletSummary
+    ? rawSummary
+    : summaryExpanded || rawSummary.length <= 150
+      ? rawSummary
+      : rawSummary.slice(0, 150);
 
   return (
     <article className={styles.card} data-testid={`content-card-${content.id}`}>
       <div className={styles.metaRow}>
+        {content.auto_tag_category ? (
+          <span className={styles.categoryBadge}>{content.auto_tag_category}</span>
+        ) : null}
         <button type="button" className={styles.platformPill} onClick={openSource} aria-label="Open source">
           <PlatformIcon platform={content.platform} url={content.url} size={13} />
           <span className={styles.platformName}>{content.platform}</span>
         </button>
-        <span className={`${styles.statusPill} ${content.status === 'inbox' ? styles.inbox : styles.archive}`}>
-          {content.status === 'inbox' ? 'inbox' : 'archived'}
-        </span>
       </div>
 
       <div className={styles.body}>
@@ -97,7 +122,7 @@ export default function ContentCard({ content, onDelete, onSwipe }: ContentCardP
         {content.author ? <p className={styles.author}>by {content.author}</p> : null}
         {hasBulletSummary ? (
           <ul className={styles.summaryList}>
-            {summaryLines.map((line, index) => (
+            {visibleBullets.map((line, index) => (
               <li key={`${content.id}-summary-${index}`} className={styles.summaryItem}>
                 {line}
               </li>
@@ -106,12 +131,20 @@ export default function ContentCard({ content, onDelete, onSwipe }: ContentCardP
         ) : (
           <p className={styles.summary}>{summaryText}</p>
         )}
+        {needsExpansion && (
+          <button
+            type="button"
+            className={styles.expandBtn}
+            onClick={() => setSummaryExpanded((v) => !v)}
+          >
+            {summaryExpanded ? '접기' : '더 보기'}
+          </button>
+        )}
       </div>
 
-      {content.auto_tag_category ? (
+      {content.auto_tag_keywords_en?.length ? (
         <div className={styles.tagRow}>
-          <span className={styles.categoryBadge}>{content.auto_tag_category}</span>
-          {content.auto_tag_keywords_en?.slice(0, 3).map((kw) => (
+          {content.auto_tag_keywords_en.map((kw) => (
             <span key={kw} className={styles.keyword}>{kw}</span>
           ))}
         </div>
