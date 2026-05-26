@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getContentDetail } from '../../api/endpoints';
+import { getContentDetail, getReflectionQuestions } from '../../api/endpoints';
 import type { Content } from '../../types';
 import SlideDrawer from '../ui/SlideDrawer';
 import styles from './ContentDrawer.module.css';
@@ -12,25 +12,29 @@ interface ContentDrawerProps {
 export default function ContentDrawer({ contentId, onClose }: ContentDrawerProps) {
   const [detail, setDetail] = useState<Content | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [questions, setQuestions] = useState<string[]>([]);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
   const isOpen = contentId !== null;
 
   useEffect(() => {
     if (contentId === null) {
       setDetail(null);
+      setQuestions([]);
       return;
     }
 
-    const run = async () => {
-      setIsLoading(true);
-      try {
-        const response = await getContentDetail(contentId);
-        setDetail(response);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    setIsLoading(true);
+    setQuestionsLoading(true);
+    setQuestions([]);
 
-    void run();
+    void getContentDetail(contentId)
+      .then((data) => setDetail(data))
+      .finally(() => setIsLoading(false));
+
+    void getReflectionQuestions(contentId)
+      .then((qs) => setQuestions(qs))
+      .catch(() => setQuestions([]))
+      .finally(() => setQuestionsLoading(false));
   }, [contentId]);
 
   return (
@@ -76,6 +80,22 @@ export default function ContentDrawer({ contentId, onClose }: ContentDrawerProps
                   <div><dt>Keywords</dt><dd>{detail.auto_tag_keywords_en.join(', ')}</dd></div>
                 ) : null}
               </dl>
+            </section>
+          ) : null}
+
+          {questionsLoading ? (
+            <section className={styles.section}>
+              <h3>Reflection questions</h3>
+              <p className={styles.loadingText}>Generating questions…</p>
+            </section>
+          ) : questions.length > 0 ? (
+            <section className={styles.section}>
+              <h3>Reflection questions</h3>
+              <ul className={styles.questionList}>
+                {questions.map((q, i) => (
+                  <li key={i} className={styles.questionPill}>{q}</li>
+                ))}
+              </ul>
             </section>
           ) : null}
 
