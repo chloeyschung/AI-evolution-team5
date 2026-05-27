@@ -17,7 +17,6 @@ from src.constants import AUTO_TAG_CATEGORIES, ContentType
 from src.data.models import Content, ContentStatus
 from src.utils.datetime_utils import utc_now
 
-
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 
@@ -177,10 +176,9 @@ async def test_background_summarize_writes_tagged_status(db_session, test_user):
     """After summarization, auto_tag_status becomes 'tagged' when auto-tagger succeeds."""
     from contextlib import asynccontextmanager
 
-    from tests.conftest import AsyncTestingSessionLocal
-
     from src.api.routers.content import _background_summarize
     from src.data.repository import ContentRepository
+    from tests.conftest import AsyncTestingSessionLocal
 
     content = await _make_content(db_session, test_user, url="https://e.com/bg-test")
     content_id = content.id
@@ -242,10 +240,9 @@ async def test_background_summarize_writes_failed_status_when_autotag_fails(
     """auto_tag_status becomes 'failed' when the auto-tag endpoint returns an error."""
     from contextlib import asynccontextmanager
 
-    from tests.conftest import AsyncTestingSessionLocal
-
     from src.api.routers.content import _background_summarize
     from src.data.repository import ContentRepository
+    from tests.conftest import AsyncTestingSessionLocal
 
     content = await _make_content(db_session, test_user, url="https://f.com/fail-test")
     content_id = content.id
@@ -296,10 +293,9 @@ async def test_background_summarize_skips_tagging_when_no_api_key(
     db_session, test_user
 ):
     """No auto-tag DB write when SUMMARY_API_KEY is empty."""
-    from tests.conftest import AsyncTestingSessionLocal
-
     from src.api.routers.content import _background_summarize
     from src.data.repository import ContentRepository
+    from tests.conftest import AsyncTestingSessionLocal
 
     content = await _make_content(db_session, test_user, url="https://g.com/no-key")
     content_id = content.id

@@ -6,7 +6,10 @@ import os
 import shutil
 import stat
 import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -50,6 +53,7 @@ def test_run_stack_setup_creates_complete_local_env_without_installing(tmp_path:
     assert "VITE_API_BASE_URL=http://localhost:8000" in extension_env
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits not meaningful on Windows")
 def test_start_dev_entrypoint_delegates_to_run_stack() -> None:
     entrypoint = REPO_ROOT / "start-dev.sh"
 

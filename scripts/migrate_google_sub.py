@@ -11,11 +11,10 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from src.constants import AuthProvider
-from src.data.models import Base, UserProfile, UserAuthMethod
-from src.utils.datetime_utils import utc_now
+from src.data.models import Base, UserAuthMethod, UserProfile
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./briefly.db")
 

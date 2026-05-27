@@ -9,7 +9,6 @@ import pytest
 from src.ai.auto_tagger import AutoTagResult, _parse_response, tag
 from src.constants import AUTO_TAG_CATEGORIES
 
-
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 
