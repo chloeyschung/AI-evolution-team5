@@ -29,11 +29,9 @@ async def upload_screenshot(
     idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
 ) -> ContentResponse:
     """Accept a base64-encoded screenshot, run OCR via Modal, store in R2, return ContentResponse."""
-    # Require idempotency key
     if not idempotency_key:
         raise HTTPException(status_code=400, detail={"error": "missing_idempotency_key", "message": "Idempotency-Key header is required."})
 
-    # 1. Check idempotency first — zero Modal/R2 spend on retry
     idempotency_repo = IdempotencyRepository(db)
     existing = await idempotency_repo.get(user_id, idempotency_key)
     if existing and existing.content_id:
@@ -50,18 +48,14 @@ async def upload_screenshot(
             ) if si else None
             return ContentResponse.from_content(content, screenshot_urls=urls)
 
-    # 2. Decode image
     try:
         image_bytes = base64.b64decode(body.image_base64)
-    except Exception:
-        raise HTTPException(status_code=400, detail={"error": "invalid_image", "message": "image_base64 is not valid base64."})
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail={"error": "invalid_image", "message": "image_base64 is not valid base64."}) from exc
 
     if len(image_bytes) > MAX_IMAGE_BYTES:
         raise HTTPException(status_code=413, detail={"error": "image_too_large", "message": "Image exceeds 10 MB limit."})
 
-    media_type = f"image/{body.original_format}"
-
-    # 3. Build processor with app-injected summarizer and R2 client
     share_handler = getattr(request.app.state, "share_handler", None)
     summarizer = getattr(share_handler, "_summarizer", None) if share_handler else None
 
@@ -75,16 +69,14 @@ async def upload_screenshot(
     processor = ImageProcessor(summarizer=summarizer, r2_client=r2_client)
 
     try:
-        metadata = await processor.process_bytes(image_bytes, media_type, idempotency_key, user_id)
+        metadata = await processor.process_bytes(image_bytes, f"image/{body.original_format}", idempotency_key, user_id)
     except Exception as exc:
         logger.exception("Screenshot processing failed: %s", exc)
-        raise HTTPException(status_code=500, detail={"error": "processing_failed", "message": "Screenshot processing failed."})
+        raise HTTPException(status_code=500, detail={"error": "processing_failed", "message": "Screenshot processing failed."}) from exc
 
-    # 4. Single transaction: ScreenshotImage + Content + idempotency record
     screenshot_repo = ScreenshotImageRepository(db)
     content_repo = ContentRepository(db)
 
-    # Insert ScreenshotImage stub first (content_id populated after Content row)
     screenshot_row = await screenshot_repo.create(
         content_id=None,  # will be updated after content is saved
         thumbnail_url=metadata.thumbnail_url,

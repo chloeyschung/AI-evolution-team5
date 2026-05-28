@@ -2,12 +2,15 @@
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...data.database import get_db
+from ...data.models import Content
 from ...data.repository import SourceInsightsRepository, TrustedSourceRepository
 from ...middleware.rate_limiter import limiter
+from ...utils.datetime_utils import serialize_datetime, utc_now
 from ..dependencies import get_current_user
 from ..schemas import (
     SourceConfirmRequest,
@@ -75,9 +78,6 @@ async def confirm_source(
     user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> SourceInsight:
-    """Upsert a manually confirmed trusted source."""
-    from ...utils.datetime_utils import utc_now
-
     trusted_repo = TrustedSourceRepository(db)
     trigger_id = body.trigger_content_id
 
@@ -125,8 +125,6 @@ async def get_source_narrative(
         await db.flush()
 
     if trusted_repo.is_narrative_fresh(row):
-        from ...utils.datetime_utils import serialize_datetime
-
         return SourceNarrativeResponse(
             text=row.narrative_cached or "",
             generated_at=serialize_datetime(row.narrative_generated_at) if row.narrative_generated_at else None,
@@ -139,10 +137,6 @@ async def get_source_narrative(
 
     manual_context: str | None = None
     if row.manually_added and row.trigger_content_id is not None:
-        from sqlalchemy import select
-
-        from ...data.models import Content
-
         content_result = await db.execute(select(Content.title, Content.created_at).where(Content.id == row.trigger_content_id))
         trigger = content_result.fetchone()
         if trigger and trigger[0]:
@@ -169,8 +163,6 @@ async def get_source_narrative(
     await trusted_repo.update_narrative(user_id, domain, text)
     await db.commit()
     await db.refresh(row)
-
-    from ...utils.datetime_utils import serialize_datetime
 
     return SourceNarrativeResponse(
         text=text,

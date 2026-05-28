@@ -6,7 +6,7 @@ TODO #6 (2026-04-14): Fix timezone handling inconsistencies in get_statistics me
 """
 
 import unicodedata
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from sqlalchemy import case, delete, func, or_, select, update
@@ -2136,20 +2136,16 @@ class TrustedSourceRepository:
         user_timezone: str | None,
     ) -> int | None:
         """Auto-detect trigger article: same domain, same calendar day in user_timezone, before added_at."""
-        from datetime import timezone
-
         try:
             import zoneinfo
 
-            tz = zoneinfo.ZoneInfo(user_timezone) if user_timezone else timezone.utc
+            tz = zoneinfo.ZoneInfo(user_timezone) if user_timezone else UTC
         except Exception:
-            from datetime import timezone as tz_module
-
-            tz = tz_module.utc
+            tz = UTC
 
         added_at_naive = added_at.replace(tzinfo=None) if hasattr(added_at, "tzinfo") and added_at.tzinfo else added_at
         result = await self.session.execute(
-            select(Content.id, Content.created_at)
+            select(Content.id, Content.created_at, Content.url)
             .where(
                 Content.user_id == user_id,
                 Content.is_deleted.is_(False),
@@ -2168,7 +2164,7 @@ class TrustedSourceRepository:
             added_at_naive.timestamp() if hasattr(added_at_naive, "timestamp") else 0, tz=tz
         ).date()
 
-        for content_id, created_at in rows:
+        for content_id, created_at, url in rows:
             if created_at is None:
                 continue
             try:
@@ -2176,14 +2172,7 @@ class TrustedSourceRepository:
                 ca_local = datetime.datetime.fromtimestamp(ca_naive.timestamp(), tz=tz)
                 if ca_local.date() != add_date:
                     continue
-                row_domain = None
-                content_result = await self.session.execute(
-                    select(Content.url).where(Content.id == content_id)
-                )
-                url_row = content_result.scalar_one_or_none()
-                if url_row:
-                    row_domain = _normalize_domain(url_row)
-                if row_domain == domain:
+                if _normalize_domain(url) == domain:
                     return content_id
             except Exception:
                 continue
