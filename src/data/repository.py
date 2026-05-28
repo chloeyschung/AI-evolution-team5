@@ -28,9 +28,11 @@ from .models import (
     DeviceToken,
     IdempotencyRecord,
     InterestTag,
+    ScreenshotImage,
     SwipeAction,
     SwipeHistory,
     Theme,
+    TrustedSource,
     UserPreferences,
     UserProfile,
     utc_now,
@@ -149,6 +151,37 @@ class ContentRepository(BaseRepository[Content]):
             self.session.add(content)
             await self.session.commit()
             return content
+
+    async def save_screenshot(
+        self,
+        user_id: int,
+        metadata: "ContentMetadata",
+        screenshot_image_id: int,
+        status: ContentStatus = ContentStatus.INBOX,
+    ) -> Content:
+        """Persist a screenshot content row with linked_url and screenshot_image_id."""
+        content = Content(
+            platform=metadata.platform,
+            content_type=metadata.content_type.value,
+            url=metadata.url,
+            title=metadata.title,
+            author=metadata.author,
+            timestamp=metadata.timestamp,
+            thumbnail_url=metadata.thumbnail_url,
+            status=status,
+            summary=metadata.summary,
+            is_ai_summarized=metadata.summary is not None,
+            is_ai_titled=False,
+            duplicate_group_key=None,
+            duplicate_index=None,
+            user_id=user_id,
+            linked_url=getattr(metadata, "linked_url", None),
+            screenshot_image_id=screenshot_image_id,
+        )
+        self.session.add(content)
+        await self.session.flush()
+        await self.session.refresh(content)
+        return content
 
     async def get_by_url(self, url: str, user_id: int) -> Content | None:
         """Get content by URL, scoped to the given user.
@@ -1878,3 +1911,280 @@ class DeviceTokenRepository:
         await self.session.flush()
         await self.session.refresh(token)
         return token
+
+
+def _normalize_domain(url: str) -> str | None:
+    """Extract and normalize domain from URL: strip www., lowercase."""
+    from urllib.parse import urlparse
+
+    try:
+        host = urlparse(url.strip()).hostname or ""
+        host = host.lower()
+        return host[4:] if host.startswith("www.") else host or None
+    except Exception:
+        return None
+
+
+class ScreenshotImageRepository:
+    """Repository for ScreenshotImage CRUD operations."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def create(
+        self,
+        content_id: int,
+        thumbnail_url: str | None,
+        preview_url: str | None,
+        original_key: str | None,
+        ocr_text: str | None,
+        original_format: str | None,
+        original_width: int | None,
+        original_height: int | None,
+    ) -> ScreenshotImage:
+        record = ScreenshotImage(
+            content_id=content_id,
+            thumbnail_url=thumbnail_url,
+            preview_url=preview_url,
+            original_key=original_key,
+            ocr_text=ocr_text,
+            original_format=original_format,
+            original_width=original_width,
+            original_height=original_height,
+        )
+        self.session.add(record)
+        await self.session.flush()
+        await self.session.refresh(record)
+        return record
+
+    async def get_map_for_content_ids(
+        self, user_id: int, content_ids: list[int]
+    ) -> dict[int, ScreenshotImage]:
+        if not content_ids:
+            return {}
+        result = await self.session.execute(
+            select(ScreenshotImage)
+            .join(Content, ScreenshotImage.content_id == Content.id)
+            .where(
+                ScreenshotImage.content_id.in_(content_ids),
+                Content.user_id == user_id,
+            )
+        )
+        rows = result.scalars().all()
+        return {row.content_id: row for row in rows if row.content_id is not None}
+
+
+class SourceInsightsRepository:
+    """Computes behavioral trust stats from swipe_history."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def get_source_stats(
+        self,
+        user_id: int,
+        min_saves: int = 5,
+        min_keep_rate: float = 0.70,
+    ) -> list[dict]:
+        """Return per-domain keep-rate stats for the user.
+
+        INNER JOIN content to swipe_history (swiped articles only).
+        Excludes screenshot rows (content_type='image' or url='').
+        Domain normalization and threshold filtering happen in Python after fetch.
+        """
+        result = await self.session.execute(
+            select(
+                Content.url,
+                Content.title,
+                SwipeHistory.action,
+                Content.created_at,
+            )
+            .join(SwipeHistory, Content.id == SwipeHistory.content_id)
+            .where(
+                Content.user_id == user_id,
+                Content.is_deleted.is_(False),
+                Content.content_type != "image",
+                Content.url != "",
+                SwipeHistory.user_id == user_id,
+            )
+        )
+        rows = result.fetchall()
+
+        domain_data: dict[str, dict] = {}
+        for url, title, action, created_at in rows:
+            domain = _normalize_domain(url)
+            if not domain:
+                continue
+            if domain not in domain_data:
+                domain_data[domain] = {
+                    "save_count": 0,
+                    "keep_count": 0,
+                    "most_recent_title": None,
+                    "most_recent_at": None,
+                }
+            d = domain_data[domain]
+            d["save_count"] += 1
+            if action == SwipeAction.KEEP:
+                d["keep_count"] += 1
+                if d["most_recent_at"] is None or (created_at and created_at > d["most_recent_at"]):
+                    d["most_recent_title"] = title
+                    d["most_recent_at"] = created_at
+
+        stats = []
+        for domain, d in domain_data.items():
+            saves = d["save_count"]
+            keeps = d["keep_count"]
+            if saves < min_saves:
+                continue
+            rate = keeps / saves
+            if rate < min_keep_rate:
+                continue
+            stats.append(
+                {
+                    "domain": domain,
+                    "save_count": saves,
+                    "keep_count": keeps,
+                    "keep_rate": rate,
+                    "most_recent_title": d["most_recent_title"],
+                }
+            )
+        return stats
+
+
+class TrustedSourceRepository:
+    """Repository for TrustedSource CRUD operations."""
+
+    NARRATIVE_TTL_DAYS = 7
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def get_all(self, user_id: int) -> list[TrustedSource]:
+        result = await self.session.execute(
+            select(TrustedSource).where(TrustedSource.user_id == user_id)
+        )
+        return list(result.scalars().all())
+
+    async def get_by_domain(self, user_id: int, domain: str) -> TrustedSource | None:
+        result = await self.session.execute(
+            select(TrustedSource).where(
+                TrustedSource.user_id == user_id, TrustedSource.domain == domain
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def upsert(
+        self,
+        user_id: int,
+        domain: str,
+        manually_added: bool = False,
+        trigger_content_id: int | None = None,
+        display_name: str | None = None,
+    ) -> TrustedSource:
+        row = await self.get_by_domain(user_id, domain)
+        now = utc_now()
+        if row is None:
+            row = TrustedSource(
+                user_id=user_id,
+                domain=domain,
+                manually_added=manually_added,
+                trigger_content_id=trigger_content_id,
+                display_name=display_name,
+                added_at=now,
+            )
+            self.session.add(row)
+        else:
+            if manually_added:
+                row.manually_added = True
+            if trigger_content_id is not None:
+                row.trigger_content_id = trigger_content_id
+            if display_name is not None:
+                row.display_name = display_name
+        await self.session.flush()
+        await self.session.refresh(row)
+        return row
+
+    async def update_narrative(self, user_id: int, domain: str, text: str) -> None:
+        from src.utils.datetime_utils import utc_now as _utc_now
+
+        await self.session.execute(
+            update(TrustedSource)
+            .where(TrustedSource.user_id == user_id, TrustedSource.domain == domain)
+            .values(narrative_cached=text, narrative_generated_at=_utc_now())
+        )
+        await self.session.flush()
+
+    def is_narrative_fresh(self, row: TrustedSource) -> bool:
+        """Return True if cached narrative is within the 7-day TTL."""
+        if row.narrative_cached is None or row.narrative_generated_at is None:
+            return False
+        from datetime import timedelta
+
+        from src.utils.datetime_utils import utc_now as _utc_now
+
+        now = _utc_now().replace(tzinfo=None)
+        generated = row.narrative_generated_at
+        if generated.tzinfo is not None:
+            generated = generated.replace(tzinfo=None)
+        return (now - generated) < timedelta(days=self.NARRATIVE_TTL_DAYS)
+
+    async def find_trigger_content(
+        self,
+        user_id: int,
+        domain: str,
+        added_at,
+        user_timezone: str | None,
+    ) -> int | None:
+        """Auto-detect trigger article: same domain, same calendar day in user_timezone, before added_at."""
+        from datetime import timezone
+
+        try:
+            import zoneinfo
+
+            tz = zoneinfo.ZoneInfo(user_timezone) if user_timezone else timezone.utc
+        except Exception:
+            from datetime import timezone as tz_module
+
+            tz = tz_module.utc
+
+        added_at_naive = added_at.replace(tzinfo=None) if hasattr(added_at, "tzinfo") and added_at.tzinfo else added_at
+        result = await self.session.execute(
+            select(Content.id, Content.created_at)
+            .where(
+                Content.user_id == user_id,
+                Content.is_deleted.is_(False),
+                Content.content_type != "image",
+                Content.url != "",
+                Content.created_at < added_at_naive,
+            )
+            .order_by(Content.created_at.desc())
+            .limit(200)
+        )
+        rows = result.fetchall()
+
+        import datetime
+
+        add_date = datetime.datetime.fromtimestamp(
+            added_at_naive.timestamp() if hasattr(added_at_naive, "timestamp") else 0, tz=tz
+        ).date()
+
+        for content_id, created_at in rows:
+            if created_at is None:
+                continue
+            try:
+                ca_naive = created_at.replace(tzinfo=None) if getattr(created_at, "tzinfo", None) else created_at
+                ca_local = datetime.datetime.fromtimestamp(ca_naive.timestamp(), tz=tz)
+                if ca_local.date() != add_date:
+                    continue
+                row_domain = None
+                content_result = await self.session.execute(
+                    select(Content.url).where(Content.id == content_id)
+                )
+                url_row = content_result.scalar_one_or_none()
+                if url_row:
+                    row_domain = _normalize_domain(url_row)
+                if row_domain == domain:
+                    return content_id
+            except Exception:
+                continue
+        return None

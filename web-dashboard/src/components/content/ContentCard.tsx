@@ -27,11 +27,14 @@ export default function ContentCard({ content, onDelete, onSwipe }: ContentCardP
     year: 'numeric',
   }).format(new Date(content.created_at));
 
+  const isScreenshot = content.content_type === 'image' && !!content.screenshot_image_id;
+  const sourceUrl = content.linked_url || (content.url || null);
+
   const handleDelete = () => {
     onDelete(content.id);
   };
   const openSource = () => {
-    window.open(content.url, '_blank', 'noopener,noreferrer');
+    if (sourceUrl) window.open(sourceUrl, '_blank', 'noopener,noreferrer');
   };
 
   const copySource = async () => {
@@ -39,7 +42,7 @@ export default function ContentCard({ content, onDelete, onSwipe }: ContentCardP
       if (!navigator.clipboard?.writeText) {
         throw new Error('Clipboard API unavailable');
       }
-      await navigator.clipboard.writeText(content.url);
+      await navigator.clipboard.writeText(sourceUrl ?? '');
       setCopyFeedback('Link copied!');
     } catch {
       setCopyFeedback('Copy failed');
@@ -110,15 +113,25 @@ export default function ContentCard({ content, onDelete, onSwipe }: ContentCardP
 
       <div className={styles.footerRow}>
         <span className={styles.date}>{createdAt}</span>
-        <button
-          type="button"
-          className={`${styles.openLink} ${copyFeedback === 'Link copied!' ? styles.openLinkSuccess : ''}`}
-          onClick={() => void copySource()}
-          aria-live="polite"
-          aria-atomic="true"
-        >
-          {copyFeedback || 'Copy link'}
-        </button>
+        {isScreenshot && content.linked_url ? (
+          <button
+            type="button"
+            className={styles.openLink}
+            onClick={() => window.open(content.linked_url!, '_blank', 'noopener,noreferrer')}
+          >
+            Source Link ↗
+          </button>
+        ) : sourceUrl ? (
+          <button
+            type="button"
+            className={`${styles.openLink} ${copyFeedback === 'Link copied!' ? styles.openLinkSuccess : ''}`}
+            onClick={() => void copySource()}
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {copyFeedback || 'Copy link'}
+          </button>
+        ) : null}
       </div>
 
       <div className={styles.actions}>

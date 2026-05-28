@@ -1,0 +1,124 @@
+{
+  "version": "1.0",
+  "title": "Source Insights + Screenshot Saves",
+  "branch": "feat/source-insights-screenshot-saves",
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Schema + R2 storage foundation",
+      "passes": false,
+      "acceptanceCriteria": [
+        "ScreenshotImage ORM model in src/data/models.py with id, content_id FK, thumbnail_url TEXT, preview_url TEXT, original_key, ocr_text, original_format VARCHAR(8), original_width, original_height, created_at — NO bytea columns",
+        "TrustedSource ORM model in src/data/models.py with all required fields including UniqueConstraint(user_id, domain)",
+        "Content model gains screenshot_image_id FK and linked_url Text columns",
+        "boto3 and pillow added to pyproject.toml dependencies",
+        "src/storage/r2_client.py created with upload() and generate_presigned_url(expires_in=86400) methods",
+        "src/config.py has R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_PUBLIC_URL as optional string settings (empty-string defaults, no startup crash without them)",
+        "src/data/database.py has _ensure_content_screenshot_columns() Postgres-gated helper (opposite of existing SQLite-only helpers) called from init_db()",
+        "pytest tests/ passes with no new failures after schema addition"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "LLMClient generalization — image_bytes param + new methods",
+      "passes": false,
+      "acceptanceCriteria": [
+        "Summarizer._build_request now accepts image_bytes: bytes | None = None, image_media_type: str = 'image/jpeg'",
+        "When image_bytes=None, all existing request paths are unchanged (text-only, backwards-compatible)",
+        "When image_bytes is provided, openai path content becomes multimodal array: [{type:image_url,...},{type:text,text:prompt}]",
+        "Summarizer.ocr_screenshot(image_bytes, media_type) -> tuple[str, str | None] method added",
+        "Summarizer.generate_source_narrative(source_name, kept_titles, topics, manual_context) -> str method added with max_tokens=350",
+        "ContentMetadata.__init__ accepts ocr_text, linked_url, preview_url as optional kwargs and stores them as instance attributes",
+        "ImageProcessor.process(image_bytes, media_type, idempotency_key) fleshed out: OCR via Summarizer, Pillow resize (600px/85% thumb, 1400px/92% preview), R2 upload, returns ContentMetadata with all fields populated",
+        "Existing summarizer tests still pass"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Screenshot ingest API — POST /api/v1/screenshot",
+      "passes": false,
+      "acceptanceCriteria": [
+        "ScreenshotShareRequest Pydantic schema in src/api/schemas.py with image_base64, original_format, width, height fields",
+        "ScreenshotURLs dataclass in src/api/schemas.py with thumbnail_url, preview_url, linked_url fields",
+        "ContentResponse gains linked_url, preview_url, screenshot_image_id optional fields",
+        "ContentResponse.from_content accepts optional screenshot_urls: ScreenshotURLs | None second argument",
+        "ScreenshotImageRepository.create() and get_map_for_content_ids() (with empty-list guard) in src/data/repository.py",
+        "ContentRepository.save_screenshot() variant that writes linked_url and screenshot_image_id to Content row",
+        "src/api/routers/screenshot.py created with POST /api/v1/screenshot — idempotency check first, 10/minute rate limit, single transaction, 201 response",
+        "screenshot router registered in src/api/app.py",
+        "Test: POST with base64 JPEG returns 201 + ContentResponse with thumbnail_url/preview_url/linked_url",
+        "Test: replaying same Idempotency-Key returns same content_id",
+        "Test: cross-user access returns 404"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Source Insights backend — GET/POST /api/v1/sources",
+      "passes": false,
+      "acceptanceCriteria": [
+        "SourceInsightsRepository.get_source_stats(user_id, min_saves=5, min_keep_rate=0.70) in src/data/repository.py — INNER JOIN on swipe_history, excludes content_type='image' and url=''",
+        "TrustedSourceRepository with get_all(), upsert(), get_narrative() in src/data/repository.py",
+        "SourceInsight, SourcesListResponse, SourceNarrativeResponse, SourceConfirmRequest schemas in src/api/schemas.py",
+        "GET /api/v1/sources returns domains meeting threshold union manually-added rows",
+        "POST /api/v1/sources/{domain}/confirm upserts TrustedSource, auto-detects trigger_content_id from same-day reads using user_timezone",
+        "GET /api/v1/sources/{domain}/narrative returns cached text or generates via Summarizer, caches with 7-day freshness TTL, rate-limited 20/minute",
+        "sources router registered in src/api/app.py",
+        "Test: keep-rate threshold boundary (exactly 5 saves at 70% appears; 4 saves does not)",
+        "Test: narrative cache hit (second call returns same text without LLM call)",
+        "Test: manual source confirm with null trigger_content_id works"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Chrome Extension — Capture this tab button + PrtSc toggle",
+      "passes": false,
+      "acceptanceCriteria": [
+        "browser-extension/src/shared/api.ts gains shareScreenshot(imageBase64, format, width, height, idempotencyKey) method mirroring shareContent auth pattern",
+        "browser-extension/src/popup/popup.html has 'Capture this tab' button (visible when logged in)",
+        "browser-extension/src/popup/popup.ts handles capture button: calls service worker, shows saving/saved state",
+        "browser-extension/src/background/service-worker.ts handles captureTab message: calls captureVisibleTab, parses data URL prefix for media type, calls shareScreenshot",
+        "PrtSc toggle in popup (default OFF), stored via storageManager, service-worker keydown listener only active when ON",
+        "Content script in browser-extension/src/content/ listens for PrintScreen keydown when toggle ON and messages service worker",
+        "TypeScript compilation succeeds (no tsc errors in extension)"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Web dashboard — screenshot item rendering",
+      "passes": false,
+      "acceptanceCriteria": [
+        "Content type in web-dashboard/src/types/index.ts gains screenshot_image_id, linked_url, thumbnail_url, preview_url optional fields",
+        "Library/Inbox/Archive item components render <img src={item.thumbnail_url}> when screenshot_image_id present (no auth header — HMAC URL is auth)",
+        "Source Link shown in item detail when linked_url present — opens in new tab via window.open(url, '_blank')",
+        "Screenshot items indistinguishable in layout from URL items (same card structure)",
+        "TypeScript compilation succeeds (cd web-dashboard && npx tsc --noEmit)"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Web dashboard — Source Insights section in Analytics",
+      "passes": false,
+      "acceptanceCriteria": [
+        "Sources API functions (fetchSources, confirmSource, fetchNarrative) added to web-dashboard/src/api/endpoints.ts or a new sources module",
+        "SourceInsight type added to web-dashboard/src/types/index.ts",
+        "Analytics.tsx shows Sources sub-section below existing stats — fetches GET /api/v1/sources on mount",
+        "Source card has favicon (opens site in new tab via window.open), keep-rate %, save count, and a separate Detail button",
+        "Detail expander/modal shows narrative text and source stats",
+        "Manual add: '+' button triggers domain input form, calls POST /api/v1/sources/{domain}/confirm with user_timezone",
+        "TypeScript compilation succeeds"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Tests — backend unit/integration + playwright E2E",
+      "passes": false,
+      "acceptanceCriteria": [
+        "tests/test_screenshot_api.py created: POST /api/v1/screenshot with mock R2 returns 201, idempotency replay returns same content_id, cross-user 404",
+        "tests/test_source_insights.py created: keep-rate threshold boundary tests, narrative cache hit test, manual confirm with no trigger works",
+        "pytest tests/ passes (all new + existing tests)",
+        "ruff check . passes with no errors",
+        "Playwright test in web-dashboard/tests/e2e/ verifies Analytics page shows Sources section"
+      ]
+    }
+  ]
+}

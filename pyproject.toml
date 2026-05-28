@@ -21,6 +21,8 @@ dependencies = [
     "argon2-cffi>=25.1.0",
     "authlib>=1.6.11",
     "slowapi>=0.1.9",
+    "boto3>=1.35",
+    "pillow>=11.0",
 ]
 
 [tool.pytest.ini_options]

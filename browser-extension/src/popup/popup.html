@@ -59,6 +59,7 @@
       </header>
 
       <button id="save-current-page" class="btn primary block">Save current page</button>
+      <button id="capture-tab-btn" class="btn secondary block">📷 Capture this tab</button>
 
       <form id="save-url-form" class="save-url-form" aria-label="URL로 저장">
         <input
@@ -88,6 +89,9 @@
           <label class="setting-item" for="api-url">API base URL</label>
           <input type="url" id="api-url" name="apiBaseUrl" inputmode="url" autocomplete="url">
         </div>
+        <label class="setting-item" title="PrtSc capture may not work on Windows/Linux (OS intercepts key). macOS has no PrtSc key.">
+          <input type="checkbox" id="prtsc-toggle"> Enable PrtSc screenshot capture
+        </label>
       </div>
 
       <button id="logout-btn" class="btn ghost block">Logout</button>

@@ -107,9 +107,11 @@ export interface Notification {
 export interface ExtensionSettings {
   apiBaseUrl: string;
   autoSummarize: boolean;
+  prtscCapture: boolean;
 }
 
 export const DEFAULT_SETTINGS: ExtensionSettings = {
   apiBaseUrl: '',
   autoSummarize: true,
+  prtscCapture: false,
 };

@@ -26,6 +26,9 @@ class ContentMetadata:
         title: str | None = None,
         summary: str | None = None,
         thumbnail_url: str | None = None,
+        ocr_text: str | None = None,
+        linked_url: str | None = None,
+        preview_url: str | None = None,
     ):
         self.platform = platform
         self.content_type = content_type
@@ -35,6 +38,9 @@ class ContentMetadata:
         self.title = title
         self.summary = summary
         self.thumbnail_url = thumbnail_url
+        self.ocr_text = ocr_text
+        self.linked_url = linked_url
+        self.preview_url = preview_url
 
     def __repr__(self) -> str:
         return (

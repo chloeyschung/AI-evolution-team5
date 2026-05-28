@@ -73,6 +73,14 @@ class Content(Base):
     status = Column(SQLEnum(ContentStatus), nullable=False, default=ContentStatus.INBOX, index=True)
     created_at = Column(DateTime, default=utc_now, index=True)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, index=True)
+    # Screenshot and linked URL fields (added for Screenshot Saves feature)
+    screenshot_image_id = Column(
+        Integer,
+        ForeignKey("screenshot_images.id", use_alter=True, name="fk_content_screenshot_image_id"),
+        nullable=True,
+    )
+    linked_url = Column(Text, nullable=True)
+
     # DAT-003: Soft delete support
     is_deleted = Column(Boolean, default=False, nullable=False, index=True)
     deleted_at = Column(DateTime, nullable=True)
@@ -517,6 +525,42 @@ class PasswordResetToken(Base):
     expires_at = Column(DateTime, nullable=False, index=True)
     used_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=utc_now, nullable=False)
+
+
+class ScreenshotImage(Base):
+    """R2-backed screenshot storage — stores CDN URLs only, no bytea."""
+
+    __tablename__ = "screenshot_images"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    content_id = Column(Integer, ForeignKey("content.id", ondelete="CASCADE"), nullable=True, index=True)
+    thumbnail_url = Column(Text, nullable=True)
+    preview_url = Column(Text, nullable=True)
+    original_key = Column(Text, nullable=True)
+    ocr_text = Column(Text, nullable=True)
+    original_format = Column(String(8), nullable=True)
+    original_width = Column(Integer, nullable=True)
+    original_height = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=utc_now)
+
+
+class TrustedSource(Base):
+    """Per-user behavioral trust map derived from triage history."""
+
+    __tablename__ = "trusted_sources"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("user_profile.id", ondelete="CASCADE"), nullable=False, index=True)
+    domain = Column(String(255), nullable=False)
+    favicon_url = Column(Text, nullable=True)
+    display_name = Column(Text, nullable=True)
+    manually_added = Column(Boolean, default=False, nullable=False)
+    trigger_content_id = Column(Integer, ForeignKey("content.id"), nullable=True)
+    added_at = Column(DateTime, default=utc_now)
+    narrative_cached = Column(Text, nullable=True)
+    narrative_generated_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (sqlalchemy.UniqueConstraint("user_id", "domain", name="uq_trusted_source_user_domain"),)
 
 
 class IdempotencyRecord(Base):

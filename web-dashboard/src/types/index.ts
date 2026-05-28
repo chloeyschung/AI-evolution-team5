@@ -16,6 +16,21 @@ export interface Content {
   status: 'inbox' | 'archived';
   created_at: string;
   updated_at: string | null;
+  // Screenshot Saves fields
+  screenshot_image_id?: number | null;
+  linked_url?: string | null;
+  preview_url?: string | null;
+}
+
+export interface SourceInsight {
+  domain: string;
+  favicon_url: string | null;
+  display_name: string | null;
+  save_count: number;
+  keep_count: number;
+  keep_rate: number;
+  manually_added: boolean;
+  most_recent_title: string | null;
 }
 
 export interface SwipeAction {

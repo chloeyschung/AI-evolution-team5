@@ -94,6 +94,59 @@ export class APIClient {
     }
   }
 
+  async shareScreenshot(
+    imageBase64: string,
+    format: string,
+    width: number,
+    height: number,
+    idempotencyKey: string,
+  ): Promise<ShareResponse> {
+    let token: string;
+    try {
+      token = await authManager.getAccessToken();
+    } catch {
+      throw new APIError('Authentication required. Please login again.', 401, 'AUTH_REQUIRED');
+    }
+
+    const settings = await storageManager.getSettings();
+    const apiBaseUrl = resolveApiBaseUrl(settings.apiBaseUrl);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.TIMEOUT_MS);
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/v1/screenshot`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
+        body: JSON.stringify({ image_base64: imageBase64, original_format: format, width, height }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.status === 401) {
+        await storageManager.clearTokens();
+        throw new APIError(this.errorMessages[401], 401, 'SESSION_EXPIRED');
+      }
+      if (!response.ok) {
+        const fallback = this.errorMessages[response.status] || `Request failed with status ${response.status}`;
+        const parsed = await parseApiErrorResponse(response, fallback);
+        throw new APIError(parsed.message, response.status, parsed.code);
+      }
+      return response.json();
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new APIError('Request timeout.', 0, 'TIMEOUT');
+      }
+      throw error;
+    }
+  }
+
   async getRecentContent(limit = 5): Promise<RecentContentItem[]> {
     let token: string;
     try {

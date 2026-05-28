@@ -3,6 +3,7 @@ import type {
   Content,
   AuthStatus,
   PlatformCount,
+  SourceInsight,
   Stats,
   UserStatistics,
   ContentFilters,
@@ -224,5 +225,35 @@ export async function getStats(): Promise<Stats> {
 export async function getUserStatistics(): Promise<UserStatistics> {
   const client = getApiClient();
   const response = await client.get<UserStatistics>('/api/v1/user/statistics');
+  return response.data;
+}
+
+// Source Insights
+export async function fetchSources(minSaves = 5, minKeepRate = 0.7): Promise<SourceInsight[]> {
+  const client = getApiClient();
+  const response = await client.get<{ sources: SourceInsight[] }>('/api/v1/sources', {
+    params: { min_saves: minSaves, min_keep_rate: minKeepRate },
+  });
+  return response.data.sources;
+}
+
+export async function confirmSource(
+  domain: string,
+  userTimezone: string,
+  triggerContentId?: number,
+): Promise<SourceInsight> {
+  const client = getApiClient();
+  const response = await client.post<SourceInsight>(`/api/v1/sources/${encodeURIComponent(domain)}/confirm`, {
+    user_timezone: userTimezone,
+    trigger_content_id: triggerContentId ?? null,
+  });
+  return response.data;
+}
+
+export async function fetchNarrative(domain: string): Promise<{ text: string; generated_at: string | null }> {
+  const client = getApiClient();
+  const response = await client.get<{ text: string; generated_at: string | null }>(
+    `/api/v1/sources/${encodeURIComponent(domain)}/narrative`,
+  );
   return response.data;
 }

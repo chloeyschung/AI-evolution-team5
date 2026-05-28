@@ -107,14 +107,58 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   }
 });
 
-// Handle messages from content script
+// Handle messages from content script and popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'saveContent') {
     handleSaveContent(message.data).then(sendResponse);
-    return true; // Keep message channel open for async response
+    return true;
+  }
+  if (message.action === 'captureTab' || message.action === 'prtscCapture') {
+    handleCaptureTab().then(sendResponse);
+    return true;
+  }
+  if (message.action === 'prtscToggleChanged') {
+    // Setting persisted by popup — no further action needed in service worker
+    return false;
   }
   return false;
 });
+
+async function handleCaptureTab(): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!(await authManager.isAuthenticated())) {
+      return { success: false, error: 'Not authenticated' };
+    }
+
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id || !tab.url || tab.url.startsWith('chrome') || tab.url.startsWith('about:')) {
+      return { success: false, error: 'Cannot capture this page.' };
+    }
+
+    const dataUrl = await chrome.tabs.captureVisibleTab({ format: 'jpeg', quality: 90 });
+
+    // Parse media type from data URL prefix — Chrome may return PNG despite format request
+    const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/s);
+    if (!match) {
+      return { success: false, error: 'Invalid capture data.' };
+    }
+    const mimeType = match[1];
+    const imageBase64 = match[2];
+    const format = mimeType.split('/')[1] ?? 'jpeg';
+
+    const idempotencyKey = crypto.randomUUID();
+    const width = tab.width ?? 1280;
+    const height = tab.height ?? 720;
+
+    await apiClient.shareScreenshot(imageBase64, format, width, height, idempotencyKey);
+    showNotification({ type: 'success', message: 'Screenshot saved to Briefly' });
+    return { success: true };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Failed to save screenshot.';
+    showNotification({ type: 'error', message: msg });
+    return { success: false, error: msg };
+  }
+}
 
 async function handleSaveContent(data: SaveRequest): Promise<SaveResult> {
   try {

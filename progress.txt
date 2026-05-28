@@ -1,0 +1,63 @@
+# Ralph Implementation Progress — Source Insights + Screenshot Saves
+
+## Branch: feat/source-insights-screenshot-saves
+
+## Completed
+
+### US-001 — Schema + R2 foundation
+- src/data/models.py: Added ScreenshotImage, TrustedSource ORM models; Content extended with screenshot_image_id (FK, use_alter=True) + linked_url
+- src/config.py: Added R2_* settings (optional, empty-string defaults, fail at use-time not startup)
+- pyproject.toml: Added boto3>=1.35, pillow>=11.0 (installed via uv add)
+- src/storage/r2_client.py: Created — upload() + generate_presigned_url(expires_in=86400)
+- src/data/database.py: Added _ensure_content_screenshot_columns() (Postgres-only helper, uses information_schema not PRAGMA)
+- tests/conftest.py: Added ScreenshotImage + TrustedSource to clear_all_test_data()
+
+### US-002 — LLMClient generalization
+- src/ai/summarizer.py: _build_request() extended with image_bytes/image_media_type optional params; openai path switches to multimodal array when image_bytes provided; ocr_screenshot() + generate_source_narrative() methods added
+- src/ai/metadata_extractor.py: ContentMetadata.__init__ extended with ocr_text, linked_url, preview_url optional kwargs
+- src/ingestion/share_processor.py: ImageProcessor.process_bytes() implemented (OCR → Pillow resize → R2 upload → ContentMetadata); backwards-compat with existing process(share_data) call; _resize helper
+
+### US-003 — Screenshot ingest API
+- src/api/schemas.py: ScreenshotShareRequest, ScreenshotURLs dataclass, ContentResponse extended with screenshot_image_id/linked_url/preview_url; from_content() updated with optional screenshot_urls arg
+- src/data/repository.py: ScreenshotImageRepository.create() + get_map_for_content_ids() (empty-list guard); ContentRepository.save_screenshot() variant
+- src/api/routers/screenshot.py: POST /api/v1/screenshot — idempotency-first, 10/min rate limit, 10MB cap, single transaction
+- src/api/app.py: screenshot + sources routers registered
+
+### US-004 — Source Insights backend
+- src/data/repository.py: SourceInsightsRepository.get_source_stats() (INNER JOIN swipe_history, excludes screenshots); TrustedSourceRepository (get_all, get_by_domain, upsert, update_narrative, is_narrative_fresh[7-day TTL], find_trigger_content)
+- src/api/schemas.py: SourceInsight, SourcesListResponse, SourceNarrativeResponse, SourceConfirmRequest
+- src/api/routers/sources.py: GET /api/v1/sources, POST /api/v1/sources/{domain}/confirm, GET /api/v1/sources/{domain}/narrative (20/min rate limit, 7-day narrative cache)
+
+### US-005 — Chrome Extension
+- browser-extension/src/shared/types.ts: prtscCapture added to ExtensionSettings + DEFAULT_SETTINGS
+- browser-extension/src/shared/api.ts: shareScreenshot() method added
+- browser-extension/src/popup/popup.html: "Capture this tab" button + PrtSc toggle checkbox
+- browser-extension/src/popup/popup.ts: captureTabBtn + prtscToggleEl handlers
+- browser-extension/src/background/service-worker.ts: handleCaptureTab() — captureVisibleTab, parse data URL prefix for media type, shareScreenshot
+- browser-extension/src/content/content-script.ts: PrtSc keydown listener, reads prtscCapture from chrome.storage.local
+
+### US-006 — Web dashboard screenshot rendering
+- web-dashboard/src/types/index.ts: Content gains screenshot_image_id, linked_url, thumbnail_url, preview_url; SourceInsight type added
+- web-dashboard/src/components/content/ContentCard.tsx: isScreenshot detection; Source Link button for screenshot items; copy/open uses sourceUrl (handles empty url)
+
+### US-007 — Source Insights web UI
+- web-dashboard/src/api/endpoints.ts: fetchSources, confirmSource, fetchNarrative functions added; SourceInsight imported
+- web-dashboard/src/pages/Analytics.tsx: Full rewrite with Sources sub-section — source rows with favicon (window.open default browser), keep-rate %, Detail button, narrative expander, manual add form
+
+### US-008 — Tests
+- tests/test_screenshot_api.py: 5 tests (201 response, idempotency replay, missing key, invalid base64, cross-user 404)
+- tests/test_source_insights.py: 6 tests (threshold boundary, screenshot exclusion, confirm persists, null trigger, narrative cache hit, stale narrative regeneration)
+- web-dashboard/tests/e2e/source-insights.spec.ts: 6 playwright tests (section visible, keep-rate display, favicon opens new tab, Detail button, Detail+favicon are separate, manual add)
+
+## Verification Results
+- pytest tests/: 493 passed, 1 skipped (all new + existing tests green)
+- ruff check .: 0 errors
+- cd web-dashboard && npx tsc --noEmit: 0 errors
+- Playwright e2e: running
+
+## Key Design Decisions (recorded from plan)
+- R2 config optional at startup, validated at use-time in R2Client
+- ScreenshotImage.content_id uses regular FK; Content.screenshot_image_id uses use_alter=True to break circular FK
+- ImageProcessor accepts optional summarizer + r2_client (backwards-compat: no-arg constructor still works for ShareHandler)
+- delete order in conftest: TrustedSource → ScreenshotImage → Content → UserProfile
+- domain normalization: host[4:] if host.startswith("www.") else host (prefix-strip, not .replace)

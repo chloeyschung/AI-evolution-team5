@@ -33,6 +33,31 @@ class ContentStatusUpdate(BaseModel):
     status: ContentStatus = Field(..., description="New status for the content")
 
 
+class ScreenshotShareRequest(BaseModel):
+    """Schema for screenshot upload via POST /api/v1/screenshot."""
+
+    image_base64: str = Field(..., min_length=1)
+    original_format: str = Field(default="jpeg", max_length=8, description="File extension only: jpeg, png, webp")
+    width: int = Field(..., gt=0)
+    height: int = Field(..., gt=0)
+
+
+class ScreenshotURLs:
+    """Named container for presigned R2 URLs returned with a ContentResponse."""
+
+    __slots__ = ("thumbnail_url", "preview_url", "linked_url")
+
+    def __init__(
+        self,
+        thumbnail_url: str | None = None,
+        preview_url: str | None = None,
+        linked_url: str | None = None,
+    ):
+        self.thumbnail_url = thumbnail_url
+        self.preview_url = preview_url
+        self.linked_url = linked_url
+
+
 class ContentResponse(BaseModel):
     """Schema for content response."""
 
@@ -53,13 +78,20 @@ class ContentResponse(BaseModel):
     status: ContentStatus = ContentStatus.INBOX
     created_at: str
     updated_at: str | None = None
+    # Screenshot Saves fields
+    screenshot_image_id: int | None = None
+    linked_url: str | None = None
+    preview_url: str | None = None
 
     @classmethod
-    def from_content(cls, content: Any) -> "ContentResponse":
+    def from_content(cls, content: Any, screenshot_urls: "ScreenshotURLs | None" = None) -> "ContentResponse":
         """Create ContentResponse from Content model instance.
 
         Args:
-            content: Content model instance from database
+            content: Content model instance from database.
+            screenshot_urls: Pre-fetched presigned R2 URLs for screenshot items.
+                Callers must fetch these before calling from_content because this
+                method is synchronous and has no DB session access.
 
         Returns:
             ContentResponse instance
@@ -68,6 +100,7 @@ class ContentResponse(BaseModel):
         if created_at is None:
             raise ValueError(f"Content {content.id} has no created_at timestamp")
 
+        s = screenshot_urls
         return cls(
             id=content.id,
             platform=content.platform,
@@ -78,12 +111,15 @@ class ContentResponse(BaseModel):
             summary=content.summary,
             is_ai_summarized=bool(getattr(content, "is_ai_summarized", False)),
             is_ai_titled=bool(getattr(content, "is_ai_titled", False)),
-            thumbnail_url=content.thumbnail_url,
+            thumbnail_url=(s.thumbnail_url if s else None) or content.thumbnail_url,
             duplicate_group_key=getattr(content, "duplicate_group_key", None),
             duplicate_index=getattr(content, "duplicate_index", None),
             status=content.status,
             created_at=created_at,
             updated_at=serialize_datetime(content.updated_at),
+            screenshot_image_id=getattr(content, "screenshot_image_id", None),
+            linked_url=(s.linked_url if s else None) or getattr(content, "linked_url", None),
+            preview_url=(s.preview_url if s else None),
         )
 
     @classmethod
@@ -859,3 +895,40 @@ class AppConfigResponse(BaseModel):
     is_maintenance: bool
     maintenance_message: str | None
     store_url: str | None
+
+
+# Source Insights schemas
+
+
+class SourceInsight(BaseModel):
+    """A single source from the behavioral trust map."""
+
+    domain: str
+    favicon_url: str | None = None
+    display_name: str | None = None
+    save_count: int
+    keep_count: int
+    keep_rate: float
+    manually_added: bool = False
+    most_recent_title: str | None = None
+
+
+class SourcesListResponse(BaseModel):
+    """Response for GET /api/v1/sources."""
+
+    sources: list[SourceInsight]
+
+
+class SourceNarrativeResponse(BaseModel):
+    """Response for GET /api/v1/sources/{domain}/narrative."""
+
+    text: str
+    generated_at: str | None = None
+
+
+class SourceConfirmRequest(BaseModel):
+    """Request body for POST /api/v1/sources/{domain}/confirm."""
+
+    trigger_content_id: int | None = None
+    display_name: str | None = None
+    user_timezone: str | None = None

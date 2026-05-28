@@ -155,3 +155,14 @@ chrome.storage.local.onChanged.addListener((changes) => {
     }
   }
 });
+
+// PrtSc screenshot capture — only active when user has enabled the toggle
+document.addEventListener('keydown', (e: KeyboardEvent) => {
+  if (e.key !== 'PrintScreen') return;
+  chrome.storage.local.get('settings', (result: Record<string, unknown>) => {
+    const settings = result['settings'] as { prtscCapture?: boolean } | undefined;
+    if (settings?.prtscCapture) {
+      void chrome.runtime.sendMessage({ action: 'prtscCapture' });
+    }
+  });
+}, { capture: true });

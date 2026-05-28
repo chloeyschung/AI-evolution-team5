@@ -15,6 +15,8 @@ const emailLoginForm = document.getElementById('email-login-form') as HTMLFormEl
 const emailLoginBtn = document.getElementById('email-login-btn') as HTMLButtonElement;
 const emailInput = document.getElementById('email-input') as HTMLInputElement;
 const passwordInput = document.getElementById('password-input') as HTMLInputElement;
+const captureTabBtn = document.getElementById('capture-tab-btn') as HTMLButtonElement;
+const prtscToggleEl = document.getElementById('prtsc-toggle') as HTMLInputElement;
 const saveCurrentPageBtn = document.getElementById('save-current-page') as HTMLButtonElement;
 const saveUrlForm = document.getElementById('save-url-form') as HTMLFormElement;
 const saveUrlInput = document.getElementById('save-url-input') as HTMLInputElement;
@@ -87,6 +89,7 @@ function showError(message: string): void {
 async function loadSettings(): Promise<void> {
   const settings = await storageManager.getSettings();
   apiUrlEl.value = settings.apiBaseUrl;
+  prtscToggleEl.checked = settings.prtscCapture ?? false;
   const showApiSetting = getRuntimeConfig().SHOW_API_URL_SETTING;
   apiUrlSettingEl.style.display = showApiSetting ? 'block' : 'none';
   settingsEl.style.display = showApiSetting ? 'grid' : 'none';
@@ -389,6 +392,39 @@ openDashboardBtn.addEventListener('click', async () => {
 // Retry
 retryBtn.addEventListener('click', () => {
   void init();
+});
+
+// Capture this tab
+captureTabBtn.addEventListener('click', async () => {
+  try {
+    captureTabBtn.disabled = true;
+    captureTabBtn.textContent = 'Capturing…';
+
+    const response = await chrome.runtime.sendMessage({ action: 'captureTab' }) as { success: boolean; error?: string };
+    if (response?.success) {
+      captureTabBtn.textContent = 'Saved!';
+      void loadRecentContent();
+      setTimeout(() => {
+        captureTabBtn.textContent = '📷 Capture this tab';
+        captureTabBtn.disabled = false;
+      }, 1200);
+    } else {
+      showError(response?.error ?? 'Failed to capture screenshot.');
+      captureTabBtn.textContent = '📷 Capture this tab';
+      captureTabBtn.disabled = false;
+    }
+  } catch (error) {
+    showError(error instanceof Error ? error.message : 'Failed to capture screenshot.');
+    captureTabBtn.textContent = '📷 Capture this tab';
+    captureTabBtn.disabled = false;
+  }
+});
+
+// PrtSc toggle
+prtscToggleEl.addEventListener('change', async () => {
+  await storageManager.updateSettings({ prtscCapture: prtscToggleEl.checked });
+  // Notify service worker so it can activate/deactivate PrtSc listener
+  void chrome.runtime.sendMessage({ action: 'prtscToggleChanged', enabled: prtscToggleEl.checked });
 });
 
 // Settings

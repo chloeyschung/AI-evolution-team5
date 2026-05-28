@@ -95,16 +95,139 @@ class Summarizer:
         }
         return url, headers, payload
 
-    def _build_request(self, prompt: str) -> tuple[str, dict[str, str], dict, str]:
+    def _build_request(
+        self,
+        prompt: str,
+        image_bytes: bytes | None = None,
+        image_media_type: str = "image/jpeg",
+    ) -> tuple[str, dict[str, str], dict, str]:
         provider = self._resolved_provider()
         if provider == "openai":
             url, headers, payload = self._openai_request(prompt)
+            if image_bytes is not None:
+                import base64
+                b64 = base64.b64encode(image_bytes).decode()
+                payload["messages"][0]["content"] = [
+                    {"type": "image_url", "image_url": {"url": f"data:{image_media_type};base64,{b64}"}},
+                    {"type": "text", "text": prompt},
+                ]
             return url, headers, payload, provider
         if provider == "gemini":
             url, headers, payload = self._gemini_request(prompt)
             return url, headers, payload, provider
         url, headers, payload = self._anthropic_request(prompt)
         return url, headers, payload, "anthropic"
+
+    async def ocr_screenshot(
+        self,
+        image_bytes: bytes,
+        media_type: str = "image/jpeg",
+        max_retries: int = 3,
+    ) -> tuple[str, str | None]:
+        """Extract text and optional URL from a screenshot via the LLM vision endpoint.
+
+        Returns (ocr_text, linked_url_or_None).
+        """
+        prompt = (
+            "Extract all visible text from this screenshot. "
+            "If a URL is visible in a browser address bar or anywhere in the image, "
+            "output it on the very first line prefixed with 'URL: '. "
+            "Then output all other text. "
+            "Be thorough — include all readable text."
+        )
+        request_url, headers, payload, provider = self._build_request(
+            prompt, image_bytes=image_bytes, image_media_type=media_type
+        )
+        payload["max_tokens"] = 600
+        last_error = None
+
+        async with async_client_context() as client:
+            for attempt in range(max_retries):
+                try:
+                    response = await client.post(request_url, headers=headers, json=payload, timeout=self.timeout)
+                    if response.status_code >= 500 and attempt < max_retries - 1:
+                        await asyncio.sleep(2**attempt)
+                        continue
+                    if response.status_code != 200:
+                        raise APIConnectionError(f"OCR API request failed with status {response.status_code}")
+                    data = response.json()
+                    raw = self._extract_summary(data, provider)
+                    linked_url: str | None = None
+                    lines = raw.split("\n")
+                    if lines and lines[0].startswith("URL: "):
+                        linked_url = lines[0][5:].strip() or None
+                        raw = "\n".join(lines[1:]).strip()
+                    return raw, linked_url
+                except (APIConnectionError, InvalidResponseError):
+                    raise
+                except httpx.RequestError as exc:
+                    last_error = exc
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(2**attempt)
+                        continue
+                    raise APIConnectionError(f"OCR request failed: {exc}") from exc
+                except Exception as e:
+                    last_error = e
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(2**attempt)
+                        continue
+                    raise SummarizationError(f"OCR unexpected error: {e}") from e
+
+        raise SummarizationError(f"OCR: all {max_retries} retries failed. Last: {last_error}")
+
+    async def generate_source_narrative(
+        self,
+        source_name: str,
+        kept_titles: list[str],
+        topics: list[str],
+        manual_context: str | None,
+        max_retries: int = 3,
+    ) -> str:
+        """Generate a consultative prose narrative for a trusted source."""
+        titles_block = "\n".join(f"- {t}" for t in kept_titles[:30]) if kept_titles else "(none yet)"
+        topics_block = ", ".join(topics[:10]) if topics else "(not classified)"
+        manual_block = f"\n\nManual add context: {manual_context}" if manual_context else ""
+
+        prompt = (
+            f"Write a short, consultative paragraph (2–4 sentences) explaining why this user "
+            f"is drawn to '{source_name}' based on their reading history. "
+            f"Tone: personal, insightful — like a thoughtful friend who knows your reading habits. "
+            f"Do NOT use structured labels or bullet points — prose only.\n\n"
+            f"Kept articles:\n{titles_block}\n\n"
+            f"Topics: {topics_block}"
+            f"{manual_block}"
+        )
+        request_url, headers, payload, provider = self._build_request(prompt)
+        payload["max_tokens"] = 350
+        last_error = None
+
+        async with async_client_context() as client:
+            for attempt in range(max_retries):
+                try:
+                    response = await client.post(request_url, headers=headers, json=payload, timeout=self.timeout)
+                    if response.status_code >= 500 and attempt < max_retries - 1:
+                        await asyncio.sleep(2**attempt)
+                        continue
+                    if response.status_code != 200:
+                        raise APIConnectionError(f"Narrative API request failed with status {response.status_code}")
+                    data = response.json()
+                    return self._extract_summary(data, provider)
+                except (APIConnectionError, InvalidResponseError):
+                    raise
+                except httpx.RequestError as exc:
+                    last_error = exc
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(2**attempt)
+                        continue
+                    raise APIConnectionError(f"Narrative request failed: {exc}") from exc
+                except Exception as e:
+                    last_error = e
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(2**attempt)
+                        continue
+                    raise SummarizationError(f"Narrative unexpected error: {e}") from e
+
+        raise SummarizationError(f"Narrative: all {max_retries} retries failed. Last: {last_error}")
 
     def _extract_summary(self, data: dict, provider: str) -> str:
         try:

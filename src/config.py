@@ -86,6 +86,13 @@ class Settings:
     MODAL_PROXY_TOKEN_ID: str = os.getenv("MODAL_PROXY_TOKEN_ID", "")
     MODAL_PROXY_TOKEN_SECRET: str = os.getenv("MODAL_PROXY_TOKEN_SECRET", "")
 
+    # Cloudflare R2 object storage — optional; validated at use time in R2Client
+    R2_ACCOUNT_ID: str = os.getenv("R2_ACCOUNT_ID", "")
+    R2_ACCESS_KEY_ID: str = os.getenv("R2_ACCESS_KEY_ID", "")
+    R2_SECRET_ACCESS_KEY: str = os.getenv("R2_SECRET_ACCESS_KEY", "")
+    R2_BUCKET_NAME: str = os.getenv("R2_BUCKET_NAME", "")
+    R2_PUBLIC_URL: str = os.getenv("R2_PUBLIC_URL", "")
+
     # iOS Universal Links — Apple App Site Association
     # 10-character Team ID from developer.apple.com/account → Membership.
     # Optional at startup; /.well-known/apple-app-site-association returns 503 until set.

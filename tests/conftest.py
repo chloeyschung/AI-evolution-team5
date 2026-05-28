@@ -44,7 +44,9 @@ from src.data.models import (
     PasswordResetToken,
     ReminderLog,
     ReminderPreference,
+    ScreenshotImage,
     SwipeHistory,
+    TrustedSource,
     UserAchievement,
     UserActivityPattern,
     UserAuthMethod,
@@ -101,6 +103,8 @@ async def _clear_all_test_data(session: AsyncSession) -> None:
     await session.execute(delete(SwipeHistory))
     await session.execute(delete(IdempotencyRecord))
     await session.execute(delete(ContentTag))
+    await session.execute(delete(TrustedSource))
+    await session.execute(delete(ScreenshotImage))
     await session.execute(delete(UserActivityPattern))
     await session.execute(delete(ReminderLog))
     await session.execute(delete(ReminderPreference))

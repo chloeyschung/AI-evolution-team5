@@ -39,6 +39,7 @@ async def init_db() -> None:
         await conn.run_sync(Base.metadata.create_all)
         await _ensure_user_profile_timezone_column(conn)
         await _ensure_content_ai_columns(conn)
+        await _ensure_content_screenshot_columns(conn)
 
 
 async def _ensure_user_profile_timezone_column(conn) -> None:
@@ -57,6 +58,33 @@ async def _ensure_user_profile_timezone_column(conn) -> None:
         return
 
     await conn.execute(text("ALTER TABLE user_profile ADD COLUMN timezone VARCHAR(64) DEFAULT 'UTC'"))
+
+
+async def _ensure_content_screenshot_columns(conn) -> None:
+    """Add screenshot_image_id and linked_url to the content table on Postgres.
+
+    Uses information_schema (Postgres-only) — opposite gate from the SQLite-only
+    helpers above. New tables (screenshot_images, trusted_sources) are created by
+    create_all(); only the additive columns on the pre-existing content table need
+    an idempotent ALTER here.
+    """
+    if DATABASE_URL.startswith("sqlite"):
+        return
+
+    result = await conn.execute(
+        text(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name='content' AND column_name IN ('screenshot_image_id','linked_url')"
+        )
+    )
+    existing = {row[0] for row in result.fetchall()}
+
+    if "linked_url" not in existing:
+        await conn.execute(text("ALTER TABLE content ADD COLUMN IF NOT EXISTS linked_url TEXT"))
+    if "screenshot_image_id" not in existing:
+        await conn.execute(
+            text("ALTER TABLE content ADD COLUMN IF NOT EXISTS screenshot_image_id INTEGER REFERENCES screenshot_images(id)")
+        )
 
 
 async def _ensure_content_ai_columns(conn) -> None:

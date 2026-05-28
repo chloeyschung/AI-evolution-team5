@@ -218,6 +218,12 @@ class ImageProcessor(BaseShareProcessor):
     """Process image share data."""
 
     IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
+    THUMBNAIL_WIDTH = 600
+    PREVIEW_MAX_WIDTH = 1400
+
+    def __init__(self, summarizer=None, r2_client=None):
+        self._summarizer = summarizer
+        self._r2_client = r2_client
 
     @property
     def supported_types(self) -> list[ShareDataType]:
@@ -234,6 +240,67 @@ class ImageProcessor(BaseShareProcessor):
             content_type=ContentType.IMAGE,
             url=image_data if is_http_url(image_data) else "",
         )
+
+    async def process_bytes(
+        self,
+        image_bytes: bytes,
+        media_type: str,
+        idempotency_key: str,
+        user_id: int,
+    ) -> ContentMetadata:
+        """Full pipeline: OCR → resize → R2 upload → ContentMetadata."""
+        from io import BytesIO
+
+        from PIL import Image
+
+        ocr_text = ""
+        linked_url: str | None = None
+        if self._summarizer is not None:
+            try:
+                ocr_text, linked_url = await self._summarizer.ocr_screenshot(image_bytes, media_type)
+            except Exception as exc:
+                logging.warning("OCR failed: %s", exc)
+
+        thumbnail_url: str | None = None
+        preview_url: str | None = None
+        if self._r2_client is not None:
+            try:
+                img = Image.open(BytesIO(image_bytes)).convert("RGB")
+
+                thumb = self._resize(img, self.THUMBNAIL_WIDTH)
+                thumb_buf = BytesIO()
+                thumb.save(thumb_buf, format="JPEG", quality=85)
+                thumb_key = f"screenshots/{user_id}/{idempotency_key}/thumbnail.jpg"
+                self._r2_client.upload(thumb_key, thumb_buf.getvalue(), "image/jpeg")
+                thumbnail_url = self._r2_client.generate_presigned_url(thumb_key)
+
+                preview = self._resize(img, self.PREVIEW_MAX_WIDTH)
+                prev_buf = BytesIO()
+                preview.save(prev_buf, format="JPEG", quality=92)
+                prev_key = f"screenshots/{user_id}/{idempotency_key}/preview.jpg"
+                self._r2_client.upload(prev_key, prev_buf.getvalue(), "image/jpeg")
+                preview_url = self._r2_client.generate_presigned_url(prev_key)
+            except Exception as exc:
+                logging.warning("R2 upload failed: %s", exc)
+
+        return ContentMetadata(
+            platform="screenshot",
+            content_type=ContentType.IMAGE,
+            url="",
+            summary=ocr_text or None,
+            thumbnail_url=thumbnail_url,
+            ocr_text=ocr_text or None,
+            linked_url=linked_url,
+            preview_url=preview_url,
+        )
+
+    @staticmethod
+    def _resize(img, max_width: int):
+        w, h = img.size
+        if w <= max_width:
+            return img
+        new_h = int(h * max_width / w)
+        return img.resize((max_width, new_h))
 
     def _is_valid_image_data(self, data: str) -> bool:
         """Check if data is valid image format (base64, URL, or file path)."""
