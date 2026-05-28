@@ -57,6 +57,15 @@ struct ItemDetailView: View {
             if showActions { actionBar }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if showActions && items.count > 1 {
+                ToolbarItem(placement: .principal) {
+                    Text("\(currentIndex + 1) / \(items.count)")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
         .sheet(isPresented: $showBrowser) {
             SafariBrowserView(url: currentItem.url)
         }
