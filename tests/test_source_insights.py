@@ -2,13 +2,11 @@
 
 from unittest.mock import AsyncMock, patch
 
-import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.constants import ContentType
+from src.constants import ContentStatus, ContentType
 from src.data.models import Content, SwipeHistory, TrustedSource
-from src.constants import ContentStatus
 from src.data.repository import SourceInsightsRepository
 from src.utils.datetime_utils import utc_now
 
@@ -21,7 +19,6 @@ async def _seed_domain_swipes(
     keep_count: int,
 ) -> None:
     """Seed content + swipe history for a domain."""
-    from src.constants import SwipeAction
 
     for i in range(save_count):
         c = Content(
@@ -74,7 +71,6 @@ async def test_get_sources_excludes_screenshots(
     test_user: int,
 ):
     """Screenshot items (content_type=image, url='') must not corrupt domain grouping."""
-    from src.constants import SwipeAction
 
     # Add a regular article from a domain
     c = Content(
@@ -151,7 +147,6 @@ async def test_narrative_cache_hit(
     cached_text = "You love this source because of its deep dives."
 
     # Pre-seed a fresh TrustedSource with cached narrative
-    from datetime import timedelta
     row = TrustedSource(
         user_id=test_user,
         domain="cached.example.com",
@@ -209,9 +204,10 @@ async def test_narrative_generated_when_stale(
         ),
     ):
         # Set a summarizer on the app state
+        import os
+
         from src.ai.summarizer import Summarizer
         from src.api.app import app
-        import os
         os.environ.setdefault("SUMMARY_API_KEY", "test-key")
         app.state.share_handler._summarizer = Summarizer(api_key="test-key")
 

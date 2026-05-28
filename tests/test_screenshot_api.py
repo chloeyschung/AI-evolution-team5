@@ -1,7 +1,7 @@
 """Tests for POST /api/v1/screenshot endpoint."""
 
 import base64
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
@@ -150,8 +150,8 @@ async def test_screenshot_cross_user_content_not_visible(
 
     from src.api.app import app
     from src.auth.tokens import create_access_token, create_refresh_token
-    from src.data.models import AuthenticationToken, UserAuthMethod, UserProfile
     from src.constants import AuthProvider
+    from src.data.models import AuthenticationToken, UserAuthMethod, UserProfile
     from src.utils.datetime_utils import utc_now
     from src.utils.token_hashing import hash_access_token
 
