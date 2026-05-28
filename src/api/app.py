@@ -24,7 +24,7 @@ from ..ingestion.share_handler import ShareHandler
 from ..middleware.rate_limiter import limiter, rate_limit_exceeded_handler
 from ..middleware.security_headers import security_headers_middleware
 from ..utils.http_client import HttpClientPool
-from .routers import account, ai, auth, config, content, integrations, swipe, user, well_known
+from .routers import account, ai, auth, config, content, integrations, stats, swipe, user, well_known
 from .routers.integrations import _background_tasks
 
 logger = logging.getLogger(__name__)
@@ -243,6 +243,7 @@ app.include_router(content.router, prefix="/api/v1", tags=["content"])
 app.include_router(user.router, prefix="/api/v1", tags=["user"])
 app.include_router(integrations.router, prefix="/api/v1", tags=["integrations"])
 app.include_router(ai.router, prefix="/api/v1", tags=["ai"])
+app.include_router(stats.router, prefix="/api/v1", tags=["stats"])
 
 
 @app.get("/")
