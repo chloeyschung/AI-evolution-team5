@@ -463,6 +463,15 @@ async def get_reflection_questions(
             detail={"error": ErrorCode.CONTENT_NOT_FOUND, "message": "Content not found."},
         )
 
+    # Return cached questions if available
+    if getattr(content, "reflection_questions", None):
+        try:
+            cached = json.loads(content.reflection_questions)
+            if isinstance(cached, list) and cached:
+                return ReflectionQuestionsResponse(content_id=content_id, questions=cached)
+        except (ValueError, TypeError):
+            pass
+
     keywords: list[str] = []
     if getattr(content, "auto_tag_keywords_en", None):
         try:
@@ -475,6 +484,9 @@ async def get_reflection_questions(
         keywords=[k for k in keywords if k],
         settings=settings,
     )
+
+    if questions:
+        await content_repo.save_reflection_questions(content_id, user_id, questions)
 
     return ReflectionQuestionsResponse(content_id=content_id, questions=questions)
 

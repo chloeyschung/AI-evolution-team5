@@ -40,6 +40,7 @@ async def init_db() -> None:
         await _ensure_user_profile_timezone_column(conn)
         await _ensure_content_ai_columns(conn)
         await _ensure_content_auto_tag_columns(conn)
+        await _ensure_content_reflection_columns(conn)
 
 
 async def _ensure_user_profile_timezone_column(conn) -> None:
@@ -94,3 +95,15 @@ async def _ensure_content_auto_tag_columns(conn) -> None:
         await conn.execute(text("ALTER TABLE content ADD COLUMN auto_tag_keywords_en TEXT"))
     if "auto_tag_keywords_original" not in existing_columns:
         await conn.execute(text("ALTER TABLE content ADD COLUMN auto_tag_keywords_original TEXT"))
+
+
+async def _ensure_content_reflection_columns(conn) -> None:
+    """Backfill reflection_questions column added for question caching."""
+    if not DATABASE_URL.startswith("sqlite"):
+        return
+
+    result = await conn.execute(text("PRAGMA table_info(content)"))
+    existing_columns = {row[1] for row in result.fetchall()}
+
+    if "reflection_questions" not in existing_columns:
+        await conn.execute(text("ALTER TABLE content ADD COLUMN reflection_questions TEXT"))
