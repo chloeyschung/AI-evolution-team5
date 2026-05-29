@@ -20,20 +20,18 @@ export default function Analytics() {
   useEffect(() => {
     const loadStats = async () => {
       try {
-        const [statsData, userStatsData] = await Promise.all([getStats(), getUserStatistics()]);
+        const [statsData, userStatsData, categoryData] = await Promise.all([
+          getStats(),
+          getUserStatistics(),
+          getCategoryStats(),
+        ]);
         setStats(statsData);
         setUserStats(userStatsData);
+        setCategoryStats(categoryData);
       } catch (error) {
         console.error('Failed to load stats:', error);
       } finally {
         setIsLoading(false);
-      }
-
-      try {
-        const categoryData = await getCategoryStats();
-        setCategoryStats(categoryData);
-      } catch (error) {
-        console.error('Failed to load category stats:', error);
       }
     };
 

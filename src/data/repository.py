@@ -700,7 +700,7 @@ class ContentRepository(BaseRepository[Content]):
             text(f"""
                 SELECT auto_tag_category, COUNT(*) AS total
                 FROM content
-                WHERE is_deleted = 0 AND auto_tag_category IS NOT NULL {user_clause}
+                WHERE is_deleted = false AND auto_tag_category IS NOT NULL {user_clause}
                 GROUP BY auto_tag_category
             """),
             params,
@@ -710,8 +710,8 @@ class ContentRepository(BaseRepository[Content]):
             text(f"""
                 SELECT auto_tag_category, COUNT(*) AS kept
                 FROM content
-                WHERE is_deleted = 0 AND auto_tag_category IS NOT NULL
-                  AND UPPER(status) = 'ARCHIVED' {user_clause}
+                WHERE is_deleted = false AND auto_tag_category IS NOT NULL
+                  AND status = 'ARCHIVED' {user_clause}
                 GROUP BY auto_tag_category
             """),
             params,
