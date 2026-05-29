@@ -7,7 +7,7 @@ import json
 import os
 import sqlite3
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import jwt
@@ -25,7 +25,7 @@ CONTENT_SUMMARY = "Seeded from SQLite, served by FastAPI, rendered by React dash
 
 def create_access_token(user_id: int) -> str:
   secret = os.environ["JWT_SECRET_KEY"]
-  now = datetime.now(timezone.utc)
+  now = datetime.now(UTC)
   payload = {
     "sub": str(user_id),
     "exp": now + timedelta(hours=1),
@@ -40,7 +40,7 @@ def create_refresh_token() -> str:
 
 
 def main() -> None:
-  now = datetime.now(timezone.utc)
+  now = datetime.now(UTC)
   expires_at = now + timedelta(hours=1)
 
   access_token = create_access_token(USER_ID)

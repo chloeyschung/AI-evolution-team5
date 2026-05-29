@@ -32,6 +32,8 @@ from ...utils.cursor_pagination import (
 from ...utils.datetime_utils import serialize_datetime
 from ..dependencies import get_current_user
 from ..schemas import (
+    CategoryKeptStat,
+    CategoryStatsResponse,
     ContentCreate,
     ContentDetailResponse,
     ContentResponse,
@@ -44,8 +46,6 @@ from ..schemas import (
     ReflectionQuestionsResponse,
     ShareRequest,
     ShareResponse,
-    CategoryStatsResponse,
-    CategoryKeptStat,
     StatsResponse,
     SwipeHistoryResponse,
     TrendFeedItem,
