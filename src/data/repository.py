@@ -685,6 +685,34 @@ class ContentRepository(BaseRepository[Content]):
             "discarded": discarded_count,
         }
 
+    async def get_category_kept_stats(self, user_id: int | None = None) -> list[dict]:
+        """Return total and kept (archived) count per auto_tag_category.
+
+        Uses raw SQL because auto_tag_category is a DB column not yet mapped
+        onto the ORM model (added via migration after initial model definition).
+        """
+        from sqlalchemy import text
+
+        user_clause = "AND user_id = :uid" if user_id is not None else ""
+        params: dict = {"uid": user_id} if user_id is not None else {}
+
+        rows = (await self.session.execute(
+            text(f"""
+                SELECT auto_tag_category,
+                       COUNT(*) AS total,
+                       SUM(CASE WHEN status = 'ARCHIVED' THEN 1 ELSE 0 END) AS kept
+                FROM content
+                WHERE is_deleted = false AND auto_tag_category IS NOT NULL {user_clause}
+                GROUP BY auto_tag_category
+            """),
+            params,
+        )).all()
+
+        return [
+            {"category": row[0], "total": row[1], "kept": row[2]}
+            for row in sorted(rows, key=lambda r: -r[1])
+        ]
+
     async def count_all(
         self,
         user_id: int,

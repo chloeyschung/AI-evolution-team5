@@ -5,6 +5,7 @@ import type {
   PlatformCount,
   Stats,
   UserStatistics,
+  CategoryStats,
   ContentFilters,
   ContentSort,
   SwipeAction,
@@ -227,5 +228,11 @@ export async function getStats(): Promise<Stats> {
 export async function getUserStatistics(): Promise<UserStatistics> {
   const client = getApiClient();
   const response = await client.get<UserStatistics>('/api/v1/user/statistics');
+  return response.data;
+}
+
+export async function getCategoryStats(): Promise<CategoryStats> {
+  const client = getApiClient();
+  const response = await client.get<CategoryStats>('/api/v1/stats/categories');
   return response.data;
 }

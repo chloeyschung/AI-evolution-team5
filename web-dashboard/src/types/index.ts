@@ -62,6 +62,16 @@ export interface UserStatistics {
   last_swipe_at: string | null;
 }
 
+export interface CategoryStat {
+  category: string;
+  total: number;
+  kept: number;
+}
+
+export interface CategoryStats {
+  categories: CategoryStat[];
+}
+
 // Filter & Sort Types
 
 export type ContentStatus = 'inbox' | 'archived' | 'all';

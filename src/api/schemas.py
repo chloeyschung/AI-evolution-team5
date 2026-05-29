@@ -201,6 +201,16 @@ class StatsResponse(BaseModel):
     discarded: int
 
 
+class CategoryKeptStat(BaseModel):
+    category: str
+    total: int
+    kept: int
+
+
+class CategoryStatsResponse(BaseModel):
+    categories: list[CategoryKeptStat]
+
+
 class ShareRequest(BaseModel):
     """Schema for sharing content via mobile share sheet."""
 

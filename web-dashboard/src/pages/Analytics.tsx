@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { getStats, getUserStatistics } from '../api/endpoints';
-import type { Stats, UserStatistics } from '../types';
+import { getStats, getUserStatistics, getCategoryStats } from '../api/endpoints';
+import type { Stats, UserStatistics, CategoryStats } from '../types';
 import styles from './Analytics.module.css';
 
 export default function Analytics() {
@@ -14,14 +14,20 @@ export default function Analytics() {
     first_swipe_at: null,
     last_swipe_at: null,
   });
+  const [categoryStats, setCategoryStats] = useState<CategoryStats>({ categories: [] });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadStats = async () => {
       try {
-        const [statsData, userStatsData] = await Promise.all([getStats(), getUserStatistics()]);
+        const [statsData, userStatsData, categoryData] = await Promise.all([
+          getStats(),
+          getUserStatistics(),
+          getCategoryStats(),
+        ]);
         setStats(statsData);
         setUserStats(userStatsData);
+        setCategoryStats(categoryData);
       } catch (error) {
         console.error('Failed to load stats:', error);
       } finally {
@@ -57,6 +63,27 @@ export default function Analytics() {
         <div><span>Retention rate</span><strong>{(userStats.retention_rate * 100).toFixed(1)}%</strong></div>
         <div><span>Current streak</span><strong>{userStats.streak_days} days</strong></div>
       </section>
+
+      {categoryStats.categories.length > 0 && (
+        <section className={styles.categorySection}>
+          <h2 className={styles.sectionTitle}>Kept by category</h2>
+          <div className={styles.categoryList}>
+            {categoryStats.categories.map(({ category, total: catTotal, kept }) => {
+              const pct = catTotal > 0 ? Math.round((kept / catTotal) * 100) : 0;
+              return (
+                <div key={category} className={styles.categoryRow}>
+                  <span className={styles.categoryName}>{category}</span>
+                  <div className={styles.barTrack}>
+                    <div className={styles.barFill} style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className={styles.categoryMeta}>{kept}/{catTotal}</span>
+                  <span className={styles.categoryPct}>{pct}%</span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </section>
   );
 }
