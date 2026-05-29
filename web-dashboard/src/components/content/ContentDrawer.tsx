@@ -23,18 +23,23 @@ export default function ContentDrawer({ contentId, onClose }: ContentDrawerProps
       return;
     }
 
+    const controller = new AbortController();
+    const { signal } = controller;
+
     setIsLoading(true);
     setQuestionsLoading(true);
     setQuestions([]);
 
     void getContentDetail(contentId)
-      .then((data) => setDetail(data))
-      .finally(() => setIsLoading(false));
+      .then((data) => { if (!signal.aborted) setDetail(data); })
+      .finally(() => { if (!signal.aborted) setIsLoading(false); });
 
-    void getReflectionQuestions(contentId)
-      .then((qs) => setQuestions(qs))
-      .catch(() => setQuestions([]))
-      .finally(() => setQuestionsLoading(false));
+    void getReflectionQuestions(contentId, signal)
+      .then((qs) => { if (!signal.aborted) setQuestions(qs); })
+      .catch(() => { if (!signal.aborted) setQuestions([]); })
+      .finally(() => { if (!signal.aborted) setQuestionsLoading(false); });
+
+    return () => controller.abort();
   }, [contentId]);
 
   return (

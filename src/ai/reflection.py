@@ -14,7 +14,8 @@ from src.utils.http_client import async_client_context
 
 logger = logging.getLogger(__name__)
 
-_TIMEOUT = 30.0
+_TIMEOUT = 8.0        # per-attempt HTTP timeout
+_TOTAL_TIMEOUT = 10.0  # absolute cap — matches axios client timeout on the frontend
 
 
 def _build_prompt(summary: str | None, keywords: list[str]) -> str:
@@ -89,26 +90,33 @@ async def generate_questions(
     if settings.SUMMARY_API_KEY:
         headers["Authorization"] = f"Bearer {settings.SUMMARY_API_KEY}"
 
-    for attempt in range(3):
-        try:
-            async with async_client_context() as client:
-                response = await client.post(url, json=payload, headers=headers, timeout=_TIMEOUT)
+    async def _attempt() -> list[str]:
+        for attempt in range(2):
+            try:
+                async with async_client_context() as client:
+                    response = await client.post(url, json=payload, headers=headers, timeout=_TIMEOUT)
 
-            if response.status_code == 200:
-                questions = _parse_response(response.json())
-                if questions:
-                    return questions
-                logger.warning("Reflection: empty or unparseable response on attempt %d/3", attempt + 1)
-            else:
-                logger.warning(
-                    "Reflection HTTP %d (attempt %d/3): %s",
-                    response.status_code, attempt + 1, response.text[:300],
-                )
+                if response.status_code == 200:
+                    questions = _parse_response(response.json())
+                    if questions:
+                        return questions
+                    logger.warning("Reflection: empty or unparseable response on attempt %d/2", attempt + 1)
+                else:
+                    logger.warning(
+                        "Reflection HTTP %d (attempt %d/2): %s",
+                        response.status_code, attempt + 1, response.text[:300],
+                    )
 
-        except Exception as exc:
-            logger.warning("Reflection attempt %d/3 error: %s", attempt + 1, exc)
+            except Exception as exc:
+                logger.warning("Reflection attempt %d/2 error: %s", attempt + 1, exc)
 
-        if attempt < 2:
-            await asyncio.sleep(2 ** attempt)
+            if attempt < 1:
+                await asyncio.sleep(1)
 
-    return []
+        return []
+
+    try:
+        return await asyncio.wait_for(_attempt(), timeout=_TOTAL_TIMEOUT)
+    except asyncio.TimeoutError:
+        logger.warning("Reflection: total timeout (%.0fs) exceeded", _TOTAL_TIMEOUT)
+        return []

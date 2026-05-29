@@ -237,10 +237,11 @@ export async function getCategoryStats(): Promise<CategoryStats> {
   return response.data;
 }
 
-export async function getReflectionQuestions(id: number): Promise<string[]> {
+export async function getReflectionQuestions(id: number, signal?: AbortSignal): Promise<string[]> {
   const client = getApiClient();
   const response = await client.get<{ content_id: number; questions: string[] }>(
-    `/api/v1/content/${id}/reflection-questions`
+    `/api/v1/content/${id}/reflection-questions`,
+    { signal },
   );
   return response.data.questions ?? [];
 }
