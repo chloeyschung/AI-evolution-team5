@@ -225,6 +225,15 @@ class ContentRepository(BaseRepository[Content]):
         )
         await self.session.commit()
 
+    async def save_reflection_questions(self, content_id: int, user_id: int, questions: list[str]) -> None:
+        """Cache generated reflection questions on the content row."""
+        await self.session.execute(
+            update(Content)
+            .where(Content.id == content_id, Content.user_id == user_id)
+            .values(reflection_questions=json.dumps(questions), updated_at=utc_now())
+        )
+        await self.session.commit()
+
     async def remove_duplicates(self, user_id: int) -> int:
         """Remove duplicate rows and keep the newest row per duplicate_group_key."""
         result = await self.session.execute(

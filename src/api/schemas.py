@@ -409,6 +409,13 @@ class ContentTagsResponse(BaseModel):
     tags: list[str]
 
 
+class ReflectionQuestionsResponse(BaseModel):
+    """Schema for reflection questions response."""
+
+    content_id: int
+    questions: list[str]
+
+
 # AUTH-001: Authentication schemas
 
 

@@ -41,6 +41,7 @@ from ..schemas import (
     DeletedContentResponse,
     PaginatedContentResponse,
     PlatformCount,
+    ReflectionQuestionsResponse,
     ShareRequest,
     ShareResponse,
     CategoryStatsResponse,
@@ -439,6 +440,55 @@ async def get_content_tags(
     tags = await tag_repo.get_tags(content_id)
 
     return ContentTagsResponse(content_id=content_id, tags=tags)
+
+
+@router.get("/content/{content_id}/reflection-questions", response_model=ReflectionQuestionsResponse)
+async def get_reflection_questions(
+    content_id: int,
+    user_id: int = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ReflectionQuestionsResponse:
+    """Generate 3 open-ended reflection questions for an article.
+
+    Uses the existing Modal/SUMMARY endpoint. Returns empty questions list on AI failure.
+    """
+    from src.ai.reflection import generate_questions
+
+    content_repo = ContentRepository(db)
+    content = await content_repo.get_by_id(content_id)
+
+    if not content or content.user_id != user_id:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": ErrorCode.CONTENT_NOT_FOUND, "message": "Content not found."},
+        )
+
+    # Return cached questions if available
+    if getattr(content, "reflection_questions", None):
+        try:
+            cached = json.loads(content.reflection_questions)
+            if isinstance(cached, list) and cached:
+                return ReflectionQuestionsResponse(content_id=content_id, questions=cached)
+        except (ValueError, TypeError):
+            pass
+
+    keywords: list[str] = []
+    if getattr(content, "auto_tag_keywords_en", None):
+        try:
+            keywords = json.loads(content.auto_tag_keywords_en)
+        except (ValueError, TypeError):
+            keywords = []
+
+    questions = await generate_questions(
+        summary=content.summary,
+        keywords=[k for k in keywords if k],
+        settings=settings,
+    )
+
+    if questions:
+        await content_repo.save_reflection_questions(content_id, user_id, questions)
+
+    return ReflectionQuestionsResponse(content_id=content_id, questions=questions)
 
 
 @router.post("/content/{content_id}/categorize", response_model=ContentTagsResponse)

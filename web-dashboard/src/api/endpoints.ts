@@ -236,3 +236,12 @@ export async function getCategoryStats(): Promise<CategoryStats> {
   const response = await client.get<CategoryStats>('/api/v1/stats/categories');
   return response.data;
 }
+
+export async function getReflectionQuestions(id: number, signal?: AbortSignal): Promise<string[]> {
+  const client = getApiClient();
+  const response = await client.get<{ content_id: number; questions: string[] }>(
+    `/api/v1/content/${id}/reflection-questions`,
+    { signal },
+  );
+  return response.data.questions ?? [];
+}

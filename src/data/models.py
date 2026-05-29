@@ -83,6 +83,9 @@ class Content(Base):
     auto_tag_keywords_en = Column(Text, nullable=True)
     auto_tag_keywords_original = Column(Text, nullable=True)
 
+    # Cached reflection questions (JSON array of up to 3 strings)
+    reflection_questions = Column(Text, nullable=True)
+
     # Relationship to swipe history
     swipe_history = relationship("SwipeHistory", back_populates="content")
     user = relationship("UserProfile", back_populates="content")
