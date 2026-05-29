@@ -192,14 +192,7 @@
 .summary {
   line-height: 1.5;
   font-size: 0.86rem;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
   overflow-wrap: anywhere;
-  /* Match .summaryList so non-bullet summaries reserve the same vertical space. */
-  min-height: calc(1.5em * 3 + 8px);
-  max-height: calc(1.5em * 3 + 8px);
 }
 
 .summaryList {
@@ -210,25 +203,28 @@
   color: var(--color-ink-secondary);
   font-size: 0.86rem;
   list-style: none;
-  /* Reserve exactly 3 lines worth so bulleted and prose summaries
-     occupy identical space — keeps footer rows aligned across cards. */
-  min-height: calc(1.5em * 3 + 8px);
-  max-height: calc(1.5em * 3 + 8px);
-  overflow: hidden;
 }
 
 .summaryItem {
-  display: grid;
-  grid-template-columns: 6px 1fr;
-  align-items: start;
-  column-gap: 8px;
   line-height: 1.5;
-  /* Allow wrap to 2 lines per bullet, then clip cleanly. */
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
   overflow-wrap: anywhere;
+}
+
+.expandBtn {
+  margin-top: 2px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 0.78rem;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  align-self: start;
+}
+
+.expandBtn:hover {
+  color: var(--color-signal);
 }
 
 .summaryItem::before {
@@ -367,15 +363,20 @@
   color: var(--color-signal);
   border: 1px solid color-mix(in srgb, var(--color-signal) 28%, var(--color-border));
   letter-spacing: 0.02em;
+  white-space: nowrap;
+  /* metaRow에서 platformPill을 우측으로 밀어냄 */
+  margin-right: auto;
 }
 
 .keyword {
   font-size: 0.7rem;
+  line-height: 1;
   padding: 3px 8px;
   border-radius: 999px;
   background: var(--color-surface-muted);
   color: var(--color-ink-muted);
   border: 1px solid var(--color-border-muted);
+  white-space: nowrap;
 }
 
 .footerRow {
