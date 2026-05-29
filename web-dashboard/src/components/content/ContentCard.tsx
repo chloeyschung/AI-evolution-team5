@@ -73,6 +73,7 @@ export default function ContentCard({ content, onDelete, onSwipe }: ContentCardP
     let acc = 0;
     const result: string[] = [];
     for (const b of allBullets) {
+      // 첫 번째 bullet은 150자를 초과해도 반드시 포함 — 아무것도 표시 안 되는 빈 카드 방지
       if (acc + b.length > 150 && result.length > 0) break;
       result.push(b);
       acc += b.length;
@@ -85,7 +86,7 @@ export default function ContentCard({ content, onDelete, onSwipe }: ContentCardP
     ? rawSummary
     : summaryExpanded || rawSummary.length <= 150
       ? rawSummary
-      : rawSummary.slice(0, 150);
+      : rawSummary.slice(0, 150) + '...';
 
   return (
     <article className={styles.card} data-testid={`content-card-${content.id}`}>
@@ -144,7 +145,7 @@ export default function ContentCard({ content, onDelete, onSwipe }: ContentCardP
 
       {content.auto_tag_keywords_en?.length ? (
         <div className={styles.tagRow}>
-          {content.auto_tag_keywords_en.map((kw) => (
+          {content.auto_tag_keywords_en.slice(0, 8).map((kw) => (
             <span key={kw} className={styles.keyword}>{kw}</span>
           ))}
         </div>

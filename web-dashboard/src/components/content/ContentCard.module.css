@@ -352,9 +352,6 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  /* 2줄 최대: tag height = 0.7rem(font) + 6px(padding) + 2px(border), 2행 + gap 1개 */
-  max-height: calc((0.7rem + 8px) * 2 + 6px);
-  overflow: hidden;
 }
 
 .categoryBadge {
