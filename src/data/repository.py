@@ -696,9 +696,11 @@ class ContentRepository(BaseRepository[Content]):
         user_clause = "AND user_id = :uid" if user_id is not None else ""
         params: dict = {"uid": user_id} if user_id is not None else {}
 
-        total_rows = (await self.session.execute(
+        rows = (await self.session.execute(
             text(f"""
-                SELECT auto_tag_category, COUNT(*) AS total
+                SELECT auto_tag_category,
+                       COUNT(*) AS total,
+                       SUM(CASE WHEN status = 'ARCHIVED' THEN 1 ELSE 0 END) AS kept
                 FROM content
                 WHERE is_deleted = false AND auto_tag_category IS NOT NULL {user_clause}
                 GROUP BY auto_tag_category
@@ -706,23 +708,9 @@ class ContentRepository(BaseRepository[Content]):
             params,
         )).all()
 
-        kept_rows = (await self.session.execute(
-            text(f"""
-                SELECT auto_tag_category, COUNT(*) AS kept
-                FROM content
-                WHERE is_deleted = false AND auto_tag_category IS NOT NULL
-                  AND status = 'ARCHIVED' {user_clause}
-                GROUP BY auto_tag_category
-            """),
-            params,
-        )).all()
-
-        total_map = {row[0]: row[1] for row in total_rows}
-        kept_map = {row[0]: row[1] for row in kept_rows}
-
         return [
-            {"category": cat, "total": total, "kept": kept_map.get(cat, 0)}
-            for cat, total in sorted(total_map.items(), key=lambda x: -x[1])
+            {"category": row[0], "total": row[1], "kept": row[2]}
+            for row in sorted(rows, key=lambda r: -r[1])
         ]
 
     async def count_all(
