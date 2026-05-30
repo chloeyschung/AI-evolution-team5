@@ -11,6 +11,8 @@ struct ItemDetailView: View {
     @State private var isProcessing = false
     @State private var isArticleExpanded = false
     @State private var showBrowser = false
+    @State private var isSummaryLoading = false
+    @State private var loadedSummary: String? = nil
     @Environment(\.dismiss) private var dismiss
 
     init(items: [SavedItem], startIndex: Int, showActions: Bool) {
@@ -335,14 +337,47 @@ struct ItemDetailView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Label("AI 요약", systemImage: "sparkles")
                     .font(.subheadline.weight(.semibold))
-                Text("AI 요약은 Phase 2b에서 추가될 예정입니다.\nClaude API를 통해 본문 핵심 내용을 최대 300자로 요약해 드립니다.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if isSummaryLoading {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("요약 생성 중...")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                } else if let summary = loadedSummary ?? currentItem.summary {
+                    Text(summary)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text("요약을 준비 중입니다.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
+            .task(id: currentItem.id) {
+                loadedSummary = nil
+                guard let contentId = currentItem.serverContentId,
+                      let token = AuthTokenStore.shared.accessToken else { return }
+                guard currentItem.summary == nil else { return }
+                isSummaryLoading = true
+                defer { isSummaryLoading = false }
+                for attempt in 0..<5 {
+                    if attempt > 0 {
+                        try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    }
+                    if let detail = try? await BrieflyAPI.shared.fetchContentDetail(contentId: contentId, token: token),
+                       let summary = detail.summary {
+                        loadedSummary = summary
+                        StorageService.shared.updateSummary(for: currentItem.id, summary: summary)
+                        return
+                    }
+                }
+            }
 
             // 본문
             articleSection
