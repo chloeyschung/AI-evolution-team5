@@ -16,7 +16,7 @@ struct SplashView: View {
                     .renderingMode(.template)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 220)
+                    .frame(maxWidth: 240)
                     .foregroundStyle(Color.brieflyPrimary600)
 
                 Text("CONSUME. NOT COLLECT.")
@@ -24,6 +24,7 @@ struct SplashView: View {
                     .foregroundStyle(Color.brieflyInk400)
                     .kerning(1.2)
             }
+            .padding(.horizontal, 40)
             .opacity(logoOpacity)
             .offset(y: logoOffset)
         }
@@ -44,7 +45,6 @@ struct SplashView: View {
         }
     }
 }
-
 
 #Preview {
     SplashView(onFinished: {})
