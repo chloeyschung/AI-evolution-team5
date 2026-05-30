@@ -67,8 +67,11 @@ struct SavedItemsView: View {
                     UIApplication.shared.open(item.url)
                     viewModel.markAsRead(item)
                 }
+                .listRowBackground(Color.brieflyBgApp)
         }
         .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(Color.brieflyBgApp)
         .refreshable {
             viewModel.reload()
         }

@@ -4,7 +4,6 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var viewModel = SavedItemsViewModel()
     @State private var selectedTab = 0
-    @State private var showSplash = true
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -62,12 +61,6 @@ struct ContentView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                     NotificationCenter.default.post(name: .brieflyOpenItem, object: articleURL)
                 }
-            }
-        }
-        .overlay(alignment: .center) {
-            if showSplash {
-                SplashView(onFinished: { showSplash = false })
-                    .ignoresSafeArea()
             }
         }
     }

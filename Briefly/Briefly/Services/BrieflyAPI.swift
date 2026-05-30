@@ -12,16 +12,22 @@ actor BrieflyAPI {
     static let devURLKey = "briefly_dev_base_url"
     static let defaultDevURL = "https://briefly-api-production-2a40.up.railway.app/api/v1"
 
+    /// 환경별 기본 baseURL. Simulator는 localhost, 실기기 DEBUG는 Railway, Release는 prod.
+    /// DevServerSheet와 init이 같은 값을 보도록 single source.
+    static var defaultDebugURL: String {
+        #if targetEnvironment(simulator)
+        return "http://localhost:8000/api/v1"
+        #else
+        return defaultDevURL
+        #endif
+    }
+
     private init() {
         #if DEBUG
-        #if targetEnvironment(simulator)
-        baseURL = URL(string: "http://localhost:8000/api/v1")!
-        #else
         let stored = UserDefaults.standard.string(forKey: BrieflyAPI.devURLKey) ?? ""
-        let urlString = stored.isEmpty ? BrieflyAPI.defaultDevURL : stored
-        baseURL = URL(string: urlString) ?? URL(string: BrieflyAPI.defaultDevURL)!
+        let urlString = stored.isEmpty ? BrieflyAPI.defaultDebugURL : stored
+        baseURL = URL(string: urlString) ?? URL(string: BrieflyAPI.defaultDebugURL)!
         print("[BrieflyAPI] baseURL: \(baseURL)")
-        #endif
         #else
         baseURL = URL(string: "https://api.briefly.app/api/v1")!
         #endif
@@ -31,11 +37,29 @@ actor BrieflyAPI {
         session = URLSession(configuration: config)
     }
 
-    func updateBaseURL(_ urlString: String) {
+    /// DevServerSheet 등에서 호출하는 URL 검증.
+    /// scheme/host 필수, `/api/v1` 경로 필수.
+    static func validateBaseURLString(_ urlString: String) -> URL? {
         let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: trimmed) else { return }
+        guard let comps = URLComponents(string: trimmed),
+              let scheme = comps.scheme?.lowercased(),
+              (scheme == "http" || scheme == "https"),
+              let host = comps.host, !host.isEmpty else {
+            return nil
+        }
+        // 백엔드 라우터가 /api/v1 prefix이므로 경로 필수.
+        let normalizedPath = comps.path.trimmingCharacters(in: .init(charactersIn: "/"))
+        guard normalizedPath.contains("api/v1") else { return nil }
+        return comps.url
+    }
+
+    /// 유효한 dev URL이면 적용 + 저장, 아니면 false 반환.
+    @discardableResult
+    func updateBaseURL(_ urlString: String) -> Bool {
+        guard let url = BrieflyAPI.validateBaseURLString(urlString) else { return false }
         baseURL = url
-        UserDefaults.standard.set(trimmed, forKey: BrieflyAPI.devURLKey)
+        UserDefaults.standard.set(url.absoluteString, forKey: BrieflyAPI.devURLKey)
+        return true
     }
 
     // MARK: - Share
@@ -89,8 +113,7 @@ actor BrieflyAPI {
             throw APIError.httpError(0, nil)
         }
         guard (200...299).contains(http.statusCode) else {
-            let message = try? JSONDecoder().decode([String: String].self, from: data)["detail"]
-            throw APIError.httpError(http.statusCode, message)
+            throw APIError.httpError(http.statusCode, BrieflyAPI.decodeErrorMessage(from: data))
         }
         let decoder = JSONDecoder()
         return try decoder.decode(R.self, from: data)
@@ -299,6 +322,15 @@ actor BrieflyAPI {
         }
     }
 
+    /// 백엔드 표준 에러 응답을 통일된 메시지로 디코드.
+    /// 우선순위: `message` (POST 표준) → `detail` (FastAPI/일부 GET) → `error` (custom)
+    private static func decodeErrorMessage(from data: Data) -> String? {
+        if let dict = try? JSONDecoder().decode([String: String].self, from: data) {
+            return dict["message"] ?? dict["detail"] ?? dict["error"]
+        }
+        return nil
+    }
+
     private func post<B: Encodable, R: Decodable>(_ path: String, body: B, token: String?) async throws -> R {
         var request = URLRequest(url: baseURL.appendingPathComponent(path))
         request.httpMethod = "POST"
@@ -313,8 +345,7 @@ actor BrieflyAPI {
             throw APIError.httpError(0, nil)
         }
         guard (200...299).contains(http.statusCode) else {
-            let message = (try? JSONDecoder().decode([String: String].self, from: data))?["message"]
-            throw APIError.httpError(http.statusCode, message)
+            throw APIError.httpError(http.statusCode, BrieflyAPI.decodeErrorMessage(from: data))
         }
         return try JSONDecoder().decode(R.self, from: data)
     }

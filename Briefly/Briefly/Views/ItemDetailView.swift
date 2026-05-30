@@ -64,7 +64,7 @@ struct ItemDetailView: View {
                 ToolbarItem(placement: .principal) {
                     Text("\(currentIndex + 1) / \(items.count)")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.brieflyInk400)
                 }
             }
         }
@@ -311,7 +311,7 @@ struct ItemDetailView: View {
                     image.resizable().scaledToFill()
                 } placeholder: {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.secondary.opacity(0.25))
+                        .fill(Color.brieflyInk200)
                 }
                 .frame(width: 20, height: 20)
                 .clipShape(RoundedRectangle(cornerRadius: 4))
@@ -328,8 +328,8 @@ struct ItemDetailView: View {
 
             // 저장 날짜
             Label(currentItem.savedAt.detailDateString, systemImage: "calendar")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.brieflyMeta)
+                .foregroundStyle(Color.brieflyInk400)
 
             Divider()
 
@@ -403,7 +403,7 @@ struct ItemDetailView: View {
 
             Text(currentItem.url.absoluteString)
                 .font(.caption2)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Color.brieflyInk300)
                 .lineLimit(2)
         }
         .padding(20)
