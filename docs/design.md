@@ -267,7 +267,34 @@ ASCII 예시:
 - **사이즈 토큰 동기화:** Web의 `--icon-md: 20px` ↔ iOS `IconSize.md = 20pt`. (Phase 2 §9.4 참조.)
 - **다국어 안전:** 한글 라벨이 1~2자(예: "나")로 짧아질 때도 아이콘이 있으면 hit-target과 스캔 가능성이 확보됨. → 데스크탑 사이드바에도 아이콘 유지를 권장.
 
-### 5.2 썸네일 이미지 처리
+### 5.2 로고 시스템 (UX-008)
+
+공식 로고 에셋 두 종류를 상황에 따라 사용. 색상은 배경에 따라 전환.
+
+**에셋 위치**
+- `images/logo_full.svg` — 가로형 워드마크 "Briefly" (viewBox 1530×546)
+- `images/logo_short.png` — B 레터마크 PNG (600×600), 브라우저 확장 전용
+- `images/logo_ios.png` — iOS 앱 아이콘용 PNG (1024×1024)
+
+**사용 기준**
+
+| 맥락 | 로고 종류 | 배경 | 로고 색 |
+|---|---|---|---|
+| 웹 로그인 페이지 | `LogoFull` (워드마크) | 카키 `#3A4229` | 흰색 |
+| 웹 사이드바 / 회원가입 / 파비콘 / 확장 | `LogoShort` (B 레터마크) | 카키 `#3A4229` | 흰색 |
+| **iOS 스플래시 / 밝은 배경** | `LogoFull` (워드마크) | 라이트 `#FAFAF8` | 카키 `--color-primary-600` |
+
+**색상 전환 규칙**
+- 카키 배경(`#3A4229`) 위: `color: #FFFFFF` → 흰색 로고
+- 밝은 배경(투명/화이트) 위: `color: var(--color-primary-600)` → 카키 로고
+- Web: `fill="currentColor"` + 부모 CSS `color` 속성으로 제어
+- iOS: `.renderingMode(.template)` + `.foregroundStyle(Color.brieflyPrimary600)`
+
+**iOS 구현 (Asset Catalog)**
+- `Assets.xcassets/logo_full.imageset` — `preserves-vector-representation: true`, `template-rendering-intent: template`
+- 사용: `Image("logo_full").renderingMode(.template).foregroundStyle(Color.brieflyPrimary600)`
+
+### 5.3 썸네일 이미지 처리
 
 세 가지 케이스, 항상 16:9 비율, `--radius-md`:
 
