@@ -31,6 +31,7 @@ struct SavedItemsView: View {
                 listView
             }
         }
+        .background(Color.brieflyBgApp.ignoresSafeArea())
         .navigationTitle("Briefly")
         .navigationBarTitleDisplayMode(.large)
         .onAppear { viewModel.reload() }
@@ -39,17 +40,18 @@ struct SavedItemsView: View {
     // MARK: - Empty State
 
     private var emptyStateView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: BrieflySpacing.s4) {
             Image(systemName: "link.circle")
-                .font(.system(size: 60))
-                .foregroundStyle(.secondary)
+                .font(.system(size: 48))
+                .foregroundStyle(Color.brieflyInk300)
 
             Text("아직 저장된 링크가 없어요")
-                .font(.headline)
+                .font(.brieflyH2)
+                .foregroundStyle(Color.brieflyTextPrimary)
 
             Text("Safari에서 기사를 보다가\n공유 버튼 → Briefly를 탭해보세요")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(.brieflyBody)
+                .foregroundStyle(Color.brieflyTextSecondary)
                 .multilineTextAlignment(.center)
         }
         .padding()
@@ -81,18 +83,19 @@ private struct ItemRowView: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Circle()
-                .fill(item.status == .unread ? Color.accentColor : Color.clear)
+                .fill(item.status == .unread ? Color.brieflyPrimary500 : Color.clear)
                 .frame(width: 8, height: 8)
                 .padding(.top, 6)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.displayTitle)
-                    .font(.body)
+                    .font(.brieflyBody)
+                    .foregroundStyle(Color.brieflyTextPrimary)
                     .lineLimit(1)
 
                 Text("\(item.domain) · \(item.savedAt.relativeString)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.brieflyMeta)
+                    .foregroundStyle(Color.brieflyInk400)
             }
         }
         .padding(.vertical, 4)

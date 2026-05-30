@@ -78,6 +78,7 @@ final class ShareViewController: UIViewController {
                     let result = try await BrieflyAPI.shared.share(url: url, token: token)
                     print("[ShareExt] 업로드 성공: contentId=\(result.id)")
                     item.serverContentId = result.id
+                    item.summary = result.summary
                     StorageService.shared.updateItemById(item)
                 } catch {
                     print("[ShareExt] 업로드 실패 (메인 앱 열 때 SyncService가 재시도합니다): \(error.localizedDescription)")

@@ -75,6 +75,7 @@ struct LibraryView: View {
                                 }
 
                                 Divider()
+                                    .overlay(Color.brieflyBorder)
                                     .padding(.leading, 16)
                             }
                         }
@@ -92,12 +93,12 @@ struct LibraryView: View {
                         } label: {
                             Text(filter.rawValue)
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(selectedFilter == filter ? .primary : .secondary)
+                                .foregroundStyle(selectedFilter == filter ? Color.brieflyTextPrimary : Color.brieflyInk400)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 9)
                                 .background(
                                     selectedFilter == filter
-                                        ? Color(.systemBackground)
+                                        ? Color.brieflyBgSurface
                                         : Color.clear
                                 )
                                 .clipShape(Capsule())
@@ -105,8 +106,8 @@ struct LibraryView: View {
                     }
                 }
                 .padding(4)
-                .background(.regularMaterial, in: Capsule())
-                .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
+                .background(Color.brieflyBgApp.opacity(0.92), in: Capsule())
+                .brieflyShadow3()
                 .padding(.bottom, 20)
             }
             .navigationTitle(navigationTitle)
@@ -166,19 +167,21 @@ struct LibraryView: View {
             }
         }()
 
-        return VStack(spacing: 16) {
+        return VStack(spacing: BrieflySpacing.s4) {
             Image(systemName: icon)
-                .font(.system(size: 60))
-                .foregroundStyle(.secondary)
+                .font(.system(size: 48))
+                .foregroundStyle(Color.brieflyInk300)
             Text(title)
-                .font(.headline)
+                .font(.brieflyH2)
+                .foregroundStyle(Color.brieflyTextPrimary)
             Text(subtitle)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(.brieflyBody)
+                .foregroundStyle(Color.brieflyTextSecondary)
                 .multilineTextAlignment(.center)
         }
-        .padding()
+        .padding(BrieflySpacing.s6)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.brieflyBgApp.ignoresSafeArea())
     }
 }
 

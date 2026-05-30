@@ -4,6 +4,7 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var viewModel = SavedItemsViewModel()
     @State private var selectedTab = 0
+    @State private var showSplash = true
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -34,6 +35,7 @@ struct ContentView: View {
             .tabItem { Label("Account", systemImage: "person.fill") }
             .tag(3)
         }
+        .tint(.brieflyBrand)
         .onAppear {
             Task { await SyncService.shared.syncLocalItemsToServer() }
         }
@@ -60,6 +62,12 @@ struct ContentView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                     NotificationCenter.default.post(name: .brieflyOpenItem, object: articleURL)
                 }
+            }
+        }
+        .overlay(alignment: .center) {
+            if showSplash {
+                SplashView(onFinished: { showSplash = false })
+                    .ignoresSafeArea()
             }
         }
     }
