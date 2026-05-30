@@ -20,6 +20,9 @@ struct SavedItem: Codable, Identifiable, Hashable {
     var articleText: String?
     var fetchStatus: FetchStatus
 
+    // Phase 2b — AI 요약
+    var summary: String?
+
     enum Status: String, Codable {
         case unread, read, discarded
         case kept       // Keep 선택 → Archived 탭

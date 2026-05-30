@@ -6,12 +6,22 @@ import Foundation
 actor BrieflyAPI {
     static let shared = BrieflyAPI()
 
-    private let baseURL: URL
+    private var baseURL: URL
     private let session: URLSession
+
+    static let devURLKey = "briefly_dev_base_url"
+    static let defaultDevURL = "https://briefly-api-production-2a40.up.railway.app/api/v1"
 
     private init() {
         #if DEBUG
+        #if targetEnvironment(simulator)
         baseURL = URL(string: "http://localhost:8000/api/v1")!
+        #else
+        let stored = UserDefaults.standard.string(forKey: BrieflyAPI.devURLKey) ?? ""
+        let urlString = stored.isEmpty ? BrieflyAPI.defaultDevURL : stored
+        baseURL = URL(string: urlString) ?? URL(string: BrieflyAPI.defaultDevURL)!
+        print("[BrieflyAPI] baseURL: \(baseURL)")
+        #endif
         #else
         baseURL = URL(string: "https://api.briefly.app/api/v1")!
         #endif
@@ -19,6 +29,13 @@ actor BrieflyAPI {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         session = URLSession(configuration: config)
+    }
+
+    func updateBaseURL(_ urlString: String) {
+        let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: trimmed) else { return }
+        baseURL = url
+        UserDefaults.standard.set(trimmed, forKey: BrieflyAPI.devURLKey)
     }
 
     // MARK: - Share
@@ -34,9 +51,10 @@ actor BrieflyAPI {
         let title: String?
         let platform: String
         let createdAt: String
+        let summary: String?
 
         enum CodingKeys: String, CodingKey {
-            case id, url, title, platform
+            case id, url, title, platform, summary
             case createdAt = "created_at"
         }
     }
@@ -44,6 +62,38 @@ actor BrieflyAPI {
     func share(url: URL, token: String) async throws -> ShareResult {
         let body = SharePayload(content: url.absoluteString, platform: url.host ?? "web")
         return try await post("/share", body: body, token: token)
+    }
+
+    // MARK: - Content Detail
+
+    struct ContentDetail: Decodable {
+        let id: Int
+        let summary: String?
+
+        enum CodingKeys: String, CodingKey {
+            case id, summary
+        }
+    }
+
+    func fetchContentDetail(contentId: Int, token: String) async throws -> ContentDetail {
+        return try await get("/content/\(contentId)", token: token)
+    }
+
+    private func get<R: Decodable>(_ path: String, token: String) async throws -> R {
+        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.httpError(0, nil)
+        }
+        guard (200...299).contains(http.statusCode) else {
+            let message = try? JSONDecoder().decode([String: String].self, from: data)["detail"]
+            throw APIError.httpError(http.statusCode, message)
+        }
+        let decoder = JSONDecoder()
+        return try decoder.decode(R.self, from: data)
     }
 
     // MARK: - Swipe (Keep / Delete)
