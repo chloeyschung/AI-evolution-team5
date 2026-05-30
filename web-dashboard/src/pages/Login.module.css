@@ -21,29 +21,20 @@
 /* ── Logo ────────────────────────────────────────────────── */
 .logoWrap {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-6) var(--space-6) var(--space-5);
+  justify-content: center;
+  padding: var(--space-5) var(--space-6);
   background: var(--color-primary-600);
   border-radius: var(--radius-md);
   color: #FFFFFF;
 }
 
-.loginLogoIcon {
-  width: 72px;
-  height: 72px;
+.loginLogo {
+  width: 80%;
+  max-width: 166px;
+  height: auto;
   display: block;
-  flex-shrink: 0;
-}
-
-.loginLogoText {
-  font-family: var(--font-display);
-  font-size: 2rem;
-  font-weight: 400;
-  letter-spacing: -0.01em;
-  color: #FFFFFF;
-  line-height: 1;
+  margin: 10px auto 0;
 }
 
 .card h1 {
@@ -320,6 +311,36 @@
   text-align: center;
   color: var(--color-ink-secondary);
   max-inline-size: none;
+}
+
+/* ── SignUp brand badge ─────────────────────────────────── */
+.brandRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.brandGlyph {
+  background: var(--color-primary-600);
+  border-radius: 9px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: #FFFFFF;
+}
+
+.brandGlyphLogo {
+  width: 14px;
+  height: 18px;
+  display: block;
+}
+
+.brandCaption {
+  margin: 0;
+  font-size: var(--text-micro);
+  color: var(--color-ink-muted);
 }
 
 /* ── Responsive ─────────────────────────────────────────── */

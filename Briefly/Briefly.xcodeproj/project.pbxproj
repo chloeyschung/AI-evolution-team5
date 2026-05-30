@@ -34,6 +34,7 @@
 		F6C0D5177D57462EE9E27E5F /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E4D1DFF8124BDD536CE34B8 /* LibraryView.swift */; };
 		FB5126CC4C836132192D774D /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85B61CF3B7E4990F5EE98A81 /* ShareViewController.swift */; };
 		FD8B9E2F680381F4EE06DA01 /* SyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E33BC4B09CDBA76DE211812A /* SyncService.swift */; };
+		060A48A12FBD72E5865C279E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 473310EBF3A64462602D7769 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -93,6 +94,7 @@
 		EBD3BB00F8972C23F3FE6293 /* SafariBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariBrowserView.swift; sourceTree = "<group>"; };
 		FBCE49D658971632424D9A88 /* ArticleService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArticleService.swift; sourceTree = "<group>"; };
 		FFE332E4A1B94830A31BB8EB /* WebContentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebContentService.swift; sourceTree = "<group>"; };
+		473310EBF3A64462602D7769 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -166,6 +168,7 @@
 		BD7F6D7A652A03F6151B9A4E /* Briefly */ = {
 			isa = PBXGroup;
 			children = (
+				473310EBF3A64462602D7769 /* Assets.xcassets */,
 				073A69009AFB06A90A3B37D0 /* BrieflyApp.swift */,
 				5334EDE6A77681E97C6D7607 /* BrieflyDesignSystem.swift */,
 				741BC2D1CB5142F4E3C61AC4 /* ContentView.swift */,
@@ -220,6 +223,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 60DB47B3450A71DAC708C70A /* Build configuration list for PBXNativeTarget "Briefly" */;
 			buildPhases = (
+				0EC478D016E248DB1A12A178 /* Resources */,
 				82B530D3A6F52D5394074478 /* Sources */,
 				C5E0FF258348A2C52570FBC0 /* Frameworks */,
 				39BA639A31ABB5F085434683 /* Embed Foundation Extensions */,
@@ -290,6 +294,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		0EC478D016E248DB1A12A178 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				060A48A12FBD72E5865C279E /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		2A59A6EBB239329761B83023 /* Sources */ = {

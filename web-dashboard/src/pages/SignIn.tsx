@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import styles from './Login.module.css';
 import { useAuthStore } from '../stores/useAuthStore';
 import { resendVerificationEmail } from '../api/endpoints';
+import { LogoFull } from '../components/Logo';
 
 type AuthStep = 'email' | 'password';
 
@@ -99,14 +100,7 @@ export default function SignIn() {
     <section className={styles.page} data-testid="login-page">
       <div className={styles.card} data-testid="auth-signal-lane">
         <div className={styles.logoWrap}>
-          <svg className={styles.loginLogoIcon} viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="10.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <line x1="14" y1="78" x2="86" y2="78" />
-            <path d="M 14 78 V 50 a 18 18 0 0 1 36 0 V 78" />
-            <path d="M 50 78 V 46 a 18 18 0 0 1 36 0 V 78" />
-            <line x1="22" y1="62" x2="42" y2="62" strokeWidth="4.725" opacity="0.55" />
-            <line x1="58" y1="62" x2="78" y2="62" strokeWidth="4.725" opacity="0.55" />
-          </svg>
-          <span className={styles.loginLogoText}>Briefly</span>
+          <LogoFull className={styles.loginLogo} />
         </div>
         <h1>Log in or create an account.</h1>
 
