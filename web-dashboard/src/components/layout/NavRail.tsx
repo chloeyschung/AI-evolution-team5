@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import styles from './NavRail.module.css';
+import { LogoShort } from '../Logo';
 
 function IconDashboard() {
   return (
@@ -77,13 +78,7 @@ export default function NavRail() {
     <aside className={styles.rail} data-testid="nav-rail">
       <div className={styles.brand}>
         <div className={styles.logoWrap}>
-          <svg className={styles.logo} viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="10.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <line x1="14" y1="78" x2="86" y2="78" />
-            <path d="M 14 78 V 50 a 18 18 0 0 1 36 0 V 78" />
-            <path d="M 50 78 V 46 a 18 18 0 0 1 36 0 V 78" />
-            <line x1="22" y1="62" x2="42" y2="62" strokeWidth="4.725" opacity="0.55" />
-            <line x1="58" y1="62" x2="78" y2="62" strokeWidth="4.725" opacity="0.55" />
-          </svg>
+          <LogoShort className={styles.logo} />
         </div>
         <div className={styles.brandText}>
           <strong>Briefly</strong>
