@@ -270,7 +270,7 @@ private struct DevServerSheet: View {
                             Text(validationError)
                                 .foregroundStyle(Color.brieflyError)
                         }
-                        Text("필수: http/https scheme + /api/v1 경로. 저장 후 앱을 재시작하면 적용돼요.")
+                        Text("필수: http/https scheme + /api/v1 경로. 저장하면 다음 API 호출부터 즉시 적용됩니다.")
                     }
                 }
 

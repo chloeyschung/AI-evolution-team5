@@ -22,7 +22,9 @@ struct BrieflyApp: App {
                     }
 
                 if !didShowSplash {
-                    SplashView(onFinished: { didShowSplash = true })
+                    SplashView(onFinished: {
+                        withAnimation(.easeOut(duration: 0.3)) { didShowSplash = true }
+                    })
                         .ignoresSafeArea()
                         .transition(.opacity)
                 }
