@@ -29,22 +29,19 @@ struct SplashView: View {
             .offset(y: logoOffset)
         }
         .opacity(screenOpacity)
-        .onAppear { animate() }
-    }
-
-    private func animate() {
-        withAnimation(.easeOut(duration: 0.45)) {
-            logoOpacity = 1
-            logoOffset  = 0
-        }
-        // 2초 유지 후 퇴장
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+        .task {
+            // 등장 → 2초 유지 → 퇴장.
+            // .task는 뷰 해제 시 자동 cancel되어 race condition 회피.
+            withAnimation(.easeOut(duration: 0.45)) {
+                logoOpacity = 1
+                logoOffset  = 0
+            }
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
             withAnimation(.easeIn(duration: 0.35)) {
                 screenOpacity = 0
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                onFinished()
-            }
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            onFinished()
         }
     }
 }
