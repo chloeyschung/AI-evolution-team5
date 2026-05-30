@@ -3,6 +3,7 @@ import GoogleSignIn
 
 struct AccountView: View {
     @StateObject private var viewModel = AuthViewModel()
+    @State private var showDevSettings = false
 
     var body: some View {
         Group {
@@ -13,8 +14,22 @@ struct AccountView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.brieflyBgApp.ignoresSafeArea())
         .navigationTitle("Account")
         .navigationBarTitleDisplayMode(.large)
+        #if DEBUG
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button { showDevSettings = true } label: {
+                    Image(systemName: "antenna.radiowaves.left.and.right")
+                        .foregroundStyle(Color.brieflyInk400)
+                }
+            }
+        }
+        .sheet(isPresented: $showDevSettings) {
+            DevServerSheet()
+        }
+        #endif
         .alert("오류", isPresented: $viewModel.showError) {
             Button("확인") {}
         } message: {
@@ -28,11 +43,11 @@ struct AccountView: View {
         VStack(spacing: 20) {
             Image(systemName: "person.circle.fill")
                 .font(.system(size: 64))
-                .foregroundStyle(.blue)
+                .foregroundStyle(Color.brieflyBrand)
 
             Text(viewModel.loggedInEmail)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.brieflyTextSecondary)
 
             Button(role: .destructive) {
                 viewModel.logout()
@@ -53,12 +68,13 @@ struct AccountView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "person.circle")
                         .font(.system(size: 64))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.brieflyInk300)
                     Text("Briefly에 로그인")
-                        .font(.title3.bold())
+                        .font(.brieflyH2)
+                        .foregroundStyle(Color.brieflyTextPrimary)
                     Text("저장한 링크를 모든 기기에서 동기화합니다")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.brieflyTextSecondary)
                         .multilineTextAlignment(.center)
                 }
                 .padding(.top, 32)
@@ -87,22 +103,22 @@ struct AccountView: View {
                                 .padding(.vertical, 4)
                         }
                         .buttonStyle(.borderedProminent)
+                        .tint(Color.brieflyPrimary500)
                         .disabled(viewModel.emailInput.isEmpty || viewModel.passwordInput.isEmpty)
 
                         HStack {
-                            Rectangle().frame(height: 1).foregroundStyle(Color(UIColor.separator))
-                            Text("또는").font(.caption).foregroundStyle(.secondary)
-                            Rectangle().frame(height: 1).foregroundStyle(Color(UIColor.separator))
+                            Rectangle().frame(height: 1).foregroundStyle(Color.brieflyBorder)
+                            Text("또는").font(.caption).foregroundStyle(Color.brieflyInk400)
+                            Rectangle().frame(height: 1).foregroundStyle(Color.brieflyBorder)
                         }
 
                         Button {
                             viewModel.signInWithGoogle()
                         } label: {
                             HStack(spacing: 8) {
-                                Image(systemName: "globe")
-                                    .foregroundStyle(.primary)
+                                GoogleGLogo(size: 18)
                                 Text("Google로 로그인")
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(Color.brieflyTextPrimary)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 4)
@@ -224,6 +240,74 @@ final class AuthViewModel: ObservableObject {
         showError = true
     }
 }
+
+// MARK: - Dev Server Sheet (DEBUG only)
+
+#if DEBUG
+private struct DevServerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var urlInput: String = UserDefaults.standard.string(forKey: BrieflyAPI.devURLKey) ?? BrieflyAPI.defaultDebugURL
+    @State private var validationError: String?
+
+    private var isValid: Bool {
+        BrieflyAPI.validateBaseURLString(urlInput) != nil
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("https://xxxx.trycloudflare.com/api/v1", text: $urlInput)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .onChange(of: urlInput) { _ in validationError = nil }
+                } header: {
+                    Text("백엔드 URL")
+                } footer: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let validationError {
+                            Text(validationError)
+                                .foregroundStyle(Color.brieflyError)
+                        }
+                        Text("필수: http/https scheme + /api/v1 경로. 저장하면 다음 API 호출부터 즉시 적용됩니다.")
+                    }
+                }
+
+                Section {
+                    Button("기본값으로 초기화") {
+                        urlInput = BrieflyAPI.defaultDebugURL
+                        validationError = nil
+                    }
+                    .foregroundStyle(Color.brieflyInk400)
+                }
+            }
+            .navigationTitle("서버 설정")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("저장") {
+                        Task {
+                            let ok = await BrieflyAPI.shared.updateBaseURL(urlInput)
+                            await MainActor.run {
+                                if ok {
+                                    dismiss()
+                                } else {
+                                    validationError = "유효한 URL이 아닙니다 (http/https + /api/v1 필요)"
+                                }
+                            }
+                        }
+                    }
+                    .disabled(!isValid)
+                }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("취소") { dismiss() }
+                }
+            }
+        }
+    }
+}
+#endif
 
 #Preview {
     NavigationStack { AccountView() }

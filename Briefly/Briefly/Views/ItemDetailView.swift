@@ -27,7 +27,7 @@ struct ItemDetailView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            Color(.systemGroupedBackground).ignoresSafeArea()
+            Color.brieflyBgApp.ignoresSafeArea()
 
             // 외부 ScrollView — 카드 전체가 콘텐츠 높이만큼 늘어나며 스크롤됨
             ScrollView(.vertical, showsIndicators: false) {
@@ -35,9 +35,9 @@ struct ItemDetailView: View {
                     thumbnailSection
                     contentSection
                 }
-                .background(Color(.systemBackground))
+                .background(Color.brieflyBgSurface)
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .shadow(color: .black.opacity(0.12), radius: 18, y: 6)
+                .brieflyShadow3()
                 .scaleEffect(cardScale)
                 .padding(.horizontal, 12)
                 .padding(.top, 4)
@@ -64,7 +64,7 @@ struct ItemDetailView: View {
                 ToolbarItem(placement: .principal) {
                     Text("\(currentIndex + 1) / \(items.count)")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.brieflyInk400)
                 }
             }
         }
@@ -76,10 +76,10 @@ struct ItemDetailView: View {
     @ViewBuilder
     private var swipeIndicators: some View {
         HStack {
-            swipeBadge("DELETE", color: .red, degrees: -15,
+            swipeBadge("DELETE", color: Color.brieflyError, degrees: -15,
                        opacity: dragOffset < -20 ? Double(min(1.0, abs(dragOffset) / 80.0)) : 0)
             Spacer()
-            swipeBadge("KEEP", color: .green, degrees: 15,
+            swipeBadge("KEEP", color: Color.brieflyPrimary500, degrees: 15,
                        opacity: dragOffset > 20 ? Double(min(1.0, abs(dragOffset) / 80.0)) : 0)
         }
         .padding(.top, 20)
@@ -262,23 +262,23 @@ struct ItemDetailView: View {
             HStack(spacing: 0) {
                 Button("Delete") { performDelete() }
                     .frame(maxWidth: .infinity)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Color.brieflyError)
 
                 Divider().frame(height: 22)
 
                 Button("Skip Now") { performSkip() }
                     .frame(maxWidth: .infinity)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.brieflyInk400)
 
                 Divider().frame(height: 22)
 
                 Button("Keep") { performKeep() }
                     .frame(maxWidth: .infinity)
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Color.brieflyPrimary500)
             }
             .font(.subheadline.weight(.semibold))
             .padding(.vertical, 14)
-            .background(Color(.systemBackground))
+            .background(Color.brieflyBgSurface)
         }
         .disabled(isProcessing)
     }
@@ -311,25 +311,25 @@ struct ItemDetailView: View {
                     image.resizable().scaledToFill()
                 } placeholder: {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.secondary.opacity(0.25))
+                        .fill(Color.brieflyInk200)
                 }
                 .frame(width: 20, height: 20)
                 .clipShape(RoundedRectangle(cornerRadius: 4))
 
                 Text(currentItem.siteName?.uppercased() ?? currentItem.domain.uppercased())
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.brieflyInk400)
             }
 
             // 제목
             Text(currentItem.displayTitle)
-                .font(.title2.weight(.bold))
+                .font(.brieflyH1)
                 .fixedSize(horizontal: false, vertical: true)
 
             // 저장 날짜
             Label(currentItem.savedAt.detailDateString, systemImage: "calendar")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(.brieflyMeta)
+                .foregroundStyle(Color.brieflyInk400)
 
             Divider()
 
@@ -337,28 +337,29 @@ struct ItemDetailView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Label("AI 요약", systemImage: "sparkles")
                     .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.brieflyPrimary600)
                 if isSummaryLoading {
                     HStack(spacing: 8) {
                         ProgressView()
                             .scaleEffect(0.8)
                         Text("요약 생성 중...")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.brieflyTextSecondary)
                     }
                 } else if let summary = loadedSummary ?? currentItem.summary {
                     Text(summary)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.brieflyTextSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
                     Text("요약을 준비 중입니다.")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.brieflyTextSecondary)
                 }
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
+            .background(Color.brieflyPrimary50, in: RoundedRectangle(cornerRadius: BrieflyRadius.md))
             .task(id: currentItem.id) {
                 loadedSummary = nil
                 guard let contentId = currentItem.serverContentId,
@@ -392,17 +393,17 @@ struct ItemDetailView: View {
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.brieflyInk300)
                 }
                 .font(.body.weight(.medium))
-                .foregroundStyle(.blue)
+                .foregroundStyle(Color.brieflyPrimary600)
                 .padding(14)
-                .background(Color.blue.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
+                .background(Color.brieflyPrimary50, in: RoundedRectangle(cornerRadius: BrieflyRadius.md))
             }
 
             Text(currentItem.url.absoluteString)
                 .font(.caption2)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Color.brieflyInk300)
                 .lineLimit(2)
         }
         .padding(20)
@@ -416,11 +417,11 @@ struct ItemDetailView: View {
                 ProgressView()
                 Text("본문을 불러오는 중...")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.brieflyTextSecondary)
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
+            .background(Color.brieflyInk50, in: RoundedRectangle(cornerRadius: BrieflyRadius.md))
 
         case .failed:
             EmptyView()
@@ -439,19 +440,19 @@ struct ItemDetailView: View {
                         } label: {
                             Text(isArticleExpanded ? "접기" : "펼치기")
                                 .font(.caption)
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(Color.brieflyPrimary500)
                         }
                     }
                     Text(text)
                         .font(.body)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.brieflyTextPrimary)
                         .lineLimit(isArticleExpanded ? nil : 6)
                         .fixedSize(horizontal: false, vertical: true)
                         .animation(.easeInOut(duration: 0.2), value: isArticleExpanded)
                 }
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 12))
+                .background(Color.brieflyInk50, in: RoundedRectangle(cornerRadius: BrieflyRadius.md))
             }
         }
     }
@@ -462,11 +463,11 @@ struct ItemDetailView: View {
 
     private var thumbnailPlaceholder: some View {
         Rectangle()
-            .fill(Color.secondary.opacity(0.1))
+            .fill(Color.brieflyInk100)
             .overlay {
                 Image(systemName: "photo")
                     .font(.system(size: 40))
-                    .foregroundStyle(.secondary.opacity(0.35))
+                    .foregroundStyle(Color.brieflyInk300)
             }
     }
 }

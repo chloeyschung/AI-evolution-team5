@@ -75,6 +75,7 @@ struct LibraryView: View {
                                 }
 
                                 Divider()
+                                    .overlay(Color.brieflyBorder)
                                     .padding(.leading, 16)
                             }
                         }
@@ -92,12 +93,12 @@ struct LibraryView: View {
                         } label: {
                             Text(filter.rawValue)
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(selectedFilter == filter ? .primary : .secondary)
+                                .foregroundStyle(selectedFilter == filter ? Color.brieflyTextPrimary : Color.brieflyInk400)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 9)
                                 .background(
                                     selectedFilter == filter
-                                        ? Color(.systemBackground)
+                                        ? Color.brieflyBgSurface
                                         : Color.clear
                                 )
                                 .clipShape(Capsule())
@@ -105,8 +106,8 @@ struct LibraryView: View {
                     }
                 }
                 .padding(4)
-                .background(.regularMaterial, in: Capsule())
-                .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
+                .background(Color.brieflyBgApp.opacity(0.92), in: Capsule())
+                .brieflyShadow3()
                 .padding(.bottom, 20)
             }
             .navigationTitle(navigationTitle)
@@ -166,19 +167,21 @@ struct LibraryView: View {
             }
         }()
 
-        return VStack(spacing: 16) {
+        return VStack(spacing: BrieflySpacing.s4) {
             Image(systemName: icon)
-                .font(.system(size: 60))
-                .foregroundStyle(.secondary)
+                .font(.system(size: 48))
+                .foregroundStyle(Color.brieflyInk300)
             Text(title)
-                .font(.headline)
+                .font(.brieflyH2)
+                .foregroundStyle(Color.brieflyTextPrimary)
             Text(subtitle)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(.brieflyBody)
+                .foregroundStyle(Color.brieflyTextSecondary)
                 .multilineTextAlignment(.center)
         }
-        .padding()
+        .padding(BrieflySpacing.s6)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.brieflyBgApp.ignoresSafeArea())
     }
 }
 
@@ -196,14 +199,14 @@ struct LibraryCardView: View {
                     image.resizable().scaledToFill()
                 } placeholder: {
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(Color.secondary.opacity(0.25))
+                        .fill(Color.brieflyInk200)
                 }
                 .frame(width: 16, height: 16)
                 .clipShape(RoundedRectangle(cornerRadius: 3))
 
                 Text(item.siteName?.uppercased() ?? item.domain.uppercased())
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .font(.brieflyMeta)
+                    .foregroundStyle(Color.brieflyInk400)
 
                 Spacer()
 
@@ -214,17 +217,18 @@ struct LibraryCardView: View {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(item.displayTitle)
-                        .font(.body.weight(.semibold))
+                        .font(.brieflyH4)
+                        .foregroundStyle(Color.brieflyTextPrimary)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
 
                     Text(item.savedAt.libraryDateString)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.brieflyMeta)
+                        .foregroundStyle(Color.brieflyInk400)
 
                     Text(item.ogDescription ?? "AI 요약이 준비 중입니다")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .font(.brieflyBodySm)
+                        .foregroundStyle(Color.brieflyTextSecondary)
                         .lineLimit(3)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -245,7 +249,7 @@ struct LibraryCardView: View {
                     }
                 }
                 .frame(width: 80, height: 80)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .clipShape(RoundedRectangle(cornerRadius: BrieflyRadius.sm))
             }
         }
         .padding(16)
@@ -264,25 +268,25 @@ struct LibraryCardView: View {
         case .failed:
             Image(systemName: "exclamationmark.circle")
                 .font(.caption)
-                .foregroundStyle(.red.opacity(0.6))
+                .foregroundStyle(Color.brieflyError.opacity(0.7))
         case .partial:
             Image(systemName: "exclamationmark.circle")
                 .font(.caption)
-                .foregroundStyle(.orange.opacity(0.6))
+                .foregroundStyle(Color.brieflyWarning.opacity(0.7))
         default:
             Image(systemName: "ellipsis")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.brieflyInk400)
                 .font(.subheadline)
         }
     }
 
     var thumbnailPlaceholder: some View {
-        RoundedRectangle(cornerRadius: 8)
-            .fill(Color.secondary.opacity(0.12))
+        RoundedRectangle(cornerRadius: BrieflyRadius.sm)
+            .fill(Color.brieflyInk100)
             .overlay {
                 Image(systemName: "photo")
-                    .foregroundStyle(.secondary.opacity(0.4))
-                    .font(.title3)
+                    .foregroundStyle(Color.brieflyInk300)
+                    .font(.brieflyH3)
             }
     }
 }

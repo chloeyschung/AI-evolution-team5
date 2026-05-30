@@ -34,6 +34,7 @@ struct ContentView: View {
             .tabItem { Label("Account", systemImage: "person.fill") }
             .tag(3)
         }
+        .tint(.brieflyBrand)
         .onAppear {
             Task { await SyncService.shared.syncLocalItemsToServer() }
         }
