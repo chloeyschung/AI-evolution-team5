@@ -170,7 +170,16 @@ async def test_db_session():
 
 @pytest.fixture(scope="session", autouse=True)
 def cleanup_test_db_after_session():
-    """Clean up test database file after all tests complete."""
+    """Remove stale test DB file before session starts and after it ends.
+
+    Deleting at start ensures schema migrations added since the last run are
+    always picked up — create_all does not ALTER existing tables.
+    """
+    if os.path.exists(TEST_DATABASE_PATH):
+        try:
+            os.remove(TEST_DATABASE_PATH)
+        except Exception:
+            pass
     yield
     if os.path.exists(TEST_DATABASE_PATH):
         try:

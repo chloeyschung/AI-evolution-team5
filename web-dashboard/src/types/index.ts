@@ -20,6 +20,10 @@ export interface Content {
   screenshot_image_id?: number | null;
   linked_url?: string | null;
   preview_url?: string | null;
+  auto_tag_status: string | null;
+  auto_tag_category: string | null;
+  auto_tag_keywords_en: string[];
+  auto_tag_keywords_original: string[];
 }
 
 export interface SourceInsight {
@@ -73,6 +77,16 @@ export interface UserStatistics {
   last_swipe_at: string | null;
 }
 
+export interface CategoryStat {
+  category: string;
+  total: number;
+  kept: number;
+}
+
+export interface CategoryStats {
+  categories: CategoryStat[];
+}
+
 // Filter & Sort Types
 
 export type ContentStatus = 'inbox' | 'archived' | 'all';
@@ -84,6 +98,7 @@ export interface ContentFilters {
   platform: string | null;
   dateFrom: string | null;
   dateTo: string | null;
+  category: string | null;
 }
 
 export interface ContentSort {

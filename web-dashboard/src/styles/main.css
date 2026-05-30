@@ -1,122 +1,183 @@
 /* ============================================================
-   BRIEFLY — main.css  v4.0 "Resolution"
+   BRIEFLY — main.css  v5.0 "Olive Forest"
+   Design system: docs/design.md
    ============================================================
 
-   ┌─ HOW TO CHANGE THE COLOR THEME ──────────────────────────┐
-   │  1. Ctrl+F the hex you want to change (e.g. #1F6B58)     │
-   │  2. Replace ALL occurrences in this file only            │
-   │  3. Save — CSS variables propagate everywhere            │
-   │                                                          │
-   │  THEME PALETTE (the only hexes you need to touch):       │
-   │                                                          │
-   │  Signal (CTA / accent)  →  #1F6B58                       │
-   │  Canvas (page bg)       →  #FAF8F4                       │
-   │  Ink    (primary text)  →  #141210                       │
-   │  AI     (machine mark)  →  #4A7C7E                       │
-   │                                                          │
-   │  To go dark-mode-first, swap --bg values in             │
-   │  [data-theme='dark'] block at the bottom.               │
-   └──────────────────────────────────────────────────────────┘
-
-   BANNED — never re-introduce these:
-   • #E07A3C amber / any gold   → reads Anthropic
-   • #6B5BFF purple / iris      → reads Sendbird
-   • #D42B20 BBC-red            → reads news authority
-   • #2D72D2 cold blue          → reads enterprise
-   • Newsreader or any serif    → reads LongBlack/editorial
-   • Radial gradient body bg    → competes with content
-   • Left-border metric cards   → 2015 dashboard trope
+   THEME PALETTE (from design.md §2):
+   Primary  →  #4F5938 (Olive Forest 500)
+   Brand    →  #3A4229 (Olive Forest 600)
+   Paper bg →  #FAFAF8 (warm off-white)
+   Ink      →  #1A1D14 (near-black, warm)
+   Accent   →  #E89B5C (Sunrise — achievement only)
 
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
 /* ============================================================
    §1  DESIGN TOKENS  (:root)
-   ─────────────────────────────────────────────────────────────
-   All visual decisions live here. Engineers use the token
-   names (e.g. var(--color-signal)) — never raw hex values.
    ============================================================ */
 :root {
 
-  /* ── §1.1  SIGNAL ACCENT ────────────────────────────────────
-     THE one color that calls the eye. One per view.
-     Max one --color-signal-filled element per page region.
+  /* ── §1.1  PRIMARY — Olive Forest ──────────────────────────
+     Dark olive green: keep action, brand anchor.
      ───────────────────────────────────────────────────────── */
-  --color-signal:         #1F6B58;   /* ← change theme accent HERE */
-  --color-signal-hover:   #185746;
-  --color-signal-active:  #124038;
-  --color-signal-subtle:  #E6F2EF;   /* tinted bg: focus rings, AI blocks  */
-  --color-signal-on:      #FFFFFF;   /* text color on signal fill           */
+  --color-primary-50:  #F0F2EA;
+  --color-primary-100: #DDE0CE;
+  --color-primary-200: #B8BFA1;
+  --color-primary-300: #929977;
+  --color-primary-400: #6E7654;
+  --color-primary-500: #4F5938;   /* Primary action (Keep, toggle on) */
+  --color-primary-600: #3A4229;   /* Logo / brand — dark olive */
+  --color-primary-700: #2B311E;   /* Pressed state */
+  --color-primary-800: #1F2415;   /* Dark mode surface */
+  --color-primary-900: #15180D;   /* Dark mode deep surface */
 
-  /* ── §1.2  CANVAS & SURFACES ────────────────────────────────
-     Warm stone scale. Never blue-grey, never cream paper.
+  /* ── §1.2  PAPER — warm off-white ──────────────────────────
+     App background is off-white, cards are pure white.
      ───────────────────────────────────────────────────────── */
-  --color-canvas:           #FAF8F4;   /* ← page background — always plain, no gradient */
-  --color-surface:          #FFFFFF;   /* cards, panels, inputs                          */
-  --color-surface-muted:    #F4F1EC;   /* sidebars, recessed panels                      */
-  --color-surface-overlay:  #F4F1EC;   /* drawer / modal backing                         */
+  --color-paper-50:  #FAFAF8;   /* App background (light) */
+  --color-paper-100: #FFFFFF;   /* Card surface */
+  --color-paper-200: #F2F2EE;   /* Dividers, inactive surfaces */
+  --color-paper-300: #E5E5DE;   /* Border */
+  --color-paper-400: #C7C7BD;   /* Inactive text above */
 
-  /* ── §1.3  INK (TEXT) ───────────────────────────────────────
-     Warm near-black scale. Never pure #000000.
+  /* ── §1.3  ACCENT — Sunrise ────────────────────────────────
+     Achievement only: cleared inbox, streak. Use sparingly.
      ───────────────────────────────────────────────────────── */
-  --color-ink-primary:      #141210;   /* ← primary text — change HERE for all text      */
-  --color-ink-secondary:    #5C5347;   /* labels, secondary body                         */
-  --color-ink-muted:        #8A7F72;   /* captions, timestamps, eyebrows                 */
-  --color-ink-disabled:     #B3A99A;   /* non-interactive text                           */
+  --color-accent-50:  #FDF4E8;
+  --color-accent-100: #FBE6CB;
+  --color-accent-300: #F2BE85;
+  --color-accent-500: #E89B5C;   /* Achievement highlight */
+  --color-accent-700: #B26F3A;
+  --color-accent-900: #7A4920;
 
-  /* ── §1.4  BORDERS ──────────────────────────────────────────
-     Derived from the ink scale. Adjust strength here.
+  /* ── §1.4  INK — text & borders ────────────────────────────
+     Warm near-black. Never pure #000.
      ───────────────────────────────────────────────────────── */
-  --color-border:           #E8E3DA;   /* default hairline                               */
-  --color-border-muted:     #F0EDE6;   /* subtle separation                              */
-  --color-border-strong:    #D4CCBF;   /* emphasized / hover                             */
+  --color-ink-50:  #F5F6F0;
+  --color-ink-100: #EAECE3;
+  --color-ink-200: #D7DAD0;
+  --color-ink-300: #B8BCB0;
+  --color-ink-400: #909488;
+  --color-ink-500: #71756A;
+  --color-ink-700: #3D4135;
+  --color-ink-900: #1A1D14;
 
-  /* ── §1.5  SEMANTIC COLORS ──────────────────────────────────
-     Desaturated by design — these are information signals,
-     NOT brand colors. Never use as CTA fills.
+  /* ── §1.5  SEMANTIC ─────────────────────────────────────────
+     design.md §2.5: guilt-free palette. Error = terracotta, not red.
      ───────────────────────────────────────────────────────── */
+  --color-success:        #4F5938;   /* primary-500 reuse */
+  --color-success-subtle: #F0F2EA;
+  --color-success-on:     #FFFFFF;
 
-  /* AI / Machine-generated content — the ONLY cool tone */
-  --color-ai:               #4A7C7E;   /* ← AI teal — used ONLY for summaries/suggestions */
-  --color-ai-subtle:        #E5EEEE;
-  --color-ai-on:            #FFFFFF;
+  --color-info:        #5A7AA8;   /* calm slate blue */
+  --color-info-subtle: #EEF2F8;
+  --color-info-on:     #FFFFFF;
 
-  /* Success / Kept / Cleared */
-  --color-success:          #3E7A4E;
-  --color-success-subtle:   #E2EEE5;
-  --color-success-on:       #FFFFFF;
+  --color-warning:        #D89A3A;   /* sunrise-derived */
+  --color-warning-subtle: #FDF4E8;
+  --color-warning-on:     #FFFFFF;
 
-  /* Attention / Mild heads-up (never for deadlines or guilt) */
-  --color-attention:        #8C6B2E;
-  --color-attention-subtle: #F0E8D6;
+  --color-error:        #B65A4E;   /* terracotta — not aggressive red */
+  --color-error-subtle: #FBF0EE;
+  --color-error-on:     #FFFFFF;
+
+  /* ── §1.6  ROLE TOKENS  (design.md §2.6) ───────────────────
+     Light mode defaults. Dark mode overrides below.
+     ───────────────────────────────────────────────────────── */
+  --bg-app:      #FAFAF8;   /* paper-50 */
+  --bg-surface:  #FFFFFF;   /* paper-100 */
+  --bg-elevated: #FFFFFF;
+  --text-primary:   #1A1D14;   /* ink-900 */
+  --text-secondary: #71756A;   /* ink-500 */
+  --border:         #E5E5DE;   /* paper-300 */
+  --brand:          #3A4229;   /* primary-600 */
+
+  /* ── §1.7  SIGNAL (CTA) — maps to primary-500/400/700 ──────
+     Legacy alias kept so component files don't break.
+     ───────────────────────────────────────────────────────── */
+  --color-signal:        #4F5938;
+  --color-signal-hover:  #6E7654;
+  --color-signal-active: #2B311E;
+  --color-signal-subtle: #F0F2EA;
+  --color-signal-on:     #FFFFFF;
+
+  /* ── §1.8  CANVAS & SURFACES (legacy names) ────────────────
+     These now point to the paper palette.
+     ───────────────────────────────────────────────────────── */
+  --color-canvas:          #FAFAF8;   /* paper-50 */
+  --color-surface:         #FFFFFF;   /* paper-100 */
+  --color-surface-muted:   #F2F2EE;   /* paper-200 */
+  --color-surface-overlay: #F2F2EE;
+
+  /* ── §1.9  INK (legacy names) ───────────────────────────────
+     Component files reference these; keep them in sync.
+     ───────────────────────────────────────────────────────── */
+  --color-ink-primary:   #1A1D14;   /* ink-900 */
+  --color-ink-secondary: #3D4135;   /* ink-700 */
+  --color-ink-muted:     #71756A;   /* ink-500 */
+  --color-ink-disabled:  #909488;   /* ink-400 */
+
+  /* ── §1.10  BORDERS (legacy names) ─────────────────────────
+     ───────────────────────────────────────────────────────── */
+  --color-border:        #E5E5DE;   /* paper-300 */
+  --color-border-muted:  #F2F2EE;   /* paper-200 */
+  --color-border-strong: #D7DAD0;   /* ink-200 */
+
+  /* ── §1.11  AI tone (legacy semantic) ──────────────────────
+     Calm slate blue — only for AI/machine-generated content.
+     ───────────────────────────────────────────────────────── */
+  --color-ai:        #5A7AA8;
+  --color-ai-subtle: #EEF2F8;
+  --color-ai-on:     #FFFFFF;
+
+  /* Danger = terracotta, not BBC red (design.md §2.5) */
+  --color-danger:        #B65A4E;
+  --color-danger-subtle: #FBF0EE;
+  --color-danger-on:     #FFFFFF;
+
+  /* Attention */
+  --color-attention:        #D89A3A;
+  --color-attention-subtle: #FDF4E8;
   --color-attention-on:     #FFFFFF;
 
-  /* Danger — permanent deletion ONLY. Never for archive/skip. */
-  --color-danger:           #A14234;
-  --color-danger-subtle:    #F0DDD9;
-  --color-danger-on:        #FFFFFF;
-
-  /* ── §1.6  TYPOGRAPHY ───────────────────────────────────────
-     One family (DM Sans) + mono for data.
-     No serif. No Newsreader. No Geist.
+  /* ── §1.12  TYPOGRAPHY ──────────────────────────────────────
+     design.md §3: Serif display + Sans body + Mono data.
+     Pretendard for Korean UI.
      ───────────────────────────────────────────────────────── */
-  --font-display: 'DM Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-body:    'DM Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-display: "Instrument Serif", "Pretendard", ui-serif, Georgia, serif;
+  --font-sans:    "IBM Plex Sans", "Pretendard", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body:    "IBM Plex Sans", "Pretendard", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-ui:      var(--font-body);
 
-  /* Type scale — 6 sizes, no more */
-  --text-hero:   clamp(44px, 5vw, 68px);  /* H1  lh:1.06  tracking:-0.04em               */
-  --text-title:  36px;                     /* H2  lh:1.20  tracking:-0.03em               */
-  --text-h3:     26px;                     /* H3  lh:1.30  tracking:-0.025em              */
-  --text-lede:   18px;                     /* Lead copy  lh:1.6  max:58ch                 */
-  --text-body:   16px;                     /* Prose  lh:1.55  max:68ch                    */
-  --text-ui:     14px;                     /* Buttons, labels, nav  lh:1.4                */
-  --text-micro:  11px;                     /* MONO ONLY — timestamps, counts  lh:1.4      */
+  /* Type scale (design.md §3.2) */
+  --text-display: 40px;   /* Serif, onboarding / cleared screen */
+  --text-h1:      28px;   /* Serif, page title */
+  --text-h2:      22px;   /* Sans 600, card title */
+  --text-h3:      18px;   /* Sans 600, section header */
+  --text-h4:      16px;   /* Sans 600, inline emphasis */
+  --text-body:    15px;   /* Sans 400, prose */
+  --text-body-sm: 13px;   /* Sans 400, card summary */
+  --text-label:   12px;   /* Sans 500, buttons/chips */
+  --text-meta:    11px;   /* Mono, dates / sources / labels — UPPERCASE */
+  --text-caption: 11px;   /* Sans, footnotes */
 
-  /* ── §1.7  SPACING  (4px base, strict) ─────────────────────
-     Use these tokens. Never write raw px in components.
+  /* Legacy type aliases */
+  --text-hero:  clamp(40px, 5vw, 64px);
+  --text-title: var(--text-h1);
+  --text-h3-size: var(--text-h3);
+  --text-lede:  var(--text-h3);
+  --text-ui:    14px;
+  --text-micro: var(--text-meta);
+  --fs-small:   var(--text-meta);
+
+  /* ── §1.13  SPACING  (4px base) ─────────────────────────────
+     design.md §4.1: 4px scale, 0→64.
      ───────────────────────────────────────────────────────── */
+  --space-0:   0px;
   --space-1:   4px;
   --space-2:   8px;
   --space-3:  12px;
@@ -130,148 +191,175 @@
   --space-20: 80px;
   --space-24: 96px;
 
-  /* ── §1.8  BORDER RADIUS ────────────────────────────────────
-     sm → inputs/chips   md → buttons   lg → cards   pill → status
+  /* ── §1.14  BORDER RADIUS (design.md §4.2) ──────────────────
      ───────────────────────────────────────────────────────── */
-  --radius-sm:    8px;
-  --radius-md:    12px;
-  --radius-lg:    18px;
-  --radius-xl:    24px;
-  --radius-pill:  999px;
+  --radius-xs:   4px;    /* chips, small inputs */
+  --radius-sm:   8px;    /* buttons, inputs */
+  --radius-md:   12px;   /* small cards, modal border */
+  --radius-lg:   16px;   /* main card */
+  --radius-xl:   24px;   /* bottom sheet top */
+  --radius-full: 9999px; /* avatars, toggles, pills */
+  --radius-pill: 9999px; /* legacy alias */
+  --radius-panel: var(--radius-lg);
 
-  /* ── §1.9  ELEVATION ────────────────────────────────────────
-     01 rest · 02 card hover · 03 sticky bars · 04 modals
-     Shadows are warm (rgba brown-black). Never blue shadows.
+  /* ── §1.15  ELEVATION (design.md §4.3) ──────────────────────
+     Warm olive-tinted shadows. Pure black shadows forbidden.
      ───────────────────────────────────────────────────────── */
-  --elevation-01:
-    0 1px 2px rgba(20, 18, 16, .05);
-  --elevation-02:
-    0 1px 2px rgba(20, 18, 16, .05),
-    0 6px 18px -6px rgba(20, 18, 16, .10);
-  --elevation-03:
-    0 1px 2px rgba(20, 18, 16, .05),
-    0 16px 36px -10px rgba(20, 18, 16, .16);
-  --elevation-04:
-    0 1px 2px rgba(20, 18, 16, .05),
-    0 28px 64px -14px rgba(20, 18, 16, .24);
+  --shadow-0: none;
+  --shadow-1: 0 1px 2px rgba(26,29,20,0.04), 0 1px 1px rgba(26,29,20,0.03);
+  --shadow-2: 0 2px 6px rgba(26,29,20,0.06), 0 1px 2px rgba(26,29,20,0.04);
+  --shadow-3: 0 8px 20px rgba(26,29,20,0.08), 0 2px 6px rgba(26,29,20,0.05);
+  --shadow-4: 0 20px 40px rgba(26,29,20,0.12);
 
-  /* Signal halo — CTA only, never decorative */
+  /* Legacy elevation aliases */
+  --elevation-01: var(--shadow-1);
+  --elevation-02: var(--shadow-2);
+  --elevation-03: var(--shadow-3);
+  --elevation-04: var(--shadow-4);
   --elevation-signal:
     0 0 0 1px color-mix(in srgb, var(--color-signal) 32%, transparent),
     0 8px 24px -6px color-mix(in srgb, var(--color-signal) 28%, transparent);
 
-  /* ── §1.10  MOTION ──────────────────────────────────────────
-     Three categories. No bounce. No ornamental shimmer.
-     arrival=page load · progression=navigation · affordance=hover/click
+  --shadow-sm: var(--shadow-1);
+  --shadow-md: var(--shadow-2);
+  --shadow-lg: var(--shadow-3);
+
+  /* ── §1.16  MOTION (design.md §7) ───────────────────────────
+     Fast but smooth. Radical Brevity = actions also brief.
      ───────────────────────────────────────────────────────── */
-  --ease-standard:   cubic-bezier(0.2, 0.7, 0.2, 1);
-  --ease-out:        cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-instant: 80ms;    /* color change, focus ring */
+  --motion-fast:    160ms;   /* hover, small transform */
+  --motion-base:    240ms;   /* card transition default */
+  --motion-slow:    320ms;   /* card exit / large transform */
+  --motion-page:    400ms;   /* page / sheet transition */
 
-  --motion-arrival:     220ms;   /* soft staged reveal for hero/first-view  */
-  --motion-progression: 180ms;   /* drawer, table, panel transitions        */
-  --motion-affordance:  140ms;   /* hover, focus, active micro-states       */
+  /* Legacy motion aliases */
+  --motion-arrival:     var(--motion-base);
+  --motion-progression: var(--motion-fast);
+  --motion-affordance:  var(--motion-fast);
+  --dur-base:           var(--motion-fast);
+  --dur-slow:           var(--motion-base);
+  --duration-fast:      var(--motion-fast);
+  --duration-base:      var(--motion-base);
+  --duration-slow:      var(--motion-slow);
 
-  /* ── §1.11  LAYOUT ──────────────────────────────────────────
-     App shell dimensions. Adjust rail-width for sidebar.
+  /* ── §1.17  EASING (design.md §7.2) ─────────────────────────
      ───────────────────────────────────────────────────────── */
-  --rail-width:         260px;   /* ← sidebar width — change here           */
-  --content-max:       1160px;
-  --topbar-height:       60px;
-  --gutter: clamp(20px, 3vw, 48px);
+  --ease-out:      cubic-bezier(0.2, 0.8, 0.2, 1);   /* appear (default) */
+  --ease-in:       cubic-bezier(0.4, 0, 1, 1);        /* disappear */
+  --ease-in-out:   cubic-bezier(0.4, 0, 0.2, 1);      /* bidirectional */
+  --ease-spring:   cubic-bezier(0.34, 1.56, 0.64, 1); /* card return only */
 
-  /* ── §1.12  LEGACY ALIASES ──────────────────────────────────
+  /* Legacy easing aliases */
+  --ease-standard:  var(--ease-out);
+  --ease-emphasized: var(--ease-out);
+
+  /* ── §1.18  ICON SIZES ───────────────────────────────────────
+     design.md §5.1: Lucide, 1.5px stroke, 24px viewbox.
+     ───────────────────────────────────────────────────────── */
+  --icon-sm: 16px;
+  --icon-md: 20px;
+  --icon-lg: 24px;
+  --icon-xl: 32px;
+
+  /* ── §1.19  LAYOUT ───────────────────────────────────────────
+     design.md §8.2: desktop sidebar 240px, content 1200px.
+     ───────────────────────────────────────────────────────── */
+  --rail-width:    240px;
+  --content-max:  1200px;
+  --topbar-height:  60px;
+  --gutter: clamp(16px, 3vw, 48px);
+
+  /* ── §1.20  LEGACY ALIASES ───────────────────────────────────
      Keep these so existing component files don't break.
-     Remove gradually as components migrate to v4 tokens.
+     Migrate components gradually to use the new token names.
      ───────────────────────────────────────────────────────── */
   --bg-canvas:          var(--color-canvas);
   --bg-base:            var(--color-canvas);
-  --bg-surface:         var(--color-surface);
   --bg-surface-muted:   var(--color-surface-muted);
-  --bg-elevated:        var(--color-surface);
   --bg-hover:           var(--color-surface-muted);
   --bg-active:          var(--color-signal-subtle);
-  --bg-overlay:         rgba(20, 18, 16, 0.52);
+  --bg-overlay:         rgba(26, 29, 20, 0.52);
   --bg-primary:         var(--color-signal);
 
-  --text-primary:       var(--color-ink-primary);
-  --text-secondary:     var(--color-ink-secondary);
-  --text-muted:         var(--color-ink-muted);
-  --text-inverse:       #FFFFFF;
+  --text-muted:   var(--color-ink-muted);
+  --text-inverse: #FFFFFF;
 
-  --border-subtle:      var(--color-border-muted);
-  --border-default:     var(--color-border);
-  --border-hover:       var(--color-border-strong);
-  --border:             var(--color-border);
+  --border-subtle:  var(--color-border-muted);
+  --border-default: var(--color-border);
+  --border-hover:   var(--color-border-strong);
 
-  --accent-primary:     var(--color-signal);
-  --accent-success:     var(--color-success);
-  --accent-info:        var(--color-ai);
-  --color-primary:      var(--color-signal);
+  --accent-primary: var(--color-signal);
+  --accent-success: var(--color-success);
+  --accent-info:    var(--color-ai);
+  --color-primary:  var(--color-signal);
   --color-primary-strong: var(--color-signal-active);
-  --primary-color:      var(--color-signal);
-  --primary-hover:      var(--color-signal-hover);
+  --primary-color:  var(--color-signal);
+  --primary-hover:  var(--color-signal-hover);
 
-  --radius-panel:       var(--radius-lg);
-  --sidebar-width:      var(--rail-width);
+  --sidebar-width:           var(--rail-width);
   --sidebar-collapsed-width: 64px;
-
-  --shadow-sm:          var(--elevation-01);
-  --shadow-md:          var(--elevation-02);
-  --shadow-lg:          var(--elevation-03);
-
-  --dur-base:           var(--motion-affordance);
-  --dur-slow:           var(--motion-arrival);
-  --duration-fast:      var(--motion-affordance);
-  --duration-base:      var(--motion-progression);
-  --duration-slow:      var(--motion-arrival);
-  --ease-emphasized:    var(--ease-out);
-  --fs-small:           var(--text-micro);
-
-  --font-ui:            var(--font-body);
-  --font-mono:          'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
 
 /* ============================================================
-   §2  DARK MODE
+   §2  DARK MODE  (design.md §2.6)
    ─────────────────────────────────────────────────────────────
-   Only role tokens change here. Primitives stay the same.
-   The signal (#1F6B58) is bright enough for both modes.
+   Warm dark — no pure #000. Primary-900 based.
+   Body text: ink-50, NOT pure white.
    ============================================================ */
 [data-theme='dark'] {
-  /* §2.1 Canvas — near-black warm, not cold */
-  --color-canvas:           #0E0D0B;
-  --color-surface:          #181613;
-  --color-surface-muted:    #1E1B17;
-  --color-surface-overlay:  #1C1A15;
+  /* Role tokens */
+  --bg-app:      #1A1D14;   /* ink-900 */
+  --bg-surface:  #222619;
+  --bg-elevated: #2B2F22;
+  --text-primary:   #F5F6F0;   /* ink-50 */
+  --text-secondary: #B8BCB0;   /* ink-300 */
+  --border:         #3D4135;   /* ink-700 */
+  --brand:          #929977;   /* primary-300 */
 
-  /* §2.2 Ink — inverted */
-  --color-ink-primary:      #F4F1EC;
-  --color-ink-secondary:    #B3A99A;
-  --color-ink-muted:        #8A7F72;
-  --color-ink-disabled:     #5C5347;
+  /* Canvas & surfaces */
+  --color-canvas:          #1A1D14;
+  --color-surface:         #222619;
+  --color-surface-muted:   #2B2F22;
+  --color-surface-overlay: #2B2F22;
 
-  /* §2.3 Signal — same hex, works on dark */
-  --color-signal-subtle:    #122820;
+  /* Ink */
+  --color-ink-primary:   #F5F6F0;
+  --color-ink-secondary: #B8BCB0;
+  --color-ink-muted:     #71756A;
+  --color-ink-disabled:  #3D4135;
 
-  /* §2.4 Borders — lighter on dark */
-  --color-border:           #2C2822;
-  --color-border-muted:     #231F1B;
-  --color-border-strong:    #3A342C;
+  /* Signal stays readable on dark */
+  --color-signal:        #929977;   /* primary-300 on dark */
+  --color-signal-hover:  #B8BFA1;
+  --color-signal-active: #DDE0CE;
+  --color-signal-subtle: #1F2415;
 
-  /* §2.5 Semantic dark variants */
-  --color-ai-subtle:        #142121;
-  --color-success-subtle:   #142019;
-  --color-attention-subtle: #201A0E;
-  --color-danger-subtle:    #1E120F;
+  /* Borders */
+  --color-border:        #3D4135;
+  --color-border-muted:  #2B2F22;
+  --color-border-strong: #4F5938;
 
-  /* §2.6 Dark elevations (deeper shadows) */
-  --elevation-01: 0 1px 2px rgba(0,0,0,.5);
-  --elevation-02: 0 1px 2px rgba(0,0,0,.5), 0 8px 20px -4px rgba(0,0,0,.65);
-  --elevation-03: 0 1px 2px rgba(0,0,0,.5), 0 20px 40px -10px rgba(0,0,0,.75);
-  --elevation-04: 0 1px 2px rgba(0,0,0,.5), 0 32px 72px -14px rgba(0,0,0,.85);
+  /* Semantic dark variants */
+  --color-ai-subtle:        #1A2130;
+  --color-success-subtle:   #1F2415;
+  --color-attention-subtle: #2B1E0D;
+  --color-error-subtle:     #2B1A18;
+  --color-danger-subtle:    #2B1A18;
 
-  --bg-hover:     var(--color-surface-muted);
-  --bg-overlay:   rgba(0, 0, 0, 0.65);
+  /* Dark shadows (deeper) */
+  --shadow-1: 0 1px 2px rgba(0,0,0,0.4), 0 1px 1px rgba(0,0,0,0.3);
+  --shadow-2: 0 2px 6px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.4);
+  --shadow-3: 0 8px 20px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.5);
+  --shadow-4: 0 20px 40px rgba(0,0,0,0.7);
+  --elevation-01: var(--shadow-1);
+  --elevation-02: var(--shadow-2);
+  --elevation-03: var(--shadow-3);
+  --elevation-04: var(--shadow-4);
+
+  --bg-hover:    var(--color-surface-muted);
+  --bg-overlay:  rgba(0, 0, 0, 0.65);
+  --bg-active:   var(--color-signal-subtle);
 }
 
 /* ============================================================
@@ -297,39 +385,47 @@ body {
   font-size: var(--text-body);
   line-height: 1.55;
   color: var(--color-ink-primary);
-  background: var(--color-canvas); /* plain — no gradient */
+  background: var(--bg-app);
 }
 
 #app { min-height: 100vh; }
 
 /* ============================================================
-   §4  TYPOGRAPHY BASE
+   §4  TYPOGRAPHY BASE (design.md §3)
    ─────────────────────────────────────────────────────────────
-   §4 controls heading defaults.
-   To change ALL heading sizes: edit --text-* tokens in §1.6.
-   To change heading font family: edit --font-display in §1.6.
+   H1/H2: Instrument Serif (editorial). H3+: IBM Plex Sans.
    ============================================================ */
 h1, h2, h3, h4, h5, h6 {
   margin: 0;
-  font-family: var(--font-display);
   font-weight: 500;
   color: var(--color-ink-primary);
 }
 
 h1 {
-  font-size: var(--text-hero);
-  line-height: 1.06;
-  letter-spacing: -0.04em;
+  font-family: var(--font-display);
+  font-size: var(--text-h1);   /* 28px */
+  line-height: 1.25;
+  letter-spacing: -0.02em;
 }
 h2 {
-  font-size: var(--text-title);
-  line-height: 1.2;
-  letter-spacing: -0.03em;
+  font-family: var(--font-sans);
+  font-size: var(--text-h2);   /* 22px */
+  font-weight: 600;
+  line-height: 1.28;
+  letter-spacing: -0.015em;
 }
 h3 {
-  font-size: var(--text-h3);
-  line-height: 1.3;
-  letter-spacing: -0.025em;
+  font-family: var(--font-sans);
+  font-size: var(--text-h3);   /* 18px */
+  font-weight: 600;
+  line-height: 1.33;
+  letter-spacing: -0.01em;
+}
+h4 {
+  font-family: var(--font-sans);
+  font-size: var(--text-h4);   /* 16px */
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 p {
@@ -338,7 +434,7 @@ p {
 }
 
 a {
-  color: var(--color-signal);
+  color: var(--brand);
   text-decoration: none;
 }
 a:hover { color: var(--color-signal-hover); }
@@ -346,8 +442,7 @@ a:hover { color: var(--color-signal-hover); }
 /* ============================================================
    §5  FORM ELEMENTS
    ─────────────────────────────────────────────────────────────
-   To change focus ring color: change --color-signal in §1.1.
-   To change input border radius: change --radius-md in §1.8.
+   Focus ring: primary-500 @ 25% (design.md §6.1).
    ============================================================ */
 button, input, select, textarea {
   font: inherit;
@@ -360,14 +455,14 @@ select,
 textarea {
   min-height: 44px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
   color: var(--color-ink-primary);
-  padding: 0 var(--space-3);
-  font-size: var(--text-ui);
+  padding: 0 var(--space-4);
+  font-size: var(--text-body);
   transition:
-    border-color   var(--motion-affordance) var(--ease-standard),
-    box-shadow     var(--motion-affordance) var(--ease-standard);
+    border-color var(--motion-fast) var(--ease-out),
+    box-shadow   var(--motion-fast) var(--ease-out);
 }
 
 input:focus-visible,
@@ -375,13 +470,13 @@ select:focus-visible,
 textarea:focus-visible {
   outline: none;
   border-color: var(--color-signal);
-  box-shadow: 0 0 0 4px var(--color-signal-subtle);
+  box-shadow: 0 0 0 3px rgba(79, 89, 56, 0.25);
 }
 
 :focus-visible {
   outline: 2px solid var(--color-signal);
   outline-offset: 2px;
-  box-shadow: 0 0 0 4px var(--color-signal-subtle);
+  box-shadow: 0 0 0 3px rgba(79, 89, 56, 0.25);
 }
 
 ::selection {
@@ -390,99 +485,99 @@ textarea:focus-visible {
 }
 
 /* ============================================================
-   §6  BUTTONS
+   §6  BUTTONS (design.md §6.1)
    ─────────────────────────────────────────────────────────────
-   To change CTA color: change --color-signal in §1.1.
-   Primary = one per view. Secondary = peer of primary.
-   Ghost = minor/reversible. Destructive = permanent delete ONLY.
+   Primary: olive-500 fill. Secondary: outlined. Ghost: transparent.
+   Danger: outlined terracotta — permanent delete ONLY.
    ============================================================ */
 
-/* §6.1 Primary — signal fill, max ONE per view */
+/* §6.1 Primary */
 .btn-primary {
   display: inline-flex; align-items: center; justify-content: center;
   gap: var(--space-2);
   min-height: 40px;
   padding: 0 var(--space-5);
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  background: var(--color-signal);
-  color: var(--color-signal-on);
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-500);
+  color: #FFFFFF;
   font-family: var(--font-body);
-  font-size: var(--text-ui);
+  font-size: var(--text-label);
   font-weight: 600;
   line-height: 1;
   cursor: pointer;
   transition:
-    background-color var(--motion-affordance) var(--ease-standard),
-    box-shadow       var(--motion-affordance) var(--ease-standard),
-    transform        var(--motion-affordance) var(--ease-standard);
+    background-color var(--motion-fast) var(--ease-out),
+    box-shadow       var(--motion-fast) var(--ease-out),
+    transform        var(--motion-fast) var(--ease-out);
 }
-.btn-primary:hover  { background: var(--color-signal-hover); box-shadow: var(--elevation-signal); transform: translateY(-1px); }
-.btn-primary:active { background: var(--color-signal-active); transform: translateY(0); box-shadow: none; }
-.btn-primary:focus-visible { outline: 2px solid var(--color-signal); outline-offset: 2px; box-shadow: 0 0 0 4px var(--color-signal-subtle); }
-.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-primary:hover  { background: var(--color-primary-400); box-shadow: var(--elevation-signal); transform: translateY(-1px); }
+.btn-primary:active { background: var(--color-primary-700); transform: translateY(0); box-shadow: none; }
+.btn-primary:focus-visible { outline: 2px solid var(--color-signal); outline-offset: 2px; box-shadow: 0 0 0 3px rgba(79,89,56,0.25); }
+.btn-primary:disabled { background: var(--color-ink-200); color: var(--color-ink-400); cursor: not-allowed; transform: none; box-shadow: none; }
 
-/* §6.2 Secondary — outlined, peer of primary */
+/* §6.2 Secondary */
 .btn-secondary {
   display: inline-flex; align-items: center; justify-content: center;
   gap: var(--space-2);
   min-height: 40px;
   padding: 0 var(--space-4);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-ink-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
   font-family: var(--font-body);
-  font-size: var(--text-ui);
+  font-size: var(--text-label);
   font-weight: 500;
   line-height: 1;
   cursor: pointer;
   transition:
-    border-color     var(--motion-affordance) var(--ease-standard),
-    background-color var(--motion-affordance) var(--ease-standard);
+    border-color     var(--motion-fast) var(--ease-out),
+    background-color var(--motion-fast) var(--ease-out);
 }
 .btn-secondary:hover { border-color: var(--color-ink-primary); background: var(--color-surface-muted); }
-.btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-secondary:disabled { border-color: var(--color-ink-200); color: var(--color-ink-400); cursor: not-allowed; }
 
-/* §6.3 Ghost — transparent, minor actions */
+/* §6.3 Ghost */
 .btn-ghost {
   display: inline-flex; align-items: center; justify-content: center;
   gap: var(--space-2);
   min-height: 36px;
   padding: 0 var(--space-3);
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--color-ink-secondary);
+  color: var(--brand);
   font-family: var(--font-body);
-  font-size: var(--text-ui);
+  font-size: var(--text-label);
   font-weight: 500;
   cursor: pointer;
   transition:
-    background-color var(--motion-affordance) var(--ease-standard),
-    color            var(--motion-affordance) var(--ease-standard);
+    background-color var(--motion-fast) var(--ease-out),
+    color            var(--motion-fast) var(--ease-out);
 }
-.btn-ghost:hover { background: var(--color-surface-muted); color: var(--color-ink-primary); }
+.btn-ghost:hover { background: var(--color-primary-50); color: var(--color-primary-600); }
+.btn-ghost:disabled { color: var(--color-ink-400); cursor: not-allowed; }
 
-/* §6.4 Destructive — permanent delete ONLY, never for archive */
+/* §6.4 Danger — permanent delete ONLY */
 .btn-destructive {
   display: inline-flex; align-items: center; justify-content: center;
   gap: var(--space-2);
   min-height: 40px;
   padding: 0 var(--space-4);
-  border: 1px solid color-mix(in srgb, var(--color-danger) 40%, var(--color-border));
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-danger);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-error);
   font-family: var(--font-body);
-  font-size: var(--text-ui);
+  font-size: var(--text-label);
   font-weight: 500;
   cursor: pointer;
   transition:
-    background-color var(--motion-affordance) var(--ease-standard),
-    border-color     var(--motion-affordance) var(--ease-standard);
+    background-color var(--motion-fast) var(--ease-out),
+    border-color     var(--motion-fast) var(--ease-out);
 }
-.btn-destructive:hover { background: var(--color-danger-subtle); border-color: var(--color-danger); }
+.btn-destructive:hover { background: var(--color-error-subtle); border-color: var(--color-error); }
 
 /* §6.5 Legacy .btn alias */
 .btn {
@@ -490,42 +585,40 @@ textarea:focus-visible {
   min-height: 32px;
   padding: 0 var(--space-3);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
+  border-radius: var(--radius-xs);
+  background: var(--bg-surface);
   color: var(--color-ink-primary);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition:
-    border-color     var(--motion-affordance) var(--ease-standard),
-    background-color var(--motion-affordance) var(--ease-standard);
+    border-color     var(--motion-fast) var(--ease-out),
+    background-color var(--motion-fast) var(--ease-out);
 }
 .btn:hover { border-color: var(--color-border-strong); background: var(--color-surface-muted); }
-.btn-danger { border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border)); color: var(--color-danger); }
-.btn-danger:hover { background: var(--color-danger-subtle); }
+.btn-danger { border-color: color-mix(in srgb, var(--color-error) 45%, var(--color-border)); color: var(--color-error); }
+.btn-danger:hover { background: var(--color-error-subtle); }
 
 /* ============================================================
-   §7  STATUS PILLS & TAGS
+   §7  STATUS PILLS & TAGS (design.md §6.5)
    ─────────────────────────────────────────────────────────────
-   Dot (6px) + text + tinted background.
-   NO colored left-borders. NO full color flood.
-   To change kept-color: edit --color-success in §1.5.
-   To change AI-color: edit --color-ai in §1.5.
+   Height 24px, mono uppercase, radius-full.
    ============================================================ */
 .pill {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  height: 22px;
+  height: 24px;
   padding: 0 var(--space-2);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-full);
   border: 1px solid var(--color-border-muted);
-  background: var(--color-surface);
+  background: var(--bg-surface);
   font-family: var(--font-mono);
-  font-size: var(--text-micro);
+  font-size: var(--text-meta);
   font-weight: 500;
-  letter-spacing: 0.04em;
-  color: var(--color-ink-secondary);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
 }
 
 .pill-dot {
@@ -536,62 +629,79 @@ textarea:focus-visible {
   flex-shrink: 0;
 }
 
+/* Source chip */
+.pill-source {
+  background: var(--color-paper-200);
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
+/* Status chips (design.md §6.5) */
+.pill-inbox {
+  background: var(--color-ink-100);
+  border: none;
+  color: var(--text-secondary);
+}
+.pill-kept {
+  background: var(--color-primary-100);
+  border: none;
+  color: var(--color-primary-700);
+}
+.pill-archived {
+  background: var(--color-ink-100);
+  border: none;
+  color: var(--color-ink-700);
+}
+.pill-tag {
+  background: var(--color-accent-50);
+  border: none;
+  color: var(--color-accent-700);
+}
+
+/* Legacy pill names kept for compatibility */
 .pill-ai {
   background: var(--color-ai-subtle);
   border-color: color-mix(in srgb, var(--color-ai) 30%, var(--color-border-muted));
   color: var(--color-ai);
 }
-.pill-kept {
-  background: var(--color-success-subtle);
-  border-color: color-mix(in srgb, var(--color-success) 30%, var(--color-border-muted));
-  color: var(--color-success);
-}
-.pill-inbox {
-  background: var(--color-surface-muted);
-  border-color: var(--color-border);
-  color: var(--color-ink-secondary);
-}
-.pill-archived {
-  background: var(--color-surface-muted);
-  border-color: var(--color-border);
-  color: var(--color-ink-muted);
+.pill-kept,
+.pill-success {
+  background: var(--color-primary-100);
+  border-color: color-mix(in srgb, var(--color-primary-500) 30%, var(--color-border-muted));
+  color: var(--color-primary-700);
 }
 
 /* ============================================================
    §8  EYEBROWS & LABELS
    ─────────────────────────────────────────────────────────────
-   Eyebrows use mono + muted — NEVER signal, never gold.
-   Signal eyebrow: max ONE per page, on the most important section.
+   Mono + uppercase + muted — the "TODAY'S READING FLOW" style.
    ============================================================ */
 .eyebrow {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   font-family: var(--font-mono);
-  font-size: var(--text-micro);
+  font-size: var(--text-meta);
   font-weight: 500;
   letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: var(--color-ink-muted); /* neutral — NOT signal */
+  color: var(--color-ink-muted);
 }
 
-.eyebrow-signal { color: var(--color-signal); }   /* max once per page */
-.eyebrow-ai     { color: var(--color-ai);     }   /* AI context only   */
+.eyebrow-signal { color: var(--color-signal); }
+.eyebrow-ai     { color: var(--color-ai);     }
 
 /* ============================================================
    §9  METRIC / DATA DISPLAY
-   ─────────────────────────────────────────────────────────────
-   Large numeral + mono label. NO left-border accent strips.
-   tabular-nums is REQUIRED on all numeric values.
    ============================================================ */
 .metric { display: flex; flex-direction: column; gap: var(--space-1); }
 
 .metric-value {
   font-family: var(--font-display);
-  font-size: var(--text-title);
+  font-size: var(--text-h1);
   font-weight: 500;
   line-height: 1;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   color: var(--color-ink-primary);
 }
@@ -604,10 +714,11 @@ textarea:focus-visible {
 
 .metric-context {
   font-family: var(--font-mono);
-  font-size: var(--text-micro);
+  font-size: var(--text-meta);
   font-variant-numeric: tabular-nums;
   color: var(--color-ink-muted);
   letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 /* ============================================================
@@ -618,10 +729,10 @@ textarea:focus-visible {
   align-items: center;
   min-height: 20px;
   padding: 0 var(--space-2);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-full);
   border: 1px solid var(--color-border-muted);
   font-family: var(--font-mono);
-  font-size: var(--text-micro);
+  font-size: var(--text-meta);
   font-weight: 500;
   color: var(--color-ink-muted);
 }
@@ -633,9 +744,9 @@ textarea:focus-visible {
 }
 
 .badge-archived {
-  border-color: color-mix(in srgb, var(--color-success) 40%, var(--color-border-muted));
-  background: var(--color-success-subtle);
-  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-primary-500) 40%, var(--color-border-muted));
+  background: var(--color-primary-50);
+  color: var(--color-primary-600);
 }
 
 /* ============================================================
@@ -650,7 +761,8 @@ textarea:focus-visible {
 /* ============================================================
    §12  LAYOUT UTILITIES
    ─────────────────────────────────────────────────────────────
-   App shell grid, content containers, common spacing helpers.
+   design.md §8.2: sidebar 240px, content max 1200px.
+   Card grid: minmax(320px, 1fr), gap --space-6.
    ============================================================ */
 .container {
   max-width: var(--content-max);
@@ -658,7 +770,6 @@ textarea:focus-visible {
   padding: 0 var(--gutter);
 }
 
-/* §12.1  App shell: side-rail + main content */
 .app-shell {
   display: grid;
   grid-template-columns: var(--rail-width) 1fr;
@@ -668,19 +779,17 @@ textarea:focus-visible {
   .app-shell { grid-template-columns: 1fr; }
 }
 
-/* §12.2  Card grid: responsive columns */
+/* design.md §8.2: card grid minmax 320px, gap space-6 */
 .card-grid {
   display: grid;
-  gap: var(--space-4);
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-6);
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
 }
 
-/* §12.3  Stack: vertical rhythm */
 .stack   > * + * { margin-top: var(--space-4); }
 .stack-sm > * + * { margin-top: var(--space-2); }
 .stack-lg > * + * { margin-top: var(--space-6); }
 
-/* §12.4  Cluster: flex row */
 .cluster { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
 
 /* ============================================================
@@ -694,7 +803,7 @@ textarea:focus-visible {
   background: linear-gradient(
     90deg,
     var(--color-surface-muted) 25%,
-    color-mix(in srgb, var(--color-surface-muted) 60%, var(--color-surface)) 50%,
+    color-mix(in srgb, var(--color-surface-muted) 60%, var(--bg-surface)) 50%,
     var(--color-surface-muted) 75%
   );
   background-size: 200% 100%;
@@ -704,7 +813,9 @@ textarea:focus-visible {
 }
 
 /* ============================================================
-   §14  MOTION KEYFRAMES
+   §14  MOTION KEYFRAMES (design.md §7.3)
+   ─────────────────────────────────────────────────────────────
+   Opacity + translateY together. Never flat fade.
    ============================================================ */
 @keyframes qm-arrival {
   from { opacity: 0; transform: translateY(6px); }
@@ -724,22 +835,65 @@ textarea:focus-visible {
    ============================================================ */
 .mono    { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .display { font-family: var(--font-display); }
+.serif   { font-family: var(--font-display); }
 
-.text-signal   { color: var(--color-signal);    }
-.text-ai       { color: var(--color-ai);        }
-.text-success  { color: var(--color-success);   }
-.text-muted    { color: var(--color-ink-muted); }
+.text-signal   { color: var(--color-signal);     }
+.text-ai       { color: var(--color-ai);         }
+.text-success  { color: var(--color-success);    }
+.text-muted    { color: var(--color-ink-muted);  }
+.text-brand    { color: var(--brand);            }
+.text-accent   { color: var(--color-accent-500); }
 
 /* ============================================================
-   §16  REDUCED MOTION
+   §16  EMPTY STATE (design.md §6.6 — Guilt-Free)
+   ─────────────────────────────────────────────────────────────
+   Center-aligned, serif title, encouraging tone.
+   ============================================================ */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding-top: var(--space-20);   /* 80px from top */
+  gap: var(--space-4);
+}
+
+.empty-state-icon {
+  color: var(--color-ink-300);
+  width: var(--icon-xl);
+  height: var(--icon-xl);
+}
+
+.empty-state-title {
+  font-family: var(--font-display);
+  font-size: var(--text-display);
+  font-weight: 400;
+  color: var(--color-ink-primary);
+  margin: 0;
+}
+
+.empty-state-body {
+  font-size: var(--text-body);
+  color: var(--text-secondary);
+  max-inline-size: 36ch;
+  margin: 0;
+}
+
+/* ============================================================
+   §17  REDUCED MOTION
    ============================================================ */
 @media (prefers-reduced-motion: reduce) {
   :root {
+    --motion-instant: 1ms;
+    --motion-fast:    1ms;
+    --motion-base:    1ms;
+    --motion-slow:    1ms;
+    --motion-page:    1ms;
     --motion-arrival:     1ms;
     --motion-progression: 1ms;
     --motion-affordance:  1ms;
-    --dur-base:  1ms;
-    --dur-slow:  1ms;
+    --dur-base: 1ms;
+    --dur-slow: 1ms;
   }
   *, *::before, *::after {
     animation-duration:        1ms !important;
@@ -751,11 +905,11 @@ textarea:focus-visible {
 }
 
 /* ============================================================
-   §17  RESPONSIVE
+   §18  RESPONSIVE
    ============================================================ */
 @media (max-width: 980px) {
   :root {
-    --rail-width:   100%;
-    --content-max:  100%;
+    --rail-width:  100%;
+    --content-max: 100%;
   }
 }

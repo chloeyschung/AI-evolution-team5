@@ -52,6 +52,23 @@
   color: var(--color-ink-secondary);
 }
 
+.categoryBadge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-signal) 14%, var(--color-surface));
+  color: var(--color-signal);
+  border: 1px solid color-mix(in srgb, var(--color-signal) 28%, var(--color-border));
+  white-space: nowrap;
+}
+
+.categoryEmpty {
+  color: var(--color-ink-muted);
+  font-size: 0.82rem;
+}
+
 .date {
   font-size: 0.78rem;
   color: var(--color-ink-muted);

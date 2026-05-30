@@ -114,9 +114,19 @@ export default function ContentTable({
       ),
     },
     {
+      key: 'category',
+      header: 'Category',
+      width: '12%',
+      render: (item) => item.auto_tag_category ? (
+        <span className={styles.categoryBadge}>{item.auto_tag_category}</span>
+      ) : (
+        <span className={styles.categoryEmpty}>—</span>
+      ),
+    },
+    {
       key: 'summary',
       header: 'Summary',
-      width: '26%',
+      width: '20%',
       render: (item) => <span className={styles.summary}>{flattenSummary(item.summary)}</span>,
     },
     {

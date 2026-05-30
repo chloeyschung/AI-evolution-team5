@@ -1,0 +1,7 @@
+{
+  "iteration": 1,
+  "pass": false,
+  "score": 0.71,
+  "action": "stats.py 생성 — 라우터와 필드 구현 완료. 테스트 파일 없음.",
+  "next": "tests/api/test_stats.py 작성"
+}

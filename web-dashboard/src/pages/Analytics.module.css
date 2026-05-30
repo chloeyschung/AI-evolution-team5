@@ -53,3 +53,72 @@
   display: grid;
   gap: 4px;
 }
+
+.categorySection {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 20px;
+  background: var(--color-surface);
+  display: grid;
+  gap: 16px;
+}
+
+.sectionTitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0;
+}
+
+.categoryList {
+  display: grid;
+  gap: 10px;
+}
+
+.categoryRow {
+  display: grid;
+  grid-template-columns: 100px 1fr 52px 40px;
+  align-items: center;
+  gap: 12px;
+}
+
+.categoryName {
+  font-size: 0.86rem;
+  color: var(--color-ink-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.barTrack {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-surface-muted);
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-signal);
+  transition: width 400ms ease;
+}
+
+/* kept / total */
+.categoryMeta {
+  font-size: 0.78rem;
+  color: var(--color-ink-muted);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* % */
+.categoryPct {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+  text-align: right;
+  white-space: nowrap;
+}

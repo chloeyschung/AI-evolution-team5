@@ -96,6 +96,16 @@ final class StorageService {
         }
     }
 
+    /// 특정 항목의 AI 요약을 업데이트합니다.
+    func updateSummary(for id: UUID, summary: String) {
+        guard let defaults else { return }
+        var items = decode(from: defaults, key: mainKey)
+        if let idx = items.firstIndex(where: { $0.id == id }) {
+            items[idx].summary = summary
+            encode(items, to: defaults, key: mainKey)
+        }
+    }
+
     // MARK: - Private helpers
 
     private func decode(from defaults: UserDefaults, key: String) -> [SavedItem] {

@@ -6,6 +6,7 @@ import type {
   SourceInsight,
   Stats,
   UserStatistics,
+  CategoryStats,
   ContentFilters,
   ContentSort,
   SwipeAction,
@@ -99,6 +100,9 @@ export async function getContent(
   }
   if (filters.platform) {
     params.platform = filters.platform;
+  }
+  if (filters.category) {
+    params.category = filters.category;
   }
   if (sort.option) {
     params.sort = sort.option;
@@ -256,4 +260,19 @@ export async function fetchNarrative(domain: string): Promise<{ text: string; ge
     `/api/v1/sources/${encodeURIComponent(domain)}/narrative`,
   );
   return response.data;
+}
+
+export async function getCategoryStats(): Promise<CategoryStats> {
+  const client = getApiClient();
+  const response = await client.get<CategoryStats>('/api/v1/stats/categories');
+  return response.data;
+}
+
+export async function getReflectionQuestions(id: number, signal?: AbortSignal): Promise<string[]> {
+  const client = getApiClient();
+  const response = await client.get<{ content_id: number; questions: string[] }>(
+    `/api/v1/content/${id}/reflection-questions`,
+    { signal },
+  );
+  return response.data.questions ?? [];
 }

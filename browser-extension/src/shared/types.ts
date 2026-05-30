@@ -7,6 +7,7 @@ export interface ShareData {
   options?: {
     auto_summarize?: boolean;
   };
+  page_text?: string;
 }
 
 export interface ShareResponse {
@@ -84,6 +85,7 @@ export interface PageMetadata {
   author: string | null;
   description: string | null;
   type: ContentType;
+  pageText?: string | null;
 }
 
 export type ContentType = 'article' | 'video' | 'social' | 'image' | 'text' | 'unknown';

@@ -5,6 +5,7 @@ TODO #4 (2026-04-14): Fix limit=None handling in get_pending, get_kept, get_disc
 TODO #6 (2026-04-14): Fix timezone handling inconsistencies in get_statistics method
 """
 
+import json
 import unicodedata
 from datetime import UTC, date, datetime, timedelta
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
@@ -231,6 +232,38 @@ class ContentRepository(BaseRepository[Content]):
             update(Content)
             .where(Content.id == content_id, Content.user_id == user_id)
             .values(title=title, is_ai_titled=True, updated_at=utc_now())
+        )
+        await self.session.commit()
+
+    async def update_auto_tags(
+        self,
+        content_id: int,
+        user_id: int,
+        status: str,
+        category: str | None = None,
+        keywords_en: list[str] | None = None,
+        keywords_original: list[str] | None = None,
+    ) -> None:
+        """Persist auto-tag result for a content row the user owns."""
+        await self.session.execute(
+            update(Content)
+            .where(Content.id == content_id, Content.user_id == user_id)
+            .values(
+                auto_tag_status=status,
+                auto_tag_category=category,
+                auto_tag_keywords_en=json.dumps(keywords_en) if keywords_en is not None else None,
+                auto_tag_keywords_original=json.dumps(keywords_original) if keywords_original is not None else None,
+                updated_at=utc_now(),
+            )
+        )
+        await self.session.commit()
+
+    async def save_reflection_questions(self, content_id: int, user_id: int, questions: list[str]) -> None:
+        """Cache generated reflection questions on the content row."""
+        await self.session.execute(
+            update(Content)
+            .where(Content.id == content_id, Content.user_id == user_id)
+            .values(reflection_questions=json.dumps(questions), updated_at=utc_now())
         )
         await self.session.commit()
 
@@ -694,11 +727,40 @@ class ContentRepository(BaseRepository[Content]):
             "discarded": discarded_count,
         }
 
+    async def get_category_kept_stats(self, user_id: int | None = None) -> list[dict]:
+        """Return total and kept (archived) count per auto_tag_category.
+
+        Uses raw SQL because auto_tag_category is a DB column not yet mapped
+        onto the ORM model (added via migration after initial model definition).
+        """
+        from sqlalchemy import text
+
+        user_clause = "AND user_id = :uid" if user_id is not None else ""
+        params: dict = {"uid": user_id} if user_id is not None else {}
+
+        rows = (await self.session.execute(
+            text(f"""
+                SELECT auto_tag_category,
+                       COUNT(*) AS total,
+                       SUM(CASE WHEN status = 'ARCHIVED' THEN 1 ELSE 0 END) AS kept
+                FROM content
+                WHERE is_deleted = false AND auto_tag_category IS NOT NULL {user_clause}
+                GROUP BY auto_tag_category
+            """),
+            params,
+        )).all()
+
+        return [
+            {"category": row[0], "total": row[1], "kept": row[2]}
+            for row in sorted(rows, key=lambda r: -r[1])
+        ]
+
     async def count_all(
         self,
         user_id: int,
         status: ContentStatus | None = None,
         platform: str | None = None,
+        category: str | None = None,
     ) -> int:
         """Count total non-deleted content rows for a user.
 
@@ -706,6 +768,7 @@ class ContentRepository(BaseRepository[Content]):
             user_id: User ID to count content for.
             status: Optional status filter.
             platform: Optional platform filter (case-insensitive).
+            category: Optional auto-tag category filter (exact match).
 
         Returns:
             Total count of non-deleted content rows.
@@ -715,6 +778,8 @@ class ContentRepository(BaseRepository[Content]):
             query = query.where(Content.status == status)
         if platform:
             query = query.where(Content.platform.ilike(platform))
+        if category:
+            query = query.where(Content.auto_tag_category == category)
         result = await self.session.execute(query)
         return result.scalar_one()
 
@@ -816,6 +881,7 @@ class ContentRepository(BaseRepository[Content]):
         platform: str | None = None,
         sort: str = "recency",
         order: str = "desc",
+        category: str | None = None,
     ) -> list[Content]:
         """Get all content ordered by creation date (newest first).
 
@@ -825,6 +891,7 @@ class ContentRepository(BaseRepository[Content]):
             offset: Pagination offset.
             status: Optional status filter (INBOX, ARCHIVED).
             platform: Optional platform filter (case-insensitive).
+            category: Optional auto-tag category filter (exact match).
 
         Returns:
             List of Content objects ordered by created_at descending.
@@ -856,6 +923,8 @@ class ContentRepository(BaseRepository[Content]):
             query = query.where(Content.status == status)
         if platform:
             query = query.where(Content.platform.ilike(platform))
+        if category:
+            query = query.where(Content.auto_tag_category == category)
         result = await self.session.execute(query)
         return list(result.scalars().all())
 

@@ -7,8 +7,41 @@ export class PageExtractor {
     const author = this.extractAuthor();
     const description = this.extractDescription();
     const type = this.detectContentType(url);
+    const pageText = this.extractPageText();
 
-    return { url, title, author, description, type };
+    return { url, title, author, description, type, pageText };
+  }
+
+  extractPageText(): string | null {
+    try {
+      const clone = document.body.cloneNode(true) as HTMLElement;
+
+      const noiseSelectors = [
+        'script', 'style', 'nav', 'footer', 'header', 'aside',
+        'form', 'iframe', 'noscript', '[role="navigation"]',
+        '[role="banner"]', '[aria-hidden="true"]',
+      ];
+      for (const sel of noiseSelectors) {
+        clone.querySelectorAll(sel).forEach((el) => el.remove());
+      }
+
+      const main =
+        clone.querySelector('article') ??
+        clone.querySelector('main') ??
+        clone.querySelector('[role="main"]') ??
+        clone;
+
+      const raw = main.textContent ?? '';
+      const cleaned = raw
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0)
+        .join('\n');
+
+      return cleaned.length > 0 ? cleaned.slice(0, 8000) : null;
+    } catch {
+      return null;
+    }
   }
 
   private extractTitle(): string | null {
