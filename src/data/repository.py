@@ -234,6 +234,24 @@ class ContentRepository(BaseRepository[Content]):
         )
         await self.session.commit()
 
+    async def save_memo(self, content_id: int, user_id: int, text: str) -> None:
+        """Save or update a user memo on the content row."""
+        await self.session.execute(
+            update(Content)
+            .where(Content.id == content_id, Content.user_id == user_id)
+            .values(memo=text, updated_at=utc_now())
+        )
+        await self.session.commit()
+
+    async def delete_memo(self, content_id: int, user_id: int) -> None:
+        """Remove the user memo from the content row."""
+        await self.session.execute(
+            update(Content)
+            .where(Content.id == content_id, Content.user_id == user_id)
+            .values(memo=None, updated_at=utc_now())
+        )
+        await self.session.commit()
+
     async def remove_duplicates(self, user_id: int) -> int:
         """Remove duplicate rows and keep the newest row per duplicate_group_key."""
         result = await self.session.execute(
@@ -297,6 +315,7 @@ class ContentRepository(BaseRepository[Content]):
         limit: int | None = 50,
         offset: int = 0,
         status: ContentStatus | None = None,
+        has_memo: bool | None = None,
     ) -> list[Content]:
         """Get all content with pagination.
 
@@ -305,6 +324,7 @@ class ContentRepository(BaseRepository[Content]):
             limit: Maximum number of results. Set to None for unlimited.
             offset: Number of results to skip.
             status: Optional filter by content status.
+            has_memo: If True, only return content with a memo.
 
         Returns:
             List of Content objects, optionally filtered by status.
@@ -321,6 +341,8 @@ class ContentRepository(BaseRepository[Content]):
             query = query.limit(limit)
         if status is not None:
             query = query.where(Content.status == status)
+        if has_memo is True:
+            query = query.where(Content.memo.isnot(None))
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
@@ -849,6 +871,7 @@ class ContentRepository(BaseRepository[Content]):
         sort: str = "recency",
         order: str = "desc",
         category: str | None = None,
+        has_memo: bool | None = None,
     ) -> list[Content]:
         """Get all content ordered by creation date (newest first).
 
@@ -892,6 +915,8 @@ class ContentRepository(BaseRepository[Content]):
             query = query.where(Content.platform.ilike(platform))
         if category:
             query = query.where(Content.auto_tag_category == category)
+        if has_memo is True:
+            query = query.where(Content.memo.isnot(None))
         result = await self.session.execute(query)
         return list(result.scalars().all())
 

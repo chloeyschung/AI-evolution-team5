@@ -69,6 +69,22 @@
   font-size: 0.82rem;
 }
 
+.memoIndicator {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-signal);
+}
+
+.memoIndicator svg {
+  width: 14px;
+  height: 14px;
+}
+
+.memoEmpty {
+  color: var(--color-ink-muted);
+  font-size: 0.82rem;
+}
+
 .date {
   font-size: 0.78rem;
   color: var(--color-ink-muted);

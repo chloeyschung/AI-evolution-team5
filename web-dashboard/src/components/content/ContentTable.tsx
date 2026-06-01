@@ -130,6 +130,19 @@ export default function ContentTable({
       render: (item) => <span className={styles.summary}>{flattenSummary(item.summary)}</span>,
     },
     {
+      key: 'memo',
+      header: 'Memo',
+      width: '6%',
+      render: (item) => item.memo ? (
+        <span className={styles.memoIndicator} title={item.memo} aria-label="Has memo">
+          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="currentColor" />
+            <path d="M4.5 8l2.5 2.5 4.5-4.5" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+          </svg>
+        </span>
+      ) : <span className={styles.memoEmpty}>—</span>,
+    },
+    {
       key: 'date',
       header: renderSortableHeader('Created', 'recency'),
       ariaSort: sort?.option === 'recency' ? (sort.order === 'asc' ? 'ascending' : 'descending') : 'none',
