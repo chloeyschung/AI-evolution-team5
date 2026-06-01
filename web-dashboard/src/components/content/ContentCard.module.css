@@ -102,6 +102,36 @@
 /* Thumb: locked aspect ratio so EVERY card has the same image footprint,
    plus a bottom-fade overlay so titles/text below always have edge contrast
    even when the source is a screenshot full of small text. */
+.thumbPlaceholder {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-surface-muted) 82%, var(--color-surface) 18%) 0%,
+    color-mix(in srgb, var(--color-surface-muted) 92%, var(--color-surface) 8%) 100%
+  );
+  border: 1px solid color-mix(in srgb, var(--color-border-muted) 75%, transparent);
+}
+
+.thumbLogoWrap {
+  background: var(--color-primary-600);
+  border-radius: 10px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+}
+
+.thumbLogo {
+  width: 14px;
+  height: 18px;
+  display: block;
+}
+
 .thumbButton {
   position: relative;
   width: 100%;
@@ -140,27 +170,6 @@
   transform: scale(1.015);
 }
 
-.thumbPlaceholder {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-md);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--color-surface-muted) 82%, var(--color-surface) 18%) 0%,
-      color-mix(in srgb, var(--color-surface-muted) 92%, var(--color-surface) 8%) 100%
-    );
-  border: 1px solid color-mix(in srgb, var(--color-border-muted) 75%, transparent);
-}
-
-.thumbFallbackLogo {
-  width: clamp(40px, 20%, 64px);
-  height: auto;
-  opacity: 0.45;
-  filter: grayscale(1) saturate(0) contrast(0.9);
-}
 
 .title {
   font-family: var(--font-display);
@@ -351,6 +360,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  align-content: flex-start;
   gap: 6px;
 }
 

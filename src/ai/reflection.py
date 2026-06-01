@@ -14,8 +14,8 @@ from src.utils.http_client import async_client_context
 
 logger = logging.getLogger(__name__)
 
-_TIMEOUT = 8.0        # per-attempt HTTP timeout
-_TOTAL_TIMEOUT = 10.0  # absolute cap — matches axios client timeout on the frontend
+_TIMEOUT = 25.0       # per-attempt HTTP timeout
+_TOTAL_TIMEOUT = 55.0  # absolute cap — Modal cold-start can take ~30-50s for large models
 
 
 def _build_prompt(summary: str | None, keywords: list[str]) -> str:
@@ -108,7 +108,7 @@ async def generate_questions(
                     )
 
             except Exception as exc:
-                logger.warning("Reflection attempt %d/2 error: %s", attempt + 1, exc)
+                logger.warning("Reflection attempt %d/2 error: %s | type=%s | repr=%r", attempt + 1, exc, type(exc).__name__, exc)
 
             if attempt < 1:
                 await asyncio.sleep(1)
