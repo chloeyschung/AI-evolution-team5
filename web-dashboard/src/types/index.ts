@@ -85,7 +85,7 @@ export interface ContentFilters {
   dateFrom: string | null;
   dateTo: string | null;
   category: string | null;
-  hasMemo?: boolean | null;
+  hasMemo: boolean | null;
 }
 
 export interface ContentSort {
