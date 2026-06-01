@@ -103,7 +103,7 @@ export async function getContent(
   if (filters.category) {
     params.category = filters.category;
   }
-  if (filters.hasMemo) {
+  if (filters.hasMemo ?? false) {
     params.has_memo = 'true';
   }
   if (sort.option) {
