@@ -65,6 +65,7 @@ export default function ContentDrawer({ contentId, onClose }: ContentDrawerProps
     setIsSavingMemo(true);
     try {
       await saveMemo(contentId, memoText.trim());
+      setMemoText(memoText.trim());
       setMemoSaved(true);
       if (memoSavedTimerRef.current !== null) window.clearTimeout(memoSavedTimerRef.current);
       memoSavedTimerRef.current = window.setTimeout(() => setMemoSaved(false), 2000);
@@ -83,7 +84,7 @@ export default function ContentDrawer({ contentId, onClose }: ContentDrawerProps
       setMemoText('');
       setMemoSaved(false);
     } catch {
-      alert('Failed to save. Please check your network connection.');
+      alert('Failed to delete. Please check your network connection.');
     } finally {
       setIsSavingMemo(false);
     }
@@ -168,7 +169,7 @@ export default function ContentDrawer({ contentId, onClose }: ContentDrawerProps
                 {memoText.length} / {MEMO_MAX}
               </span>
               <div className={styles.memoActions}>
-                {memoText.trim() && (
+                {(memoText.trim() || detail?.memo) && (
                   <button
                     type="button"
                     className={styles.memoDeleteBtn}

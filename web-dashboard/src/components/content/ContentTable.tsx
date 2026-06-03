@@ -135,9 +135,11 @@ export default function ContentTable({
       width: '6%',
       render: (item) => item.memo ? (
         <span className={styles.memoIndicator} title={item.memo} aria-label="Has memo">
-          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-            <rect x="1.5" y="1.5" width="13" height="13" rx="3" fill="currentColor" />
-            <path d="M4.5 8l2.5 2.5 4.5-4.5" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="1.5" width="9" height="12" rx="1.5" />
+            <path d="M4.5 5h4M4.5 7.5h4M4.5 10h2.5" />
+            <path d="M11 9.5l1.5-1.5 1.5 1.5-1.5 1.5z" />
+            <path d="M12.5 8L14 9.5l-2 2-1.5-1.5" />
           </svg>
         </span>
       ) : <span className={styles.memoEmpty}>—</span>,

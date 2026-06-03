@@ -188,7 +188,7 @@ async def list_content(
             has_memo=has_memo,
         )
 
-    total = await repo.count_all(user_id=user_id, status=status_filter, platform=platform, category=category_filter)
+    total = await repo.count_all(user_id=user_id, status=status_filter, platform=platform, category=category_filter, has_memo=has_memo)
     has_more = len(contents) == limit
     next_cursor = None
     next_offset = offset + len(contents) if has_more else None

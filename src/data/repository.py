@@ -750,6 +750,7 @@ class ContentRepository(BaseRepository[Content]):
         status: ContentStatus | None = None,
         platform: str | None = None,
         category: str | None = None,
+        has_memo: bool | None = None,
     ) -> int:
         """Count total non-deleted content rows for a user.
 
@@ -758,6 +759,7 @@ class ContentRepository(BaseRepository[Content]):
             status: Optional status filter.
             platform: Optional platform filter (case-insensitive).
             category: Optional auto-tag category filter (exact match).
+            has_memo: Optional filter for items with/without a memo.
 
         Returns:
             Total count of non-deleted content rows.
@@ -769,6 +771,10 @@ class ContentRepository(BaseRepository[Content]):
             query = query.where(Content.platform.ilike(platform))
         if category:
             query = query.where(Content.auto_tag_category == category)
+        if has_memo is True:
+            query = query.where(Content.memo.isnot(None), Content.memo != "")
+        elif has_memo is False:
+            query = query.where((Content.memo.is_(None)) | (Content.memo == ""))
         result = await self.session.execute(query)
         return result.scalar_one()
 
