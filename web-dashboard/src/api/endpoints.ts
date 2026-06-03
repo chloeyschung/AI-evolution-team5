@@ -241,7 +241,7 @@ export async function getReflectionQuestions(id: number, signal?: AbortSignal): 
   const client = getApiClient();
   const response = await client.get<{ content_id: number; questions: string[] }>(
     `/api/v1/content/${id}/reflection-questions`,
-    { signal },
+    { signal, timeout: 60000 },
   );
   return response.data.questions ?? [];
 }
