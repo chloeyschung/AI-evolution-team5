@@ -58,6 +58,7 @@ class ContentResponse(BaseModel):
     auto_tag_category: str | None = None
     auto_tag_keywords_en: list[str] = []
     auto_tag_keywords_original: list[str] = []
+    memo: str | None = None
 
     @classmethod
     def from_content(cls, content: Any) -> "ContentResponse":
@@ -101,6 +102,7 @@ class ContentResponse(BaseModel):
             auto_tag_category=getattr(content, "auto_tag_category", None),
             auto_tag_keywords_en=_parse_keywords(getattr(content, "auto_tag_keywords_en", None)),
             auto_tag_keywords_original=_parse_keywords(getattr(content, "auto_tag_keywords_original", None)),
+            memo=getattr(content, "memo", None),
         )
 
     @classmethod
@@ -279,6 +281,7 @@ class ContentDetailResponse(BaseModel):
     auto_tag_category: str | None = None
     auto_tag_keywords_en: list[str] = []
     auto_tag_keywords_original: list[str] = []
+    memo: str | None = None
 
 
 # DAT-002: User Profile & Preferences schemas
@@ -414,6 +417,19 @@ class ReflectionQuestionsResponse(BaseModel):
 
     content_id: int
     questions: list[str]
+
+
+class MemoSaveRequest(BaseModel):
+    """Schema for saving a memo."""
+
+    text: str = Field(..., min_length=1, max_length=500)
+
+
+class MemoResponse(BaseModel):
+    """Schema for memo response."""
+
+    content_id: int
+    memo: str | None
 
 
 # AUTH-001: Authentication schemas

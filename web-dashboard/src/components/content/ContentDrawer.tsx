@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
-import { getContentDetail, getReflectionQuestions } from '../../api/endpoints';
+import { useEffect, useRef, useState } from 'react';
+import { deleteMemo, getContentDetail, getReflectionQuestions, saveMemo } from '../../api/endpoints';
 import type { Content } from '../../types';
 import SlideDrawer from '../ui/SlideDrawer';
 import styles from './ContentDrawer.module.css';
+
+const MEMO_MAX = 500;
 
 interface ContentDrawerProps {
   contentId: number | null;
@@ -14,12 +16,18 @@ export default function ContentDrawer({ contentId, onClose }: ContentDrawerProps
   const [isLoading, setIsLoading] = useState(false);
   const [questions, setQuestions] = useState<string[]>([]);
   const [questionsLoading, setQuestionsLoading] = useState(false);
+  const [memoText, setMemoText] = useState('');
+  const [isSavingMemo, setIsSavingMemo] = useState(false);
+  const [memoSaved, setMemoSaved] = useState(false);
+  const memoSavedTimerRef = useRef<number | null>(null);
   const isOpen = contentId !== null;
 
   useEffect(() => {
     if (contentId === null) {
       setDetail(null);
       setQuestions([]);
+      setMemoText('');
+      setMemoSaved(false);
       return;
     }
 
@@ -29,9 +37,16 @@ export default function ContentDrawer({ contentId, onClose }: ContentDrawerProps
     setIsLoading(true);
     setQuestionsLoading(true);
     setQuestions([]);
+    setMemoText('');
+    setMemoSaved(false);
 
     void getContentDetail(contentId)
-      .then((data) => { if (!signal.aborted) setDetail(data); })
+      .then((data) => {
+        if (!signal.aborted) {
+          setDetail(data);
+          setMemoText(data.memo ?? '');
+        }
+      })
       .finally(() => { if (!signal.aborted) setIsLoading(false); });
 
     void getReflectionQuestions(contentId, signal)
@@ -39,8 +54,41 @@ export default function ContentDrawer({ contentId, onClose }: ContentDrawerProps
       .catch(() => { if (!signal.aborted) setQuestions([]); })
       .finally(() => { if (!signal.aborted) setQuestionsLoading(false); });
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      if (memoSavedTimerRef.current !== null) window.clearTimeout(memoSavedTimerRef.current);
+    };
   }, [contentId]);
+
+  const handleSaveMemo = async () => {
+    if (!contentId || !memoText.trim()) return;
+    setIsSavingMemo(true);
+    try {
+      await saveMemo(contentId, memoText.trim());
+      setMemoText(memoText.trim());
+      setMemoSaved(true);
+      if (memoSavedTimerRef.current !== null) window.clearTimeout(memoSavedTimerRef.current);
+      memoSavedTimerRef.current = window.setTimeout(() => setMemoSaved(false), 2000);
+    } catch {
+      alert('Failed to save. Please check your network connection.');
+    } finally {
+      setIsSavingMemo(false);
+    }
+  };
+
+  const handleDeleteMemo = async () => {
+    if (!contentId) return;
+    setIsSavingMemo(true);
+    try {
+      await deleteMemo(contentId);
+      setMemoText('');
+      setMemoSaved(false);
+    } catch {
+      alert('Failed to delete. Please check your network connection.');
+    } finally {
+      setIsSavingMemo(false);
+    }
+  };
 
   return (
     <SlideDrawer
@@ -103,6 +151,45 @@ export default function ContentDrawer({ contentId, onClose }: ContentDrawerProps
               </ul>
             </section>
           ) : null}
+
+          <section className={styles.section}>
+            <h3>Memo</h3>
+            <textarea
+              className={styles.memoTextarea}
+              placeholder="What did you think about this?"
+              value={memoText}
+              onChange={(e) => {
+                if (e.target.value.length <= MEMO_MAX) setMemoText(e.target.value);
+              }}
+              rows={4}
+              disabled={isSavingMemo}
+            />
+            <div className={styles.memoFooter}>
+              <span className={`${styles.memoCounter} ${memoText.length >= MEMO_MAX ? styles.memoCounterLimit : ''}`}>
+                {memoText.length} / {MEMO_MAX}
+              </span>
+              <div className={styles.memoActions}>
+                {(memoText.trim() || detail?.memo) && (
+                  <button
+                    type="button"
+                    className={styles.memoDeleteBtn}
+                    onClick={() => void handleDeleteMemo()}
+                    disabled={isSavingMemo}
+                  >
+                    Delete
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className={`${styles.memoSaveBtn} ${memoSaved ? styles.memoSaveBtnSaved : ''}`}
+                  onClick={() => void handleSaveMemo()}
+                  disabled={isSavingMemo || !memoText.trim()}
+                >
+                  {memoSaved ? 'Saved ✓' : isSavingMemo ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </section>
 
           <section className={styles.section}>
             <h3>Source</h3>

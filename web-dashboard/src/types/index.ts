@@ -20,6 +20,7 @@ export interface Content {
   auto_tag_category: string | null;
   auto_tag_keywords_en: string[];
   auto_tag_keywords_original: string[];
+  memo: string | null;
 }
 
 export interface SwipeAction {
@@ -84,6 +85,7 @@ export interface ContentFilters {
   dateFrom: string | null;
   dateTo: string | null;
   category: string | null;
+  hasMemo: boolean | null;
 }
 
 export interface ContentSort {

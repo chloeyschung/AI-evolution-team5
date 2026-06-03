@@ -58,6 +58,7 @@ export const useContentStore = create<ContentState>((set, get) => ({
     dateFrom: null,
     dateTo: null,
     category: null,
+    hasMemo: null,
   },
   sort: {
     option: 'recency',

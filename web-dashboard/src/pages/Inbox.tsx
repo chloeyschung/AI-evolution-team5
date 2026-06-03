@@ -11,15 +11,16 @@ export default function Inbox() {
   const contentStore = useContentStore();
   const [selectedPlatform, setSelectedPlatform] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [hasMemoFilter, setHasMemoFilter] = useState(false);
   const [selectedContentId, setSelectedContentId] = useState<number | null>(null);
   const [isRemovingDuplicates, setIsRemovingDuplicates] = useState(false);
 
   useEffect(() => {
-    contentStore.updateFilters({ status: 'all', category: null });
+    contentStore.updateFilters({ status: 'all', category: null, hasMemo: null });
     void contentStore.loadContent(1);
     void contentStore.loadPlatforms();
     return () => {
-      contentStore.updateFilters({ platform: null, category: null });
+      contentStore.updateFilters({ platform: null, category: null, hasMemo: null });
     };
   }, []);
 
@@ -41,6 +42,12 @@ export default function Inbox() {
     const category = e.target.value || null;
     setSelectedCategory(e.target.value);
     contentStore.updateFilters({ category });
+  };
+
+  const handleHasMemoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = e.target.checked;
+    setHasMemoFilter(checked);
+    contentStore.updateFilters({ hasMemo: checked ? true : null });
   };
 
   const handleSortChange = (option: 'recency' | 'platform' | 'title' | 'status') => {
@@ -96,6 +103,15 @@ export default function Inbox() {
             <option key={cat} value={cat}>{cat}</option>
           ))}
         </select>
+        <label className={styles.memoFilterLabel}>
+          <input
+            type="checkbox"
+            checked={hasMemoFilter}
+            onChange={handleHasMemoChange}
+            className={styles.memoFilterCheckbox}
+          />
+          Has memo
+        </label>
         <button
           type="button"
           className={styles.removeDuplicatesBtn}

@@ -103,6 +103,9 @@ export async function getContent(
   if (filters.category) {
     params.category = filters.category;
   }
+  if (filters.hasMemo ?? false) {
+    params.has_memo = 'true';
+  }
   if (sort.option) {
     params.sort = sort.option;
   }
@@ -235,6 +238,16 @@ export async function getCategoryStats(): Promise<CategoryStats> {
   const client = getApiClient();
   const response = await client.get<CategoryStats>('/api/v1/stats/categories');
   return response.data;
+}
+
+export async function saveMemo(id: number, text: string): Promise<void> {
+  const client = getApiClient();
+  await client.put(`/api/v1/content/${id}/memo`, { text });
+}
+
+export async function deleteMemo(id: number): Promise<void> {
+  const client = getApiClient();
+  await client.delete(`/api/v1/content/${id}/memo`);
 }
 
 export async function getReflectionQuestions(id: number, signal?: AbortSignal): Promise<string[]> {

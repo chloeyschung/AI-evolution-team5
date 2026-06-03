@@ -41,6 +41,8 @@ from ..schemas import (
     ContentTagsResponse,
     DeleteContentResponse,
     DeletedContentResponse,
+    MemoResponse,
+    MemoSaveRequest,
     PaginatedContentResponse,
     PlatformCount,
     ReflectionQuestionsResponse,
@@ -123,6 +125,7 @@ async def list_content(
     sort: str = Query("recency", pattern="^(recency|platform|title|status)$"),
     order: str = Query("desc", pattern="^(asc|desc)$"),
     category: str | None = Query(None, description="Filter by auto-tag category"),
+    has_memo: bool | None = Query(None, description="Filter to only items with a memo"),
     user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> PaginatedContentResponse:
@@ -170,6 +173,7 @@ async def list_content(
             sort=sort,
             order=order,
             category=category_filter,
+            has_memo=has_memo,
         )
     else:
         contents = await repo.get_all_ordered(
@@ -181,9 +185,10 @@ async def list_content(
             sort=sort,
             order=order,
             category=category_filter,
+            has_memo=has_memo,
         )
 
-    total = await repo.count_all(user_id=user_id, status=status_filter, platform=platform, category=category_filter)
+    total = await repo.count_all(user_id=user_id, status=status_filter, platform=platform, category=category_filter, has_memo=has_memo)
     has_more = len(contents) == limit
     next_cursor = None
     next_offset = offset + len(contents) if has_more else None
@@ -361,6 +366,7 @@ async def get_content_detail(
         auto_tag_category=getattr(content, "auto_tag_category", None),
         auto_tag_keywords_en=json.loads(content.auto_tag_keywords_en) if getattr(content, "auto_tag_keywords_en", None) else [],
         auto_tag_keywords_original=json.loads(content.auto_tag_keywords_original) if getattr(content, "auto_tag_keywords_original", None) else [],
+        memo=getattr(content, "memo", None),
     )
 
 
@@ -489,6 +495,43 @@ async def get_reflection_questions(
         await content_repo.save_reflection_questions(content_id, user_id, questions)
 
     return ReflectionQuestionsResponse(content_id=content_id, questions=questions)
+
+
+@router.put("/content/{content_id}/memo", response_model=MemoResponse)
+async def save_memo(
+    content_id: int,
+    body: MemoSaveRequest,
+    user_id: int = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> MemoResponse:
+    """Save or update a user memo for a content item."""
+    content_repo = ContentRepository(db)
+    content = await content_repo.get_by_id(content_id)
+    if not content or content.user_id != user_id:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": ErrorCode.CONTENT_NOT_FOUND, "message": "Content not found."},
+        )
+    await content_repo.save_memo(content_id, user_id, body.text)
+    return MemoResponse(content_id=content_id, memo=body.text)
+
+
+@router.delete("/content/{content_id}/memo", response_model=MemoResponse)
+async def delete_memo(
+    content_id: int,
+    user_id: int = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> MemoResponse:
+    """Delete the user memo for a content item."""
+    content_repo = ContentRepository(db)
+    content = await content_repo.get_by_id(content_id)
+    if not content or content.user_id != user_id:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": ErrorCode.CONTENT_NOT_FOUND, "message": "Content not found."},
+        )
+    await content_repo.delete_memo(content_id, user_id)
+    return MemoResponse(content_id=content_id, memo=None)
 
 
 @router.post("/content/{content_id}/categorize", response_model=ContentTagsResponse)

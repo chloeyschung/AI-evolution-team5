@@ -86,6 +86,9 @@ class Content(Base):
     # Cached reflection questions (JSON array of up to 3 strings)
     reflection_questions = Column(Text, nullable=True)
 
+    # User memo (free-text note, max 500 chars enforced at API layer)
+    memo = Column(Text, nullable=True)
+
     # Relationship to swipe history
     swipe_history = relationship("SwipeHistory", back_populates="content")
     user = relationship("UserProfile", back_populates="content")
