@@ -872,10 +872,21 @@ async def _background_summarize(
 
     try:
         # Fetch page text — use pre-extracted text from client if provided (e.g. LinkedIn, Facebook),
-        # otherwise fall back to server-side fetch. Failure is non-fatal.
+        # try YouTube transcript for YouTube URLs, otherwise fall back to server-side HTML fetch.
+        from src.ingestion.youtube_transcript import extract_video_id, fetch_youtube_text
+
         text_content = ""
         if page_text:
             text_content = page_text
+        elif extract_video_id(url):
+            yt_text = await fetch_youtube_text(url)
+            if yt_text:
+                text_content = yt_text
+            else:
+                try:
+                    _, text_content = await content_extractor.fetch_html_and_text(url)
+                except Exception as exc:  # noqa: BLE001
+                    logging.warning("Content extraction failed for content %s: %s", content_id, exc)
         else:
             try:
                 _, text_content = await content_extractor.fetch_html_and_text(url)
