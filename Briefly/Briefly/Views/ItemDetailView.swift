@@ -74,15 +74,15 @@ struct ItemDetailView: View {
         .sheet(isPresented: $showBrowser) {
             SafariBrowserView(url: currentItem.url)
         }
+        .onAppear {
+            refreshLiveItem()
+        }
         .onChange(of: currentIndex) { _ in
-            liveItem = nil
             summaryPollId = UUID()
+            refreshLiveItem()
         }
         .onReceive(NotificationCenter.default.publisher(for: .fetchCoordinatorDidUpdate)) { _ in
-            let baseItem = items[currentIndex]
-            if let updated = StorageService.shared.loadAll().first(where: { $0.id == baseItem.id }) {
-                liveItem = updated
-            }
+            refreshLiveItem()
         }
         .task(id: summaryPollId) {
             loadedSummary = nil
@@ -506,8 +506,24 @@ struct ItemDetailView: View {
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.brieflyInk50, in: RoundedRectangle(cornerRadius: BrieflyRadius.md))
+            } else if currentItem.fetchStatus == .partial {
+                HStack(spacing: 8) {
+                    Image(systemName: "doc.text")
+                        .foregroundStyle(Color.brieflyInk300)
+                    Text("본문을 직접 가져올 수 없습니다. 아래 원문에서 확인해 주세요.")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.brieflyTextSecondary)
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.brieflyInk50, in: RoundedRectangle(cornerRadius: BrieflyRadius.md))
             }
         }
+    }
+
+    private func refreshLiveItem() {
+        let baseItem = items[currentIndex]
+        liveItem = StorageService.shared.loadAll().first(where: { $0.id == baseItem.id })
     }
 
     private var faviconURL: URL? {
