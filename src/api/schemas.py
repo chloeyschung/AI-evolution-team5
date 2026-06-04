@@ -223,6 +223,13 @@ class ShareRequest(BaseModel):
     page_text: str | None = Field(None, description="Pre-extracted page text from the client (skips server-side fetch)")
 
 
+class RescanRequest(BaseModel):
+    """Schema for client-triggered re-summarization with pre-extracted page text."""
+
+    page_text: str = Field(..., min_length=50, description="Client-extracted page text (e.g. via WKWebView)")
+    force: bool = Field(False, description="Re-summarize even if a summary already exists")
+
+
 class ShareResponse(BaseModel):
     """Schema for share response with summary."""
 

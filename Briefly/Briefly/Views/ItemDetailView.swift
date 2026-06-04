@@ -14,6 +14,8 @@ struct ItemDetailView: View {
     @State private var isSummaryLoading = false
     @State private var loadedSummary: String? = nil
     @State private var liveItem: SavedItem? = nil
+    @State private var summaryPollId = UUID()
+    @State private var isRetrying = false
     @Environment(\.dismiss) private var dismiss
 
     init(items: [SavedItem], startIndex: Int, showActions: Bool) {
@@ -74,6 +76,7 @@ struct ItemDetailView: View {
         }
         .onChange(of: currentIndex) { _ in
             liveItem = nil
+            summaryPollId = UUID()
         }
         .onReceive(NotificationCenter.default.publisher(for: .fetchCoordinatorDidUpdate)) { _ in
             let baseItem = items[currentIndex]
@@ -234,6 +237,27 @@ struct ItemDetailView: View {
         flyOut(direction: 1, isSkip: true)
     }
 
+    private func retryAISummary() {
+        guard let contentId = currentItem.serverContentId,
+              let token = AuthTokenStore.shared.accessToken else { return }
+
+        StorageService.shared.updateSummaryStatus(for: currentItem.id, status: .unknown)
+
+        Task {
+            if let pageText = currentItem.articleText, pageText.count >= 200 {
+                try? await BrieflyAPI.shared.rescan(
+                    contentId: contentId, pageText: pageText, token: token, force: true
+                )
+                print("[Retry] rescan 전송: contentId=\(contentId), \(pageText.count)자")
+            } else {
+                print("[Retry] articleText 부족 — 폴링만 재시도: contentId=\(contentId)")
+            }
+        }
+
+        isRetrying = true
+        summaryPollId = UUID()
+    }
+
     private func flyOut(direction: CGFloat, isSkip: Bool = false) {
         let targetOffset = direction * CGFloat(UIScreen.main.bounds.width) * 1.6
         withAnimation(.easeIn(duration: 0.22)) {
@@ -348,7 +372,12 @@ struct ItemDetailView: View {
                 Label("AI 요약", systemImage: "sparkles")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color.brieflyPrimary600)
-                if isSummaryLoading {
+                if let summary = loadedSummary ?? currentItem.summary {
+                    Text(summary)
+                        .font(.subheadline)
+                        .foregroundStyle(Color.brieflyTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if isSummaryLoading {
                     HStack(spacing: 8) {
                         ProgressView()
                             .scaleEffect(0.8)
@@ -356,38 +385,56 @@ struct ItemDetailView: View {
                             .font(.subheadline)
                             .foregroundStyle(Color.brieflyTextSecondary)
                     }
-                } else if let summary = loadedSummary ?? currentItem.summary {
-                    Text(summary)
-                        .font(.subheadline)
-                        .foregroundStyle(Color.brieflyTextSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
                 } else {
-                    Text("요약을 준비 중입니다.")
-                        .font(.subheadline)
-                        .foregroundStyle(Color.brieflyTextSecondary)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("요약을 가져오지 못했습니다.")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.brieflyTextSecondary)
+                        Button(action: retryAISummary) {
+                            Label("AI 요약 다시 시도", systemImage: "arrow.clockwise.circle")
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(Color.brieflyPrimary600)
+                        }
+                    }
                 }
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.brieflyPrimary50, in: RoundedRectangle(cornerRadius: BrieflyRadius.md))
-            .task(id: currentItem.id) {
+            .task(id: summaryPollId) {
                 loadedSummary = nil
+                let retrying = isRetrying
+                isRetrying = false
+
+                // summary 이미 있으면 즉시 종료 (버튼/스피너 모두 미표시)
+                guard currentItem.summary == nil else { return }
+                // serverContentId/토큰 없으면 즉시 종료 → isSummaryLoading 미설정 → 버튼 표시
                 guard let contentId = currentItem.serverContentId,
                       let token = AuthTokenStore.shared.accessToken else { return }
-                guard currentItem.summary == nil else { return }
+                // 이전 세션 실패 항목은 재시도 버튼 탭 시에만 폴링
+                guard currentItem.summaryStatus != .failed || retrying else { return }
+
+                // 여기서부터 실제 폴링 시작
                 isSummaryLoading = true
-                defer { isSummaryLoading = false }
+                defer { isSummaryLoading = false }  // 성공/실패/취소 모두 스피너 해제 → 버튼 표시
+
                 for attempt in 0..<15 {
                     if attempt > 0 {
                         try? await Task.sleep(nanoseconds: 5_000_000_000)
                     }
+                    if Task.isCancelled { return }
                     if let detail = try? await BrieflyAPI.shared.fetchContentDetail(contentId: contentId, token: token),
                        let summary = detail.summary {
                         loadedSummary = summary
                         StorageService.shared.updateSummary(for: currentItem.id, summary: summary)
+                        StorageService.shared.updateSummaryStatus(for: currentItem.id, status: .done)
                         return
                     }
                 }
+
+                // 70초 타임아웃 — summaryStatus 저장 (다음 세션 자동 재폴링 방지)
+                // UI 갱신은 defer의 isSummaryLoading = false 가 처리
+                StorageService.shared.updateSummaryStatus(for: currentItem.id, status: .failed)
             }
 
             // 본문

@@ -88,6 +88,27 @@ actor BrieflyAPI {
         return try await post("/share", body: body, token: token)
     }
 
+    // MARK: - Rescan (page_text 기반 재요약 트리거)
+
+    struct RescanPayload: Encodable {
+        let pageText: String
+        let force: Bool
+
+        enum CodingKeys: String, CodingKey {
+            case pageText = "page_text"
+            case force
+        }
+    }
+
+    private struct RescanResult: Decodable {
+        let status: String
+    }
+
+    func rescan(contentId: Int, pageText: String, token: String, force: Bool = false) async throws {
+        let body = RescanPayload(pageText: pageText, force: force)
+        let _: RescanResult = try await post("/content/\(contentId)/rescan", body: body, token: token)
+    }
+
     // MARK: - Content Detail
 
     struct ContentDetail: Decodable {

@@ -22,6 +22,13 @@ struct SavedItem: Codable, Identifiable, Hashable {
 
     // Phase 2b — AI 요약
     var summary: String?
+    var summaryStatus: SummaryStatus
+
+    enum SummaryStatus: String, Codable {
+        case unknown    // 초기 상태 (기존 데이터 하위 호환용)
+        case failed     // 타임아웃 초과 — 수동 재시도 필요
+        case done       // 요약 완료
+    }
 
     enum Status: String, Codable {
         case unread, read, discarded
@@ -44,6 +51,26 @@ struct SavedItem: Codable, Identifiable, Hashable {
         self.savedAt = Date()
         self.status = .unread
         self.fetchStatus = .pending
+        self.summaryStatus = .unknown
+    }
+
+    // summaryStatus 필드가 없는 기존 JSON과 하위 호환
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id            = try c.decode(UUID.self, forKey: .id)
+        url           = try c.decode(URL.self, forKey: .url)
+        title         = try? c.decode(String.self, forKey: .title)
+        savedAt       = try c.decode(Date.self, forKey: .savedAt)
+        status        = try c.decode(Status.self, forKey: .status)
+        serverContentId = try? c.decode(Int.self, forKey: .serverContentId)
+        ogTitle       = try? c.decode(String.self, forKey: .ogTitle)
+        ogImageURL    = try? c.decode(URL.self, forKey: .ogImageURL)
+        ogDescription = try? c.decode(String.self, forKey: .ogDescription)
+        siteName      = try? c.decode(String.self, forKey: .siteName)
+        articleText   = try? c.decode(String.self, forKey: .articleText)
+        fetchStatus   = (try? c.decode(FetchStatus.self, forKey: .fetchStatus)) ?? .pending
+        summary       = try? c.decode(String.self, forKey: .summary)
+        summaryStatus = (try? c.decode(SummaryStatus.self, forKey: .summaryStatus)) ?? .unknown
     }
 
     /// 표시용 제목 — ogTitle → title → 도메인

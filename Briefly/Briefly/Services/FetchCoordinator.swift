@@ -26,8 +26,18 @@ final class FetchCoordinator {
         print("[Fetch] 대기 중인 항목: \(pending.count)개 / 전체: \(items.count)개")
         guard !pending.isEmpty else { return }
 
-        for item in pending {
-            await fetchOne(item: item)
+        // 최대 3개 동시 처리 — 하나의 지연이 다른 항목에 영향을 주지 않도록
+        await withTaskGroup(of: Void.self) { group in
+            var active = 0
+            for item in pending {
+                if active >= 3 {
+                    await group.next()
+                    active -= 1
+                }
+                let capturedItem = item
+                group.addTask { await self.fetchOne(item: capturedItem) }
+                active += 1
+            }
         }
     }
 
@@ -42,12 +52,14 @@ final class FetchCoordinator {
             // 1단계: OG 메타데이터
             // YouTube/LinkedIn은 oEmbed API로 빠르게 취득, 그 외는 HTML 파싱
             let meta: PageMetadata
+            var linkedInOEmbedSucceeded = false
             if Self.isYouTubeURL(item.url),
                let ytMeta = try? await MetadataService.shared.fetchYouTubeMetadata(for: item.url) {
                 meta = ytMeta
             } else if Self.isLinkedInURL(item.url),
                       let liMeta = try? await MetadataService.shared.fetchLinkedInMetadata(for: item.url) {
                 meta = liMeta
+                linkedInOEmbedSucceeded = true
             } else {
                 meta = try await MetadataService.shared.fetchMetadata(for: item.url)
             }
@@ -62,20 +74,33 @@ final class FetchCoordinator {
             NotificationCenter.default.post(name: .fetchCoordinatorDidUpdate, object: nil)
 
             // 2단계: 본문 텍스트
-            // YouTube/LinkedIn은 스크래핑 불가 — ogDescription(author명 등)을 즉시 사용
+            // YouTube: 스크래핑 불가 — ogDescription 즉시 사용
+            // LinkedIn: oEmbed 성공 시만 ogDescription 사용, 실패 시 빈 상태 (로그인 페이지 내용 방지)
             if Self.isYouTubeURL(item.url) {
                 updated.articleText = updated.ogDescription
                 updated.fetchStatus = .partial
                 print("[Fetch] YouTube — ogDescription 사용: \(updated.articleText?.count ?? 0)자")
             } else if Self.isLinkedInURL(item.url) {
-                updated.articleText = updated.ogDescription
+                updated.articleText = linkedInOEmbedSucceeded ? updated.ogDescription : nil
                 updated.fetchStatus = .partial
-                print("[Fetch] LinkedIn — ogDescription 사용: \(updated.articleText?.count ?? 0)자")
+                print("[Fetch] LinkedIn — oEmbed \(linkedInOEmbedSucceeded ? "성공" : "실패"): \(updated.articleText?.count ?? 0)자")
             } else {
                 let articleText = try await fetchArticleText(for: item.url)
                 updated.articleText = articleText ?? updated.ogDescription
                 updated.fetchStatus = (articleText != nil) ? .done : .partial
                 print("[Fetch] 본문 완료: \(updated.articleText?.count ?? 0)자, status=\(updated.fetchStatus)")
+            }
+
+            // ING-005: 본문이 충분하고 서버 요약이 없으면 page_text를 백엔드에 전송해 재요약 트리거
+            let fetchedText = updated.articleText ?? ""
+            let needsSummary = (item.summary == nil || item.summary?.isEmpty == true)
+            if fetchedText.count >= 200, needsSummary,
+               let contentId = item.serverContentId,
+               let token = AuthTokenStore.shared.accessToken {
+                Task {
+                    try? await BrieflyAPI.shared.rescan(contentId: contentId, pageText: fetchedText, token: token)
+                    print("[Fetch] rescan 전송: contentId=\(contentId), \(fetchedText.count)자")
+                }
             }
 
         } catch {

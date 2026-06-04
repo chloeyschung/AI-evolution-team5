@@ -46,6 +46,7 @@ from ..schemas import (
     PaginatedContentResponse,
     PlatformCount,
     ReflectionQuestionsResponse,
+    RescanRequest,
     ShareRequest,
     ShareResponse,
     StatsResponse,
@@ -874,8 +875,8 @@ async def _background_summarize(
         # Fetch page text — use pre-extracted text from client if provided (e.g. LinkedIn, Facebook),
         # try YouTube transcript for YouTube URLs, LinkedIn oEmbed for LinkedIn URLs,
         # otherwise fall back to server-side HTML fetch.
+        from src.ingestion.linkedin_extractor import fetch_linkedin_text, is_linkedin_url
         from src.ingestion.youtube_transcript import extract_video_id, fetch_youtube_text
-        from src.ingestion.linkedin_extractor import is_linkedin_url, fetch_linkedin_text
 
         text_content = ""
         if page_text:
@@ -910,7 +911,10 @@ async def _background_summarize(
             final_title = content.title or ""
 
             # Summarization + title generation — only when text was fetched and not yet done.
-            already_summarized = bool(getattr(content, "is_ai_summarized", False)) or bool(content.summary)
+            # page_text indicates the client has better text (e.g. WKWebView), so allow override.
+            already_summarized = (
+                bool(getattr(content, "is_ai_summarized", False)) or bool(content.summary)
+            ) and not page_text
             if text_content and summarizer is not None and not already_summarized:
                 summary = await summarizer.summarize(text_content, max_retries=1)
                 await repo.update_summary(content_id, user_id, summary)
@@ -1023,6 +1027,43 @@ async def share_content(
         is_ai_titled=bool(getattr(content, "is_ai_titled", False)),
         created_at=serialize_datetime(content.created_at),
     )
+
+
+@router.post("/content/{content_id}/rescan", status_code=202)
+@limiter.limit("30/minute")
+async def rescan_content(
+    request: Request,
+    content_id: int,
+    data: RescanRequest,
+    background_tasks: BackgroundTasks,
+    user_id: int = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    share_handler: ShareHandler = Depends(get_share_handler),
+) -> dict:
+    """Re-summarize content using client-provided page text.
+
+    Called by iOS after FetchCoordinator successfully extracts article text via WKWebView,
+    allowing AI summaries for JavaScript-rendered SPA sites that server-side scraping cannot handle.
+    """
+    repo = ContentRepository(db)
+    content = await repo.get_by_id(content_id)
+    if not content or content.user_id != user_id or content.is_deleted:
+        raise HTTPException(status_code=404, detail="Content not found.")
+
+    already = bool(getattr(content, "is_ai_summarized", False)) or bool(content.summary)
+    if already and not data.force:
+        return {"status": "skipped", "reason": "already_summarized"}
+
+    background_tasks.add_task(
+        _background_summarize,
+        content_id,
+        user_id,
+        content.url,
+        share_handler._content_extractor,
+        share_handler._summarizer,
+        data.page_text,
+    )
+    return {"status": "queued"}
 
 
 @router.post("/content/remove-duplicates", response_model=DeleteContentResponse)

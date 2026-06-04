@@ -106,6 +106,24 @@ final class StorageService {
         }
     }
 
+    /// 특정 항목의 AI 요약 상태를 업데이트합니다 (inbox/main 모두 확인).
+    func updateSummaryStatus(for id: UUID, status: SavedItem.SummaryStatus) {
+        guard let defaults else { return }
+
+        var inbox = decode(from: defaults, key: inboxKey)
+        if let idx = inbox.firstIndex(where: { $0.id == id }) {
+            inbox[idx].summaryStatus = status
+            encode(inbox, to: defaults, key: inboxKey)
+            return
+        }
+
+        var items = decode(from: defaults, key: mainKey)
+        if let idx = items.firstIndex(where: { $0.id == id }) {
+            items[idx].summaryStatus = status
+            encode(items, to: defaults, key: mainKey)
+        }
+    }
+
     // MARK: - Private helpers
 
     private func decode(from defaults: UserDefaults, key: String) -> [SavedItem] {
