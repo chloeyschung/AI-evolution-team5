@@ -70,33 +70,30 @@ final class ShareViewController: UIViewController {
         var item = SavedItem(url: url, title: nil)
         StorageService.shared.appendToInbox(item)
 
-        // 로그인된 경우 백엔드에도 전송하고 serverContentId를 저장
-        if let token = AuthTokenStore.shared.accessToken {
-            print("[ShareExt] 로그인 상태 — 서버 업로드 시도: \(url)")
-            Task {
-                do {
-                    let result = try await BrieflyAPI.shared.share(url: url, token: token)
-                    print("[ShareExt] 업로드 성공: contentId=\(result.id)")
-                    item.serverContentId = result.id
-                    // 백엔드는 share 응답 후 background task로 요약을 생성하므로
-                    // 일반적으로 result.summary는 nil. 다만 향후 inline summary
-                    // API 변경에 대비해 non-empty일 때만 저장 (whitespace 필터).
-                    if let summary = result.summary?
-                        .trimmingCharacters(in: .whitespacesAndNewlines),
-                       !summary.isEmpty {
-                        item.summary = summary
-                    }
-                    StorageService.shared.updateItemById(item)
-                } catch {
-                    print("[ShareExt] 업로드 실패 (메인 앱 열 때 SyncService가 재시도합니다): \(error.localizedDescription)")
-                }
-            }
-        } else {
+        guard let token = AuthTokenStore.shared.accessToken else {
             print("[ShareExt] 비로그인 상태 — 로컬에만 저장")
+            DispatchQueue.main.async { self.showConfirmation(success: true, savedURL: url) }
+            return
         }
 
-        DispatchQueue.main.async {
-            self.showConfirmation(success: true, savedURL: url)
+        // 로그인된 경우 API 응답을 받은 뒤 serverContentId를 저장하고 UI를 표시한다.
+        // "지금 읽기" 진입 시 serverContentId가 반드시 확정된 상태여야 폴링이 시작된다.
+        print("[ShareExt] 로그인 상태 — 서버 업로드 시도: \(url)")
+        Task {
+            do {
+                let result = try await BrieflyAPI.shared.share(url: url, token: token)
+                print("[ShareExt] 업로드 성공: contentId=\(result.id)")
+                item.serverContentId = result.id
+                if let summary = result.summary?
+                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                   !summary.isEmpty {
+                    item.summary = summary
+                }
+                StorageService.shared.updateItemById(item)
+            } catch {
+                print("[ShareExt] 업로드 실패 (메인 앱 열 때 SyncService가 재시도합니다): \(error.localizedDescription)")
+            }
+            DispatchQueue.main.async { self.showConfirmation(success: true, savedURL: url) }
         }
     }
 

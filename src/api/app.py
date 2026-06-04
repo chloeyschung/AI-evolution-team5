@@ -120,6 +120,7 @@ async def lifespan(app: FastAPI):
             provider=settings.SUMMARY_PROVIDER,
             extra_headers=extra_headers,
             timeout=120.0 if modal_tokens_ok else None,
+            total_timeout=120.0 if modal_tokens_ok else None,
         )
 
     content_extractor = ContentExtractor()

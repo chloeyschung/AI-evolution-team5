@@ -367,9 +367,9 @@ struct ItemDetailView: View {
                 guard currentItem.summary == nil else { return }
                 isSummaryLoading = true
                 defer { isSummaryLoading = false }
-                for attempt in 0..<5 {
+                for attempt in 0..<15 {
                     if attempt > 0 {
-                        try? await Task.sleep(nanoseconds: 3_000_000_000)
+                        try? await Task.sleep(nanoseconds: 5_000_000_000)
                     }
                     if let detail = try? await BrieflyAPI.shared.fetchContentDetail(contentId: contentId, token: token),
                        let summary = detail.summary {
