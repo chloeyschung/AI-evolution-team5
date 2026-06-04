@@ -11,7 +11,7 @@ from .exceptions import APIConnectionError, InvalidResponseError, SummarizationE
 class Summarizer:
     DEFAULT_MODEL = "claude-3-5-sonnet-20240620"
     DEFAULT_MAX_TOKENS = 120
-    DEFAULT_TIMEOUT = 30.0
+    DEFAULT_TIMEOUT = 60.0  # Modal cold-start이 30~50s 걸리므로 여유 있게 (PR #29 reflection.py 패턴과 동일)
     ANTHROPIC_VERSION = "2023-06-01"
     CONTENT_TYPE_JSON = "application/json"
     PROVIDERS = {"anthropic", "openai", "gemini", "auto"}
