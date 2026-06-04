@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -179,6 +180,33 @@ async def test_extra_headers_forwarded_to_request():
         headers = mock_post.call_args.kwargs.get("headers", {})
         assert headers.get("Modal-Key") == "test-key-id"
         assert headers.get("Modal-Secret") == "test-key-secret"
+
+
+def test_default_two_stage_timeouts():
+    """Defaults follow the 2-stage pattern: 25s per-attempt, 55s absolute cap.
+
+    Guards against accidental regressions if someone edits the defaults later.
+    """
+    s = Summarizer(api_key="key")
+    assert s.timeout == 25.0
+    assert s.total_timeout == 55.0
+
+
+@pytest.mark.asyncio
+async def test_total_timeout_caps_runtime():
+    """Retries that exceed total_timeout are cut off with APIConnectionError, not hung.
+
+    With a 0.05s absolute cap and a post that sleeps 1s, asyncio.wait_for must
+    cancel the in-flight attempt rather than letting it run to completion.
+    """
+    summarizer = Summarizer(api_key="key", total_timeout=0.05)
+
+    async def slow_post(*args, **kwargs):
+        await asyncio.sleep(1.0)
+
+    with patch("httpx.AsyncClient.post", new=slow_post):
+        with pytest.raises(APIConnectionError, match="exceeded total timeout"):
+            await summarizer.summarize("Some content")
 
 
 @pytest.mark.asyncio
