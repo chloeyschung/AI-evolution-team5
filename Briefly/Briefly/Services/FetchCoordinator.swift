@@ -48,11 +48,17 @@ final class FetchCoordinator {
             print("[Fetch] OG 완료: title=\(meta.ogTitle ?? "nil"), image=\(meta.ogImageURL?.absoluteString ?? "nil")")
 
             // 2단계: 본문 텍스트
-            let articleText = try await fetchArticleText(for: item.url)
-            // 본문이 없으면 ogDescription을 폴백으로 사용 (YouTube, 영상 플랫폼 등)
-            updated.articleText = articleText ?? updated.ogDescription
-            updated.fetchStatus = (articleText != nil) ? .done : .partial
-            print("[Fetch] 본문 완료: \(updated.articleText?.count ?? 0)자, status=\(updated.fetchStatus)")
+            // YouTube는 스크래핑이 불가하므로 ogDescription을 즉시 사용
+            if Self.isYouTubeURL(item.url) {
+                updated.articleText = updated.ogDescription
+                updated.fetchStatus = .partial
+                print("[Fetch] YouTube — ogDescription 사용: \(updated.articleText?.count ?? 0)자")
+            } else {
+                let articleText = try await fetchArticleText(for: item.url)
+                updated.articleText = articleText ?? updated.ogDescription
+                updated.fetchStatus = (articleText != nil) ? .done : .partial
+                print("[Fetch] 본문 완료: \(updated.articleText?.count ?? 0)자, status=\(updated.fetchStatus)")
+            }
 
         } catch {
             print("[Fetch] 에러: \(error)")
@@ -67,6 +73,11 @@ final class FetchCoordinator {
 
         StorageService.shared.updateItem(updated)
         NotificationCenter.default.post(name: .fetchCoordinatorDidUpdate, object: nil)
+    }
+
+    private static func isYouTubeURL(_ url: URL) -> Bool {
+        guard let host = url.host?.lowercased() else { return false }
+        return host == "youtube.com" || host.hasSuffix(".youtube.com") || host == "youtu.be"
     }
 
     /// ArticleService 시도 후 결과가 짧으면 WebContentService 폴백
