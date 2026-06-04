@@ -16,7 +16,7 @@ actor BrieflyAPI {
     /// DevServerSheet와 init이 같은 값을 보도록 single source.
     static var defaultDebugURL: String {
         #if targetEnvironment(simulator)
-        return "http://localhost:8000/api/v1"
+        return "http://127.0.0.1:8000/api/v1"
         #else
         return defaultDevURL
         #endif
