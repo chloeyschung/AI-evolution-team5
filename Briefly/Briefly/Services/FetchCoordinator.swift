@@ -41,9 +41,13 @@ final class FetchCoordinator {
         do {
             // 1단계: OG 메타데이터
             // YouTube는 oEmbed API로 빠르게 취득, 그 외는 HTML 파싱
-            let meta = Self.isYouTubeURL(item.url)
-                ? (try? await MetadataService.shared.fetchYouTubeMetadata(for: item.url)) ?? (try await MetadataService.shared.fetchMetadata(for: item.url))
-                : try await MetadataService.shared.fetchMetadata(for: item.url)
+            let meta: PageMetadata
+            if Self.isYouTubeURL(item.url),
+               let ytMeta = try? await MetadataService.shared.fetchYouTubeMetadata(for: item.url) {
+                meta = ytMeta
+            } else {
+                meta = try await MetadataService.shared.fetchMetadata(for: item.url)
+            }
             updated.ogTitle = meta.ogTitle
             updated.ogImageURL = meta.ogImageURL
             updated.ogDescription = meta.ogDescription
