@@ -18,6 +18,27 @@ actor MetadataService {
         return URLSession(configuration: config)
     }()
 
+    /// YouTube oEmbed API로 메타데이터를 빠르게 취득합니다 (전체 HTML 파싱 불필요).
+    func fetchYouTubeMetadata(for url: URL) async throws -> PageMetadata {
+        let encoded = url.absoluteString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        guard let oembedURL = URL(string: "https://www.youtube.com/oembed?url=\(encoded)&format=json") else {
+            throw URLError(.badURL)
+        }
+        let (data, _) = try await session.data(from: oembedURL)
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw URLError(.cannotParseResponse)
+        }
+        var meta = PageMetadata()
+        meta.ogTitle = json["title"] as? String
+        meta.ogDescription = json["author_name"] as? String
+        meta.siteName = "YouTube"
+        // oEmbed thumbnail → og:image 대신 사용
+        if let thumbURL = json["thumbnail_url"] as? String {
+            meta.ogImageURL = URL(string: thumbURL)
+        }
+        return meta
+    }
+
     func fetchMetadata(for url: URL) async throws -> PageMetadata {
         var request = URLRequest(url: url)
         request.setValue(

@@ -39,13 +39,20 @@ final class FetchCoordinator {
         NotificationCenter.default.post(name: .fetchCoordinatorDidUpdate, object: nil)
 
         do {
-            // 1단계: OG 메타데이터 (URLSession)
-            let meta = try await MetadataService.shared.fetchMetadata(for: item.url)
+            // 1단계: OG 메타데이터
+            // YouTube는 oEmbed API로 빠르게 취득, 그 외는 HTML 파싱
+            let meta = Self.isYouTubeURL(item.url)
+                ? (try? await MetadataService.shared.fetchYouTubeMetadata(for: item.url)) ?? (try await MetadataService.shared.fetchMetadata(for: item.url))
+                : try await MetadataService.shared.fetchMetadata(for: item.url)
             updated.ogTitle = meta.ogTitle
             updated.ogImageURL = meta.ogImageURL
             updated.ogDescription = meta.ogDescription
             updated.siteName = meta.siteName
             print("[Fetch] OG 완료: title=\(meta.ogTitle ?? "nil"), image=\(meta.ogImageURL?.absoluteString ?? "nil")")
+
+            // OG 완료 즉시 저장 + 알림 — 이미지가 바로 표시되도록
+            StorageService.shared.updateItem(updated)
+            NotificationCenter.default.post(name: .fetchCoordinatorDidUpdate, object: nil)
 
             // 2단계: 본문 텍스트
             // YouTube는 스크래핑이 불가하므로 ogDescription을 즉시 사용
@@ -62,13 +69,8 @@ final class FetchCoordinator {
 
         } catch {
             print("[Fetch] 에러: \(error)")
-            // 에러가 나도 ogDescription이 있으면 폴백으로 저장
             updated.articleText = updated.ogDescription
-            if updated.ogTitle != nil {
-                updated.fetchStatus = .partial
-            } else {
-                updated.fetchStatus = .failed
-            }
+            updated.fetchStatus = updated.ogTitle != nil ? .partial : .failed
         }
 
         StorageService.shared.updateItem(updated)
