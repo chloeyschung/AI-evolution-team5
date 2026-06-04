@@ -11,7 +11,13 @@ from .exceptions import APIConnectionError, InvalidResponseError, SummarizationE
 class Summarizer:
     DEFAULT_MODEL = "claude-3-5-sonnet-20240620"
     DEFAULT_MAX_TOKENS = 120
-    DEFAULT_TIMEOUT = 60.0  # Modal cold-start이 30~50s 걸리므로 여유 있게 (PR #29 reflection.py 패턴과 동일)
+    # 2단계 타임아웃 (reflection.py 패턴):
+    #   DEFAULT_TIMEOUT       = per-attempt HTTP timeout
+    #   DEFAULT_TOTAL_TIMEOUT = retries + backoff 전체를 감싸는 절대 상한
+    # Modal serverless GPU의 cold-start가 30~50s라 per-attempt는 넉넉히 25s로 두되,
+    # 3 retries + backoff가 누적돼 태스크가 무한정 블록되지 않도록 55s에서 강제 종료한다.
+    DEFAULT_TIMEOUT = 25.0
+    DEFAULT_TOTAL_TIMEOUT = 55.0
     ANTHROPIC_VERSION = "2023-06-01"
     CONTENT_TYPE_JSON = "application/json"
     PROVIDERS = {"anthropic", "openai", "gemini", "auto"}
@@ -24,6 +30,7 @@ class Summarizer:
         provider: str = "auto",
         extra_headers: dict | None = None,
         timeout: float | None = None,
+        total_timeout: float | None = None,
     ):
         self.api_key = api_key
         self.base_url = base_url
@@ -32,6 +39,9 @@ class Summarizer:
         self.provider = provider if provider in self.PROVIDERS else "auto"
         self.extra_headers = extra_headers or {}
         self.timeout = timeout if timeout is not None else self.DEFAULT_TIMEOUT
+        self.total_timeout = (
+            total_timeout if total_timeout is not None else self.DEFAULT_TOTAL_TIMEOUT
+        )
 
     def _resolved_provider(self) -> str:
         if self.provider != "auto":
@@ -190,70 +200,77 @@ class Summarizer:
         prompt = self._build_prompt(content, max_lines)
         request_url, headers, payload, provider = self._build_request(prompt)
 
-        last_error = None
-
-        async with async_client_context() as client:
-            for attempt in range(max_retries):
-                try:
-                    response = await client.post(
-                        request_url,
-                        headers=headers,
-                        json=payload,
-                        timeout=self.timeout,
-                    )
-
-                    if response.status_code >= 500 and attempt < max_retries - 1:
-                        await asyncio.sleep(2**attempt)
-                        continue
-
-                    if response.status_code != 200:
-                        raise APIConnectionError(
-                            f"API request failed with status {response.status_code}"
+        async def _attempt() -> str:
+            last_error = None
+            async with async_client_context() as client:
+                for attempt in range(max_retries):
+                    try:
+                        response = await client.post(
+                            request_url,
+                            headers=headers,
+                            json=payload,
+                            timeout=self.timeout,
                         )
 
-                    data = response.json()
-
-                    # Some reasoning-capable open models behind Anthropic-compatible routes
-                    # emit only "thinking" blocks at low token budgets.
-                    # Retry with a larger budget before failing extraction.
-                    if provider == "anthropic" and not self._anthropic_has_text_block(data):
-                        if attempt < max_retries - 1:
-                            current_max_tokens = int(payload.get("max_tokens", self.DEFAULT_MAX_TOKENS))
-                            payload["max_tokens"] = min(current_max_tokens * 4, 5000)
+                        if response.status_code >= 500 and attempt < max_retries - 1:
                             await asyncio.sleep(2**attempt)
                             continue
 
-                    summary = self._extract_summary(data, provider)
+                        if response.status_code != 200:
+                            raise APIConnectionError(
+                                f"API request failed with status {response.status_code}"
+                            )
 
-                    lines = summary.split("\n")
-                    if len(lines) > max_lines:
-                        summary = "\n".join(lines[:max_lines])
+                        data = response.json()
 
-                    # Hard cap: 240 chars total (~70 chars × 3 bullets)
-                    if len(summary) > 240:
-                        truncated = summary[:240]
-                        last_newline = truncated.rfind("\n")
-                        summary = truncated[:last_newline] if last_newline > 80 else truncated
+                        # Some reasoning-capable open models behind Anthropic-compatible routes
+                        # emit only "thinking" blocks at low token budgets.
+                        # Retry with a larger budget before failing extraction.
+                        if provider == "anthropic" and not self._anthropic_has_text_block(data):
+                            if attempt < max_retries - 1:
+                                current_max_tokens = int(payload.get("max_tokens", self.DEFAULT_MAX_TOKENS))
+                                payload["max_tokens"] = min(current_max_tokens * 4, 5000)
+                                await asyncio.sleep(2**attempt)
+                                continue
 
-                    return summary
+                        summary = self._extract_summary(data, provider)
 
-                except (APIConnectionError, InvalidResponseError):
-                    # Don't retry domain-specific errors, raise immediately
-                    raise
-                except httpx.RequestError as exc:
-                    last_error = exc
-                    if attempt < max_retries - 1:
-                        await asyncio.sleep(2**attempt)
-                        continue
-                    raise APIConnectionError(f"Request failed: {exc}") from exc
-                except Exception as e:
-                    last_error = e
-                    if attempt < max_retries - 1:
-                        await asyncio.sleep(2**attempt)
-                        continue
-                    raise SummarizationError(f"Unexpected error: {e}") from e
+                        lines = summary.split("\n")
+                        if len(lines) > max_lines:
+                            summary = "\n".join(lines[:max_lines])
 
-        raise SummarizationError(f"All {max_retries} retry attempts failed. Last error: {last_error}")
+                        # Hard cap: 240 chars total (~70 chars × 3 bullets)
+                        if len(summary) > 240:
+                            truncated = summary[:240]
+                            last_newline = truncated.rfind("\n")
+                            summary = truncated[:last_newline] if last_newline > 80 else truncated
+
+                        return summary
+
+                    except (APIConnectionError, InvalidResponseError):
+                        # Don't retry domain-specific errors, raise immediately
+                        raise
+                    except httpx.RequestError as exc:
+                        last_error = exc
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(2**attempt)
+                            continue
+                        raise APIConnectionError(f"Request failed: {exc}") from exc
+                    except Exception as e:
+                        last_error = e
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(2**attempt)
+                            continue
+                        raise SummarizationError(f"Unexpected error: {e}") from e
+
+            raise SummarizationError(f"All {max_retries} retry attempts failed. Last error: {last_error}")
+
+        try:
+            return await asyncio.wait_for(_attempt(), timeout=self.total_timeout)
+        except TimeoutError as exc:
+            raise APIConnectionError(
+                f"Summarization exceeded total timeout of {self.total_timeout}s"
+            ) from exc
 
     async def generate_title(self, content: str, max_retries: int = 3) -> str:
         if not content or not content.strip():
@@ -262,40 +279,48 @@ class Summarizer:
         prompt = self._build_title_prompt(content)
         request_url, headers, payload, provider = self._build_request(prompt)
         payload["max_tokens"] = 80
-        last_error = None
 
-        async with async_client_context() as client:
-            for attempt in range(max_retries):
-                try:
-                    response = await client.post(
-                        request_url,
-                        headers=headers,
-                        json=payload,
-                        timeout=self.timeout,
-                    )
-                    if response.status_code >= 500 and attempt < max_retries - 1:
-                        await asyncio.sleep(2**attempt)
-                        continue
-                    if response.status_code != 200:
-                        raise APIConnectionError(
-                            f"API request failed with status {response.status_code}"
+        async def _attempt() -> str:
+            last_error = None
+            async with async_client_context() as client:
+                for attempt in range(max_retries):
+                    try:
+                        response = await client.post(
+                            request_url,
+                            headers=headers,
+                            json=payload,
+                            timeout=self.timeout,
                         )
-                    data = response.json()
-                    title = self._extract_summary(data, provider)
-                    return " ".join(title.split()).strip()[:220]
-                except (APIConnectionError, InvalidResponseError):
-                    raise
-                except httpx.RequestError as exc:
-                    last_error = exc
-                    if attempt < max_retries - 1:
-                        await asyncio.sleep(2**attempt)
-                        continue
-                    raise APIConnectionError(f"Request failed: {exc}") from exc
-                except Exception as e:
-                    last_error = e
-                    if attempt < max_retries - 1:
-                        await asyncio.sleep(2**attempt)
-                        continue
-                    raise SummarizationError(f"Unexpected error: {e}") from e
+                        if response.status_code >= 500 and attempt < max_retries - 1:
+                            await asyncio.sleep(2**attempt)
+                            continue
+                        if response.status_code != 200:
+                            raise APIConnectionError(
+                                f"API request failed with status {response.status_code}"
+                            )
+                        data = response.json()
+                        title = self._extract_summary(data, provider)
+                        return " ".join(title.split()).strip()[:220]
+                    except (APIConnectionError, InvalidResponseError):
+                        raise
+                    except httpx.RequestError as exc:
+                        last_error = exc
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(2**attempt)
+                            continue
+                        raise APIConnectionError(f"Request failed: {exc}") from exc
+                    except Exception as e:
+                        last_error = e
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(2**attempt)
+                            continue
+                        raise SummarizationError(f"Unexpected error: {e}") from e
 
-        raise SummarizationError(f"All {max_retries} retry attempts failed. Last error: {last_error}")
+            raise SummarizationError(f"All {max_retries} retry attempts failed. Last error: {last_error}")
+
+        try:
+            return await asyncio.wait_for(_attempt(), timeout=self.total_timeout)
+        except TimeoutError as exc:
+            raise APIConnectionError(
+                f"Title generation exceeded total timeout of {self.total_timeout}s"
+            ) from exc
