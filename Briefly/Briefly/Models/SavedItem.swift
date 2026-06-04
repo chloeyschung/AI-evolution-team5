@@ -25,8 +25,8 @@ struct SavedItem: Codable, Identifiable, Hashable {
 
     enum Status: String, Codable {
         case unread, read, discarded
-        case kept       // Keep 선택 → Archived 탭
-        case deleted    // Delete 선택 → Deleted 탭
+        case kept       // Keep 선택 → Saved 탭
+        case deleted    // Discard 선택 → Discarded 탭
     }
 
     enum FetchStatus: String, Codable {

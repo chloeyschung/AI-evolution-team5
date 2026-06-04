@@ -76,7 +76,7 @@ struct ItemDetailView: View {
     @ViewBuilder
     private var swipeIndicators: some View {
         HStack {
-            swipeBadge("DELETE", color: Color.brieflyError, degrees: -15,
+            swipeBadge("DISCARD", color: Color.brieflyError, degrees: -15,
                        opacity: dragOffset < -20 ? Double(min(1.0, abs(dragOffset) / 80.0)) : 0)
             Spacer()
             swipeBadge("KEEP", color: Color.brieflyPrimary500, degrees: 15,
@@ -260,7 +260,7 @@ struct ItemDetailView: View {
         VStack(spacing: 0) {
             Divider()
             HStack(spacing: 0) {
-                Button("Delete") { performDelete() }
+                Button("Discard") { performDelete() }
                     .frame(maxWidth: .infinity)
                     .foregroundStyle(Color.brieflyError)
 
@@ -385,11 +385,11 @@ struct ItemDetailView: View {
 
             Divider()
 
-            // 원문 바로가기
+            // 원문 보기
             Button { showBrowser = true } label: {
                 HStack {
                     Image(systemName: "safari")
-                    Text("원문 바로가기")
+                    Text("원문 보기")
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(.caption)

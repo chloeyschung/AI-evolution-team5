@@ -119,7 +119,7 @@ actor BrieflyAPI {
         return try decoder.decode(R.self, from: data)
     }
 
-    // MARK: - Swipe (Keep / Delete)
+    // MARK: - Swipe (Keep / Discard)
 
     enum SwipeAction: String, Encodable {
         case keep
