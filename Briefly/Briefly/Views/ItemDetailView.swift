@@ -13,6 +13,7 @@ struct ItemDetailView: View {
     @State private var showBrowser = false
     @State private var isSummaryLoading = false
     @State private var loadedSummary: String? = nil
+    @State private var liveItem: SavedItem? = nil
     @Environment(\.dismiss) private var dismiss
 
     init(items: [SavedItem], startIndex: Int, showActions: Bool) {
@@ -21,7 +22,7 @@ struct ItemDetailView: View {
         self._currentIndex = State(initialValue: startIndex)
     }
 
-    var currentItem: SavedItem { items[currentIndex] }
+    var currentItem: SavedItem { liveItem ?? items[currentIndex] }
 
     // MARK: - Body
 
@@ -70,6 +71,15 @@ struct ItemDetailView: View {
         }
         .sheet(isPresented: $showBrowser) {
             SafariBrowserView(url: currentItem.url)
+        }
+        .onChange(of: currentIndex) { _ in
+            liveItem = nil
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .fetchCoordinatorDidUpdate)) { _ in
+            let baseItem = items[currentIndex]
+            if let updated = StorageService.shared.loadAll().first(where: { $0.id == baseItem.id }) {
+                liveItem = updated
+            }
         }
     }
 
