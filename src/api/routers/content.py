@@ -872,8 +872,10 @@ async def _background_summarize(
 
     try:
         # Fetch page text — use pre-extracted text from client if provided (e.g. LinkedIn, Facebook),
-        # try YouTube transcript for YouTube URLs, otherwise fall back to server-side HTML fetch.
+        # try YouTube transcript for YouTube URLs, LinkedIn oEmbed for LinkedIn URLs,
+        # otherwise fall back to server-side HTML fetch.
         from src.ingestion.youtube_transcript import extract_video_id, fetch_youtube_text
+        from src.ingestion.linkedin_extractor import is_linkedin_url, fetch_linkedin_text
 
         text_content = ""
         if page_text:
@@ -887,6 +889,11 @@ async def _background_summarize(
                     _, text_content = await content_extractor.fetch_html_and_text(url)
                 except Exception as exc:  # noqa: BLE001
                     logging.warning("Content extraction failed for content %s: %s", content_id, exc)
+        elif is_linkedin_url(url):
+            # LinkedIn blocks unauthenticated scraping — use oEmbed (title + author) instead.
+            # If oEmbed also fails, skip summarization rather than summarizing the login page.
+            linkedin_text = await fetch_linkedin_text(url)
+            text_content = linkedin_text or ""
         else:
             try:
                 _, text_content = await content_extractor.fetch_html_and_text(url)

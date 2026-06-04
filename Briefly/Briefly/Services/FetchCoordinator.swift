@@ -40,11 +40,14 @@ final class FetchCoordinator {
 
         do {
             // 1단계: OG 메타데이터
-            // YouTube는 oEmbed API로 빠르게 취득, 그 외는 HTML 파싱
+            // YouTube/LinkedIn은 oEmbed API로 빠르게 취득, 그 외는 HTML 파싱
             let meta: PageMetadata
             if Self.isYouTubeURL(item.url),
                let ytMeta = try? await MetadataService.shared.fetchYouTubeMetadata(for: item.url) {
                 meta = ytMeta
+            } else if Self.isLinkedInURL(item.url),
+                      let liMeta = try? await MetadataService.shared.fetchLinkedInMetadata(for: item.url) {
+                meta = liMeta
             } else {
                 meta = try await MetadataService.shared.fetchMetadata(for: item.url)
             }
@@ -59,11 +62,15 @@ final class FetchCoordinator {
             NotificationCenter.default.post(name: .fetchCoordinatorDidUpdate, object: nil)
 
             // 2단계: 본문 텍스트
-            // YouTube는 스크래핑이 불가하므로 ogDescription을 즉시 사용
+            // YouTube/LinkedIn은 스크래핑 불가 — ogDescription(author명 등)을 즉시 사용
             if Self.isYouTubeURL(item.url) {
                 updated.articleText = updated.ogDescription
                 updated.fetchStatus = .partial
                 print("[Fetch] YouTube — ogDescription 사용: \(updated.articleText?.count ?? 0)자")
+            } else if Self.isLinkedInURL(item.url) {
+                updated.articleText = updated.ogDescription
+                updated.fetchStatus = .partial
+                print("[Fetch] LinkedIn — ogDescription 사용: \(updated.articleText?.count ?? 0)자")
             } else {
                 let articleText = try await fetchArticleText(for: item.url)
                 updated.articleText = articleText ?? updated.ogDescription
@@ -84,6 +91,11 @@ final class FetchCoordinator {
     private static func isYouTubeURL(_ url: URL) -> Bool {
         guard let host = url.host?.lowercased() else { return false }
         return host == "youtube.com" || host.hasSuffix(".youtube.com") || host == "youtu.be"
+    }
+
+    private static func isLinkedInURL(_ url: URL) -> Bool {
+        guard let host = url.host?.lowercased() else { return false }
+        return host == "linkedin.com" || host.hasSuffix(".linkedin.com")
     }
 
     /// ArticleService 시도 후 결과가 짧으면 WebContentService 폴백
