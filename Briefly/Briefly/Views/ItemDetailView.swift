@@ -84,6 +84,37 @@ struct ItemDetailView: View {
                 liveItem = updated
             }
         }
+        .task(id: summaryPollId) {
+            loadedSummary = nil
+            let retrying = isRetrying
+            isRetrying = false
+
+            guard currentItem.summary == nil else { return }
+            guard let contentId = currentItem.serverContentId,
+                  let token = AuthTokenStore.shared.accessToken else { return }
+            guard currentItem.summaryStatus != .failed || retrying else { return }
+
+            isSummaryLoading = true
+            defer { isSummaryLoading = false }
+
+            let deadline = Date().addingTimeInterval(90)
+            for attempt in 0..<15 {
+                if attempt > 0 {
+                    try? await Task.sleep(nanoseconds: 5_000_000_000)
+                }
+                if Task.isCancelled { return }
+                if Date() > deadline { break }
+                if let detail = try? await BrieflyAPI.shared.fetchContentDetail(contentId: contentId, token: token),
+                   let summary = detail.summary {
+                    loadedSummary = summary
+                    StorageService.shared.updateSummary(for: currentItem.id, summary: summary)
+                    StorageService.shared.updateSummaryStatus(for: currentItem.id, status: .done)
+                    return
+                }
+            }
+
+            StorageService.shared.updateSummaryStatus(for: currentItem.id, status: .failed)
+        }
     }
 
     @ViewBuilder
@@ -401,41 +432,6 @@ struct ItemDetailView: View {
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.brieflyPrimary50, in: RoundedRectangle(cornerRadius: BrieflyRadius.md))
-            .task(id: summaryPollId) {
-                loadedSummary = nil
-                let retrying = isRetrying
-                isRetrying = false
-
-                // summary 이미 있으면 즉시 종료 (버튼/스피너 모두 미표시)
-                guard currentItem.summary == nil else { return }
-                // serverContentId/토큰 없으면 즉시 종료 → isSummaryLoading 미설정 → 버튼 표시
-                guard let contentId = currentItem.serverContentId,
-                      let token = AuthTokenStore.shared.accessToken else { return }
-                // 이전 세션 실패 항목은 재시도 버튼 탭 시에만 폴링
-                guard currentItem.summaryStatus != .failed || retrying else { return }
-
-                // 여기서부터 실제 폴링 시작
-                isSummaryLoading = true
-                defer { isSummaryLoading = false }  // 성공/실패/취소 모두 스피너 해제 → 버튼 표시
-
-                for attempt in 0..<15 {
-                    if attempt > 0 {
-                        try? await Task.sleep(nanoseconds: 5_000_000_000)
-                    }
-                    if Task.isCancelled { return }
-                    if let detail = try? await BrieflyAPI.shared.fetchContentDetail(contentId: contentId, token: token),
-                       let summary = detail.summary {
-                        loadedSummary = summary
-                        StorageService.shared.updateSummary(for: currentItem.id, summary: summary)
-                        StorageService.shared.updateSummaryStatus(for: currentItem.id, status: .done)
-                        return
-                    }
-                }
-
-                // 70초 타임아웃 — summaryStatus 저장 (다음 세션 자동 재폴링 방지)
-                // UI 갱신은 defer의 isSummaryLoading = false 가 처리
-                StorageService.shared.updateSummaryStatus(for: currentItem.id, status: .failed)
-            }
 
             // 본문
             articleSection
