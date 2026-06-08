@@ -114,9 +114,24 @@ actor BrieflyAPI {
     struct ContentDetail: Decodable {
         let id: Int
         let summary: String?
+        let autoTagCategory: String?
+        let autoTagKeywordsEn: [String]
+        let autoTagKeywordsOriginal: [String]
 
         enum CodingKeys: String, CodingKey {
             case id, summary
+            case autoTagCategory      = "auto_tag_category"
+            case autoTagKeywordsEn    = "auto_tag_keywords_en"
+            case autoTagKeywordsOriginal = "auto_tag_keywords_original"
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id      = try  c.decode(Int.self,    forKey: .id)
+            summary = try? c.decode(String.self, forKey: .summary)
+            autoTagCategory         = try? c.decode(String.self,   forKey: .autoTagCategory)
+            autoTagKeywordsEn       = (try? c.decode([String].self, forKey: .autoTagKeywordsEn))       ?? []
+            autoTagKeywordsOriginal = (try? c.decode([String].self, forKey: .autoTagKeywordsOriginal)) ?? []
         }
     }
 

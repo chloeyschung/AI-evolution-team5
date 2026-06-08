@@ -24,6 +24,11 @@ struct SavedItem: Codable, Identifiable, Hashable {
     var summary: String?
     var summaryStatus: SummaryStatus
 
+    // Phase 2c — AI 자동 태깅
+    var autoTagCategory: String?
+    var autoTagKeywordsEn: [String]
+    var autoTagKeywordsOriginal: [String]
+
     enum SummaryStatus: String, Codable {
         case unknown    // 초기 상태 (기존 데이터 하위 호환용)
         case failed     // 타임아웃 초과 — 수동 재시도 필요
@@ -52,6 +57,9 @@ struct SavedItem: Codable, Identifiable, Hashable {
         self.status = .unread
         self.fetchStatus = .pending
         self.summaryStatus = .unknown
+        self.autoTagCategory = nil
+        self.autoTagKeywordsEn = []
+        self.autoTagKeywordsOriginal = []
     }
 
     // summaryStatus 필드가 없는 기존 JSON과 하위 호환
@@ -71,6 +79,9 @@ struct SavedItem: Codable, Identifiable, Hashable {
         fetchStatus   = (try? c.decode(FetchStatus.self, forKey: .fetchStatus)) ?? .pending
         summary       = try? c.decode(String.self, forKey: .summary)
         summaryStatus = (try? c.decode(SummaryStatus.self, forKey: .summaryStatus)) ?? .unknown
+        autoTagCategory         = try? c.decode(String.self,   forKey: .autoTagCategory)
+        autoTagKeywordsEn       = (try? c.decode([String].self, forKey: .autoTagKeywordsEn))       ?? []
+        autoTagKeywordsOriginal = (try? c.decode([String].self, forKey: .autoTagKeywordsOriginal)) ?? []
     }
 
     /// 표시용 제목 — ogTitle → title → 도메인

@@ -124,6 +124,28 @@ final class StorageService {
         }
     }
 
+    /// 특정 항목의 AI 자동 태그를 업데이트합니다 (inbox/main 모두 확인).
+    func updateAutoTags(for id: UUID, category: String?, keywordsEn: [String], keywordsOriginal: [String]) {
+        guard let defaults else { return }
+
+        var inbox = decode(from: defaults, key: inboxKey)
+        if let idx = inbox.firstIndex(where: { $0.id == id }) {
+            inbox[idx].autoTagCategory = category
+            inbox[idx].autoTagKeywordsEn = keywordsEn
+            inbox[idx].autoTagKeywordsOriginal = keywordsOriginal
+            encode(inbox, to: defaults, key: inboxKey)
+            return
+        }
+
+        var items = decode(from: defaults, key: mainKey)
+        if let idx = items.firstIndex(where: { $0.id == id }) {
+            items[idx].autoTagCategory = category
+            items[idx].autoTagKeywordsEn = keywordsEn
+            items[idx].autoTagKeywordsOriginal = keywordsOriginal
+            encode(items, to: defaults, key: mainKey)
+        }
+    }
+
     // MARK: - Private helpers
 
     private func decode(from defaults: UserDefaults, key: String) -> [SavedItem] {

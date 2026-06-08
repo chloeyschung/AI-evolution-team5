@@ -99,6 +99,11 @@ private struct ItemRowView: View {
                 Text("\(item.domain) · \(item.savedAt.relativeString)")
                     .font(.brieflyMeta)
                     .foregroundStyle(Color.brieflyInk400)
+
+                if !item.autoTagKeywordsEn.isEmpty {
+                    KeywordPillRow(keywords: item.autoTagKeywordsEn, maxCount: 3)
+                        .padding(.top, 2)
+                }
             }
         }
         .padding(.vertical, 4)

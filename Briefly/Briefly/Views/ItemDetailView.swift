@@ -89,12 +89,14 @@ struct ItemDetailView: View {
             let retrying = isRetrying
             isRetrying = false
 
-            guard currentItem.summary == nil else { return }
+            let needsSummary = (loadedSummary ?? currentItem.summary) == nil
+            let needsKeywords = currentItem.autoTagKeywordsEn.isEmpty
+            guard needsSummary || needsKeywords else { return }
             guard let contentId = currentItem.serverContentId,
                   let token = AuthTokenStore.shared.accessToken else { return }
             guard currentItem.summaryStatus != .failed || retrying else { return }
 
-            isSummaryLoading = true
+            isSummaryLoading = needsSummary
             defer { isSummaryLoading = false }
 
             let deadline = Date().addingTimeInterval(90)
@@ -104,16 +106,28 @@ struct ItemDetailView: View {
                 }
                 if Task.isCancelled { return }
                 if Date() > deadline { break }
-                if let detail = try? await BrieflyAPI.shared.fetchContentDetail(contentId: contentId, token: token),
-                   let summary = detail.summary {
-                    loadedSummary = summary
-                    StorageService.shared.updateSummary(for: currentItem.id, summary: summary)
-                    StorageService.shared.updateSummaryStatus(for: currentItem.id, status: .done)
-                    return
+                if let detail = try? await BrieflyAPI.shared.fetchContentDetail(contentId: contentId, token: token) {
+                    if !detail.autoTagKeywordsEn.isEmpty {
+                        StorageService.shared.updateAutoTags(
+                            for: currentItem.id,
+                            category: detail.autoTagCategory,
+                            keywordsEn: detail.autoTagKeywordsEn,
+                            keywordsOriginal: detail.autoTagKeywordsOriginal
+                        )
+                        refreshLiveItem()
+                    }
+                    if let summary = detail.summary {
+                        loadedSummary = summary
+                        StorageService.shared.updateSummary(for: currentItem.id, summary: summary)
+                        StorageService.shared.updateSummaryStatus(for: currentItem.id, status: .done)
+                        return
+                    }
                 }
             }
 
-            StorageService.shared.updateSummaryStatus(for: currentItem.id, status: .failed)
+            if (loadedSummary ?? currentItem.summary) == nil {
+                StorageService.shared.updateSummaryStatus(for: currentItem.id, status: .failed)
+            }
         }
     }
 
@@ -499,6 +513,11 @@ struct ItemDetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.brieflyPrimary50, in: RoundedRectangle(cornerRadius: BrieflyRadius.md))
 
+            // 키워드 / 카테고리
+            if currentItem.autoTagCategory != nil || !currentItem.autoTagKeywordsEn.isEmpty {
+                keywordsSection
+            }
+
             // 본문
             articleSection
 
@@ -526,6 +545,23 @@ struct ItemDetailView: View {
                 .lineLimit(2)
         }
         .padding(20)
+    }
+
+    private var keywordsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let category = currentItem.autoTagCategory {
+                Text(category)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.brieflyPrimary600)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color.brieflyPrimary50, in: Capsule())
+                    .overlay(Capsule().stroke(Color.brieflyPrimary200, lineWidth: 1))
+            }
+            if !currentItem.autoTagKeywordsEn.isEmpty {
+                KeywordPillRow(keywords: currentItem.autoTagKeywordsEn)
+            }
+        }
     }
 
     @ViewBuilder
