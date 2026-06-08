@@ -91,15 +91,19 @@ final class FetchCoordinator {
                 print("[Fetch] 본문 완료: \(updated.articleText?.count ?? 0)자, status=\(updated.fetchStatus)")
             }
 
-            // ING-005: 본문이 충분하고 서버 요약이 없으면 page_text를 백엔드에 전송해 재요약 트리거
+            // ING-006: 본문이 충분하면 page_text를 백엔드에 전송해 재요약 트리거.
+            // ≥500자: 서버 스크래핑이 저품질 요약을 저장했을 수 있으므로 force=true로 덮어씀.
+            // 200~499자: 요약이 없는 경우에만 전송(force=false).
             let fetchedText = updated.articleText ?? ""
+            let hasRichText = fetchedText.count >= 500
             let needsSummary = (item.summary == nil || item.summary?.isEmpty == true)
-            if fetchedText.count >= 200, needsSummary,
+            let shouldRescan = fetchedText.count >= 200 && (hasRichText || needsSummary)
+            if shouldRescan,
                let contentId = item.serverContentId,
                let token = AuthTokenStore.shared.accessToken {
                 Task {
-                    try? await BrieflyAPI.shared.rescan(contentId: contentId, pageText: fetchedText, token: token)
-                    print("[Fetch] rescan 전송: contentId=\(contentId), \(fetchedText.count)자")
+                    try? await BrieflyAPI.shared.rescan(contentId: contentId, pageText: fetchedText, token: token, force: hasRichText)
+                    print("[Fetch] rescan 전송: contentId=\(contentId), \(fetchedText.count)자, force=\(hasRichText)")
                 }
             }
 
@@ -113,18 +117,18 @@ final class FetchCoordinator {
         NotificationCenter.default.post(name: .fetchCoordinatorDidUpdate, object: nil)
     }
 
-    private static func isYouTubeURL(_ url: URL) -> Bool {
+    static func isYouTubeURL(_ url: URL) -> Bool {
         guard let host = url.host?.lowercased() else { return false }
         return host == "youtube.com" || host.hasSuffix(".youtube.com") || host == "youtu.be"
     }
 
-    private static func isLinkedInURL(_ url: URL) -> Bool {
+    static func isLinkedInURL(_ url: URL) -> Bool {
         guard let host = url.host?.lowercased() else { return false }
         return host == "linkedin.com" || host.hasSuffix(".linkedin.com")
     }
 
     /// ArticleService 시도 후 결과가 짧으면 WebContentService 폴백
-    private func fetchArticleText(for url: URL) async throws -> String? {
+    func fetchArticleText(for url: URL) async throws -> String? {
         // WebView 전용 도메인은 바로 WebContentService
         if WebContentService.needsWebView(for: url) {
             return try await WebContentService.shared.fetchWithWebView(url: url)

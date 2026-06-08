@@ -269,24 +269,77 @@ struct ItemDetailView: View {
     }
 
     private func retryAISummary() {
-        guard let contentId = currentItem.serverContentId,
-              let token = AuthTokenStore.shared.accessToken else { return }
+        guard let token = AuthTokenStore.shared.accessToken else { return }
 
         StorageService.shared.updateSummaryStatus(for: currentItem.id, status: .unknown)
+        isSummaryLoading = true
+
+        let itemId = currentItem.id
+        let itemURL = currentItem.url
+        let cachedText = currentItem.articleText
 
         Task {
-            if let pageText = currentItem.articleText, pageText.count >= 200 {
-                try? await BrieflyAPI.shared.rescan(
-                    contentId: contentId, pageText: pageText, token: token, force: true
-                )
-                print("[Retry] rescan 전송: contentId=\(contentId), \(pageText.count)자")
-            } else {
-                print("[Retry] articleText 부족 — 폴링만 재시도: contentId=\(contentId)")
-            }
-        }
+            // 1. serverContentId 확보 (없으면 서버에 먼저 등록)
+            var contentId = StorageService.shared.loadAll()
+                .first(where: { $0.id == itemId })?.serverContentId
+                ?? currentItem.serverContentId
 
-        isRetrying = true
-        summaryPollId = UUID()
+            if contentId == nil {
+                print("[Retry] serverContentId 없음 — share 먼저 시도: \(itemURL)")
+                do {
+                    let result = try await BrieflyAPI.shared.share(url: itemURL, token: token)
+                    contentId = result.id
+                    var synced = StorageService.shared.loadAll().first(where: { $0.id == itemId }) ?? currentItem
+                    synced.serverContentId = result.id
+                    StorageService.shared.updateItemById(synced)
+                    liveItem = synced
+                    print("[Retry] share 성공: contentId=\(result.id)")
+                    if let summary = result.summary, !summary.isEmpty {
+                        loadedSummary = summary
+                        StorageService.shared.updateSummary(for: itemId, summary: summary)
+                        StorageService.shared.updateSummaryStatus(for: itemId, status: .done)
+                        isSummaryLoading = false
+                        return
+                    }
+                } catch {
+                    print("[Retry] share 실패: \(error.localizedDescription)")
+                    isSummaryLoading = false
+                    return
+                }
+            }
+
+            guard let contentId else {
+                isSummaryLoading = false
+                return
+            }
+
+            // 2. pageText 결정: 캐시 부족하면 재크롤링
+            var pageText = cachedText
+            if (cachedText?.count ?? 0) < 200,
+               !FetchCoordinator.isYouTubeURL(itemURL),
+               !FetchCoordinator.isLinkedInURL(itemURL) {
+                print("[Retry] articleText 부족 — 재크롤링 시도")
+                let refetched = try? await FetchCoordinator.shared.fetchArticleText(for: itemURL)
+                if let text = refetched {
+                    pageText = text
+                    var updated = StorageService.shared.loadAll().first(where: { $0.id == itemId }) ?? currentItem
+                    updated.articleText = text
+                    StorageService.shared.updateItemById(updated)
+                }
+            }
+
+            // 3. rescan API 호출
+            if let text = pageText, text.count >= 200 {
+                try? await BrieflyAPI.shared.rescan(contentId: contentId, pageText: text, token: token, force: true)
+                print("[Retry] rescan 전송: contentId=\(contentId), \(text.count)자")
+            } else {
+                print("[Retry] pageText 없음 — 폴링만 재시도: contentId=\(contentId)")
+            }
+
+            // 4. 폴링 재시작 (.task(id:)가 isSummaryLoading 제어 이어받음)
+            isRetrying = true
+            summaryPollId = UUID()
+        }
     }
 
     private func flyOut(direction: CGFloat, isSkip: Bool = false) {
