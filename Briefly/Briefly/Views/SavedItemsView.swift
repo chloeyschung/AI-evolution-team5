@@ -3,9 +3,11 @@ import SwiftUI
 @MainActor
 final class SavedItemsViewModel: ObservableObject {
     @Published var items: [SavedItem] = []
+    private var isFetchingKeywords = false
 
     func reload() {
         items = StorageService.shared.drainInboxAndLoad()
+        fetchMissingKeywords()
     }
 
     func markAsRead(_ item: SavedItem) {
@@ -14,6 +16,32 @@ final class SavedItemsViewModel: ObservableObject {
         StorageService.shared.updateItem(updated)
         if let idx = items.firstIndex(where: { $0.id == item.id }) {
             items[idx] = updated
+        }
+    }
+
+    // serverContentId가 있지만 keywords가 비어있는 항목을 백그라운드에서 패치
+    private func fetchMissingKeywords() {
+        guard !isFetchingKeywords else { return }
+        guard let token = AuthTokenStore.shared.accessToken else { return }
+        let pending = items.filter { $0.serverContentId != nil && $0.autoTagKeywordsEn.isEmpty }
+        guard !pending.isEmpty else { return }
+
+        isFetchingKeywords = true
+        Task {
+            defer { isFetchingKeywords = false }
+            for item in pending {
+                guard let contentId = item.serverContentId else { continue }
+                if let detail = try? await BrieflyAPI.shared.fetchContentDetail(contentId: contentId, token: token),
+                   !detail.autoTagKeywordsEn.isEmpty {
+                    StorageService.shared.updateAutoTags(
+                        for: item.id,
+                        category: detail.autoTagCategory,
+                        keywordsEn: detail.autoTagKeywordsEn,
+                        keywordsOriginal: detail.autoTagKeywordsOriginal
+                    )
+                }
+            }
+            reload()
         }
     }
 }
