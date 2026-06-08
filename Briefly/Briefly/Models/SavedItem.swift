@@ -76,8 +76,10 @@ struct SavedItem: Codable, Identifiable, Hashable {
     /// 표시용 제목 — ogTitle → title → 도메인
     var displayTitle: String {
         let raw = ogTitle ?? title ?? url.host ?? url.absoluteString
-        // LinkedIn 포스팅은 ogTitle에 포스팅 본문 전체가 들어있으므로 20자로 축약
-        if siteName == "LinkedIn", raw.count > 20 {
+        // LinkedIn 포스팅은 별도 제목이 없어 ogTitle에 본문 전체가 담기므로 20자로 축약.
+        // siteName 대신 URL로 감지 — oEmbed 실패 시 siteName이 미설정인 경우도 처리.
+        let isLinkedIn = url.host?.lowercased().contains("linkedin.com") ?? false
+        if isLinkedIn, raw.count > 20 {
             return String(raw.prefix(20)) + "..."
         }
         return raw
