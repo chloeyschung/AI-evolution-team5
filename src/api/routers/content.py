@@ -847,6 +847,21 @@ async def _background_autotag(
             await ContentRepository(db).update_auto_tags(content_id, user_id, "failed")
 
 
+def _is_low_quality_text(text: str) -> bool:
+    """서버 사이드 스크래핑 결과가 요약 불가한 저품질인지 판별한다.
+
+    True를 반환하면 요약 저장을 건너뜀 → is_ai_summarized=False 유지 → iOS rescan 가능.
+    """
+    if len(text.strip()) < 300:
+        return True
+    lower = text.lower()
+    boilerplate_signals = [
+        "sign in", "log in", "로그인", "create account", "register to",
+        "please enable javascript", "enable cookies", "you need to enable",
+    ]
+    return any(signal in lower for signal in boilerplate_signals)
+
+
 async def _background_summarize(
     content_id: int,
     user_id: int,
@@ -915,6 +930,13 @@ async def _background_summarize(
             already_summarized = (
                 bool(getattr(content, "is_ai_summarized", False)) or bool(content.summary)
             ) and not page_text
+            # page_text가 없는 경우(서버 사이드 스크래핑)는 품질 검사 후 저품질이면 저장 않음.
+            # → is_ai_summarized=False 유지 → iOS rescan이 나중에 좋은 본문으로 덮어씀.
+            skip_low_quality = (not page_text) and _is_low_quality_text(text_content)
+            if skip_low_quality:
+                logging.info("_background_summarize: low-quality text skipped for content %s", content_id)
+                text_content = ""
+
             if text_content and summarizer is not None and not already_summarized:
                 summary = await summarizer.summarize(text_content, max_retries=1)
                 await repo.update_summary(content_id, user_id, summary)

@@ -273,7 +273,9 @@ struct ItemDetailView: View {
 
         let itemId = currentItem.id
         let itemURL = currentItem.url
-        let cachedText = currentItem.articleText
+        // LinkedIn 구 저장 항목: articleText nil → ogTitle 폴백
+        let isLinkedIn = itemURL.host?.lowercased().contains("linkedin.com") ?? false
+        let cachedText = currentItem.articleText ?? (isLinkedIn ? currentItem.ogTitle : nil)
 
         Task {
             // 토큰 확보 — 없으면 refresh 시도
@@ -544,7 +546,10 @@ struct ItemDetailView: View {
             EmptyView()
 
         case .done, .partial:
-            if let text = currentItem.articleText, !text.isEmpty {
+            // LinkedIn 구 저장 항목: articleText가 nil이어도 ogTitle에 본문이 담겨 있을 수 있음
+            let isLinkedIn = currentItem.url.host?.lowercased().contains("linkedin.com") ?? false
+            let bodyText = currentItem.articleText ?? (isLinkedIn ? currentItem.ogTitle : nil)
+            if let text = bodyText, !text.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
                         Label("본문", systemImage: "doc.text")

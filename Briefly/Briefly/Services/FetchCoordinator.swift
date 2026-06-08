@@ -81,7 +81,8 @@ final class FetchCoordinator {
                 updated.fetchStatus = .partial
                 print("[Fetch] YouTube — ogDescription 사용: \(updated.articleText?.count ?? 0)자")
             } else if Self.isLinkedInURL(item.url) {
-                updated.articleText = linkedInOEmbedSucceeded ? updated.ogDescription : nil
+                // ogTitle = oEmbed "title" 필드 = 포스팅 본문 전체 (ogDescription과 동일 값이나 ogTitle이 더 안정적으로 설정됨)
+                updated.articleText = linkedInOEmbedSucceeded ? (updated.ogTitle ?? updated.ogDescription) : nil
                 updated.fetchStatus = .partial
                 print("[Fetch] LinkedIn — oEmbed \(linkedInOEmbedSucceeded ? "성공" : "실패"): \(updated.articleText?.count ?? 0)자")
             } else {
