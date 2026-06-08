@@ -269,16 +269,26 @@ struct ItemDetailView: View {
     }
 
     private func retryAISummary() {
-        guard let token = AuthTokenStore.shared.accessToken else { return }
-
-        StorageService.shared.updateSummaryStatus(for: currentItem.id, status: .unknown)
-        isSummaryLoading = true
+        isSummaryLoading = true  // 탭 즉시 스피너 표시 (token 확인 전에도)
 
         let itemId = currentItem.id
         let itemURL = currentItem.url
         let cachedText = currentItem.articleText
 
         Task {
+            // 토큰 확보 — 없으면 refresh 시도
+            let token: String
+            if let t = AuthTokenStore.shared.accessToken {
+                token = t
+            } else if let t = await BrieflyAPI.shared.refreshCurrentToken() {
+                token = t
+            } else {
+                isSummaryLoading = false
+                return
+            }
+
+            StorageService.shared.updateSummaryStatus(for: itemId, status: .unknown)
+
             // 1. serverContentId 확보 (없으면 서버에 먼저 등록)
             var contentId = StorageService.shared.loadAll()
                 .first(where: { $0.id == itemId })?.serverContentId
@@ -479,6 +489,7 @@ struct ItemDetailView: View {
                                 .font(.subheadline.weight(.medium))
                                 .foregroundStyle(Color.brieflyPrimary600)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }
