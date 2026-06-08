@@ -230,6 +230,11 @@ struct LibraryCardView: View {
                         .font(.brieflyBodySm)
                         .foregroundStyle(Color.brieflyTextSecondary)
                         .lineLimit(3)
+
+                    if !item.autoTagKeywordsEn.isEmpty {
+                        KeywordPillRow(keywords: item.autoTagKeywordsEn, maxCount: 3)
+                            .padding(.top, 2)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
