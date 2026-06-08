@@ -75,7 +75,12 @@ struct SavedItem: Codable, Identifiable, Hashable {
 
     /// 표시용 제목 — ogTitle → title → 도메인
     var displayTitle: String {
-        ogTitle ?? title ?? url.host ?? url.absoluteString
+        let raw = ogTitle ?? title ?? url.host ?? url.absoluteString
+        // LinkedIn 포스팅은 ogTitle에 포스팅 본문 전체가 들어있으므로 20자로 축약
+        if siteName == "LinkedIn", raw.count > 20 {
+            return String(raw.prefix(20)) + "..."
+        }
+        return raw
     }
 
     /// 도메인만 추출 (예: "medium.com")
