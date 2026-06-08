@@ -29,8 +29,13 @@ actor MetadataService {
             throw URLError(.cannotParseResponse)
         }
         var meta = PageMetadata()
-        meta.ogTitle = json["title"] as? String
-        meta.ogDescription = json["author_name"] as? String
+        // LinkedIn oEmbed의 "title" 필드는 포스팅 본문 전체.
+        // 포스팅에는 별도 제목이 없으므로 본문 앞 20자를 제목으로, 전체를 description에 저장.
+        let postText = json["title"] as? String
+        if let text = postText {
+            meta.ogTitle = text.count > 20 ? String(text.prefix(20)) + "..." : text
+        }
+        meta.ogDescription = postText
         meta.siteName = "LinkedIn"
         if let thumbURL = json["thumbnail_url"] as? String {
             meta.ogImageURL = URL(string: thumbURL)
