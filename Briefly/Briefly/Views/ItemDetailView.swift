@@ -51,7 +51,7 @@ struct ItemDetailView: View {
                 .degrees(Double(dragOffset) / Double(UIScreen.main.bounds.width) * 10.0),
                 anchor: UnitPoint(x: 0.5, y: 0.9)
             )
-            .simultaneousGesture(swipeGesture)
+            .gesture(swipeGesture)
 
             // 스와이프 방향 인디케이터 (화면 고정, 스크롤 무관)
             if showActions {
