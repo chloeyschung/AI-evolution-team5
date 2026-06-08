@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import GoogleSignIn
 
 @main
@@ -11,6 +12,9 @@ struct BrieflyApp: App {
         if let clientID = Bundle.main.object(forInfoDictionaryKey: "GIDClientID") as? String {
             GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: clientID)
         }
+        // UIScrollView의 기본 delaysTouchesBegan 동작이 ScrollView 내부 버튼 탭을 차단함.
+        // false로 설정해 탭이 즉시 서브뷰에 전달되도록 함.
+        UIScrollView.appearance().delaysContentTouches = false
     }
 
     var body: some Scene {
