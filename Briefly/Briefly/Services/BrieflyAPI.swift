@@ -174,6 +174,26 @@ actor BrieflyAPI {
         return response.clusters
     }
 
+    // MARK: - Dive Deeper (IOS-015)
+
+    private struct DiveDeeperResponse: Decodable {
+        let contentId: Int
+        let questions: [String]
+
+        enum CodingKeys: String, CodingKey {
+            case contentId = "content_id"
+            case questions
+        }
+    }
+
+    func fetchDiveDeeperQuestions(contentId: Int, token: String) async throws -> [String] {
+        let response: DiveDeeperResponse = try await get(
+            "/content/\(contentId)/reflection-questions",
+            token: token
+        )
+        return response.questions
+    }
+
     // MARK: - GET helper
 
     private func get<R: Decodable>(

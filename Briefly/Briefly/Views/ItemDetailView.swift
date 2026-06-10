@@ -16,6 +16,9 @@ struct ItemDetailView: View {
     @State private var liveItem: SavedItem? = nil
     @State private var summaryPollId = UUID()
     @State private var isRetrying = false
+    @State private var diveDeeperQuestions: [String] = []
+    @State private var isDiveDeeperLoading = false
+    @State private var diveDeeperPollId = UUID()
     @Environment(\.dismiss) private var dismiss
 
     init(items: [SavedItem], startIndex: Int, showActions: Bool) {
@@ -79,6 +82,8 @@ struct ItemDetailView: View {
         }
         .onChange(of: currentIndex) { _ in
             summaryPollId = UUID()
+            diveDeeperQuestions = []
+            diveDeeperPollId = UUID()
             refreshLiveItem()
         }
         .onReceive(NotificationCenter.default.publisher(for: .fetchCoordinatorDidUpdate)) { _ in
@@ -128,6 +133,16 @@ struct ItemDetailView: View {
             if (loadedSummary ?? currentItem.summary) == nil {
                 StorageService.shared.updateSummaryStatus(for: currentItem.id, status: .failed)
             }
+        }
+        .task(id: diveDeeperPollId) {
+            guard let contentId = currentItem.serverContentId,
+                  let token = AuthTokenStore.shared.accessToken else { return }
+            isDiveDeeperLoading = true
+            defer { isDiveDeeperLoading = false }
+            let questions = (try? await BrieflyAPI.shared.fetchDiveDeeperQuestions(
+                contentId: contentId, token: token
+            )) ?? []
+            diveDeeperQuestions = questions
         }
     }
 
@@ -513,6 +528,11 @@ struct ItemDetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.brieflyPrimary50, in: RoundedRectangle(cornerRadius: BrieflyRadius.md))
 
+            // Dive Deeper (IOS-015)
+            if currentItem.serverContentId != nil && (isDiveDeeperLoading || !diveDeeperQuestions.isEmpty) {
+                diveDeeperSection
+            }
+
             // 키워드 / 카테고리
             if currentItem.autoTagCategory != nil || !currentItem.autoTagKeywordsEn.isEmpty {
                 keywordsSection
@@ -562,6 +582,47 @@ struct ItemDetailView: View {
                 KeywordPillRow(keywords: currentItem.autoTagKeywordsEn)
             }
         }
+    }
+
+    private var diveDeeperSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Label("Dive Deeper", systemImage: "lightbulb.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.brieflyPrimary600)
+                Text("더 깊이 생각해보기")
+                    .font(.caption)
+                    .foregroundStyle(Color.brieflyInk400)
+            }
+
+            if isDiveDeeperLoading {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(0..<3, id: \.self) { _ in
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.brieflyInk100)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 14)
+                    }
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(diveDeeperQuestions, id: \.self) { question in
+                        HStack(alignment: .top, spacing: 8) {
+                            Text("•")
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(Color.brieflyPrimary400)
+                            Text(question)
+                                .font(.subheadline)
+                                .foregroundStyle(Color.brieflyTextSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.brieflyPrimary50, in: RoundedRectangle(cornerRadius: BrieflyRadius.md))
     }
 
     @ViewBuilder
