@@ -55,3 +55,11 @@ struct ServerContent: Codable, Identifiable {
         autoTagKeywordsOriginal = (try? c.decode([String].self, forKey: .autoTagKeywordsOriginal)) ?? []
     }
 }
+
+// MARK: - URL helper (양쪽 타겟에서 사용 — ServerContent + HomeItem)
+extension URL {
+    var normalizedDomain: String {
+        guard let host else { return absoluteString }
+        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+    }
+}

@@ -118,7 +118,7 @@ async def create_content(
 async def list_content(
     request: Request,
     response: Response,
-    limit: int = Query(50, gt=0, le=100),
+    limit: int = Query(50, gt=0, le=200),
     offset: int = Query(0, ge=0),
     cursor: str | None = Query(None),
     status: str | None = Query(None, pattern="^(inbox|archived)$"),

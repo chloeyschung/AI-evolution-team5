@@ -26,8 +26,11 @@ private struct DailySeededRNG: RandomNumberGenerator {
 
     init(date: Date = Date()) {
         let c = Calendar.current.dateComponents([.year, .month, .day], from: date)
-        let seed = UInt64((c.year ?? 2026) * 10000 + (c.month ?? 1) * 100 + (c.day ?? 1))
-        state = seed == 0 ? 1 : seed
+        let y = c.year ?? 2026
+        let m = c.month ?? 1
+        let d = c.day ?? 1
+        let raw = UInt64(y * 10000 + m * 100 + d)
+        state = raw == 0 ? 1 : raw
     }
 
     mutating func next() -> UInt64 {
