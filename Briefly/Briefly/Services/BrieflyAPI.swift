@@ -187,9 +187,11 @@ actor BrieflyAPI {
     }
 
     func fetchDiveDeeperQuestions(contentId: Int, token: String) async throws -> [String] {
+        let langCode = Locale.current.language.languageCode?.identifier ?? "en"
         let response: DiveDeeperResponse = try await get(
             "/content/\(contentId)/reflection-questions",
-            token: token
+            token: token,
+            queryItems: [URLQueryItem(name: "lang", value: langCode)]
         )
         return response.questions
     }

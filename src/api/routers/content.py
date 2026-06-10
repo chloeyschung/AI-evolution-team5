@@ -449,17 +449,52 @@ async def get_content_tags(
     return ContentTagsResponse(content_id=content_id, tags=tags)
 
 
+def _read_lang_cache(raw: str, lang: str) -> list[str] | None:
+    """Read per-language cache. Legacy flat-list cache is treated as 'en'."""
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, list) and parsed:
+            return parsed if lang == "en" else None
+        if isinstance(parsed, dict):
+            cached = parsed.get(lang)
+            if isinstance(cached, list) and cached:
+                return cached
+    except (ValueError, TypeError):
+        pass
+    return None
+
+
+def _merge_lang_cache(existing_raw: str | None, lang: str, questions: list[str]) -> str:
+    """Merge new questions into per-language cache dict. Migrates legacy flat list."""
+    cache: dict = {}
+    if existing_raw:
+        try:
+            parsed = json.loads(existing_raw)
+            if isinstance(parsed, dict):
+                cache = parsed
+            elif isinstance(parsed, list) and parsed:
+                cache["en"] = parsed  # migrate legacy flat list
+        except (ValueError, TypeError):
+            pass
+    cache[lang] = questions
+    return json.dumps(cache)
+
+
 @router.get("/content/{content_id}/reflection-questions", response_model=ReflectionQuestionsResponse)
 async def get_reflection_questions(
     content_id: int,
+    lang: str = Query(default="en", max_length=10),
     user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ReflectionQuestionsResponse:
     """Generate 3 open-ended reflection questions for an article.
 
     Uses the existing Modal/SUMMARY endpoint. Returns empty questions list on AI failure.
+    lang: BCP-47 language code from the client device locale (e.g. 'ko', 'en').
     """
     from src.ai.reflection import generate_questions
+
+    lang = lang[:2].lower()  # normalise to 2-char code
 
     content_repo = ContentRepository(db)
     content = await content_repo.get_by_id(content_id)
@@ -470,14 +505,11 @@ async def get_reflection_questions(
             detail={"error": ErrorCode.CONTENT_NOT_FOUND, "message": "Content not found."},
         )
 
-    # Return cached questions if available
+    # Return cached questions for this language if available
     if getattr(content, "reflection_questions", None):
-        try:
-            cached = json.loads(content.reflection_questions)
-            if isinstance(cached, list) and cached:
-                return ReflectionQuestionsResponse(content_id=content_id, questions=cached)
-        except (ValueError, TypeError):
-            pass
+        cached = _read_lang_cache(content.reflection_questions, lang)
+        if cached:
+            return ReflectionQuestionsResponse(content_id=content_id, questions=cached)
 
     keywords: list[str] = []
     if getattr(content, "auto_tag_keywords_en", None):
@@ -490,10 +522,14 @@ async def get_reflection_questions(
         summary=content.summary,
         keywords=[k for k in keywords if k],
         settings=settings,
+        lang=lang,
     )
 
     if questions:
-        await content_repo.save_reflection_questions(content_id, user_id, questions)
+        raw_json = _merge_lang_cache(
+            getattr(content, "reflection_questions", None), lang, questions
+        )
+        await content_repo.save_reflection_questions(content_id, user_id, raw_json)
 
     return ReflectionQuestionsResponse(content_id=content_id, questions=questions)
 
