@@ -100,13 +100,15 @@ final class HomeViewModel: ObservableObject {
     // MARK: Section building
 
     private func rebuildSections(clusters: [TopicCluster]?) {
-        var built: [HomeCardSection] = []
-        built.append(contentsOf: dateSections())
-        built.append(contentsOf: sourceSections())
-        built.append(contentsOf: topicSections(clusters: clusters))
+        // 주제별 섹션은 항상 상단 고정 (FR-15)
+        let topicFixed = topicSections(clusters: clusters)
 
+        // 날짜별·출처별은 하단에서 하루 1회 셔플
+        var utility = dateSections() + sourceSections()
         var rng = DailySeededRNG()
-        sections = built.shuffled(using: &rng)
+        utility.shuffle(using: &rng)
+
+        sections = topicFixed + utility
     }
 
     private func dateSections() -> [HomeCardSection] {
