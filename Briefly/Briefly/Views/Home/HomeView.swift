@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HomeView: View {
     @ObservedObject var viewModel: HomeViewModel
+    @State private var selectedSavedItem: SavedItem? = nil
 
     var body: some View {
         ZStack {
@@ -14,6 +15,14 @@ struct HomeView: View {
         }
         .navigationTitle("Briefly")
         .navigationBarTitleDisplayMode(.large)
+        .navigationDestination(isPresented: Binding(
+            get: { selectedSavedItem != nil },
+            set: { if !$0 { selectedSavedItem = nil } }
+        )) {
+            if let item = selectedSavedItem {
+                ItemDetailView(items: [item], startIndex: 0, showActions: true)
+            }
+        }
     }
 
     private var contentView: some View {
@@ -21,7 +30,12 @@ struct HomeView: View {
             LazyVStack(alignment: .leading, spacing: BrieflySpacing.s8) {
                 ForEach(viewModel.sections) { section in
                     HomeSectionView(section: section) { item in
-                        UIApplication.shared.open(item.url)
+                        switch item {
+                        case .local(let savedItem):
+                            selectedSavedItem = savedItem
+                        case .server:
+                            UIApplication.shared.open(item.url)
+                        }
                     }
                 }
             }

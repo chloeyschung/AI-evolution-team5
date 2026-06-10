@@ -10,7 +10,6 @@ struct ItemDetailView: View {
     @State private var cardScale: CGFloat = 1.0
     @State private var isProcessing = false
     @State private var isArticleExpanded = false
-    @State private var showBrowser = false
     @State private var isSummaryLoading = false
     @State private var loadedSummary: String? = nil
     @State private var liveItem: SavedItem? = nil
@@ -73,9 +72,6 @@ struct ItemDetailView: View {
                         .foregroundStyle(Color.brieflyInk400)
                 }
             }
-        }
-        .sheet(isPresented: $showBrowser) {
-            SafariBrowserView(url: currentItem.url)
         }
         .onAppear {
             refreshLiveItem()
@@ -544,7 +540,7 @@ struct ItemDetailView: View {
             Divider()
 
             // 원문 보기
-            Button { showBrowser = true } label: {
+            Button { UIApplication.shared.open(currentItem.url) } label: {
                 HStack {
                     Image(systemName: "safari")
                     Text("원문 보기")
