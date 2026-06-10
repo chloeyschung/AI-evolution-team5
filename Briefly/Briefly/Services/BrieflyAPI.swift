@@ -139,8 +139,55 @@ actor BrieflyAPI {
         return try await get("/content/\(contentId)", token: token)
     }
 
-    private func get<R: Decodable>(_ path: String, token: String) async throws -> R {
-        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+    // MARK: - Content List (IOS-006)
+
+    private struct PaginatedContentResponse: Decodable {
+        let items: [ServerContent]
+        let total: Int
+        let hasMore: Bool
+        let nextOffset: Int?
+
+        enum CodingKeys: String, CodingKey {
+            case items, total
+            case hasMore     = "has_more"
+            case nextOffset  = "next_offset"
+        }
+    }
+
+    func fetchServerContent(token: String, limit: Int = 200) async throws -> [ServerContent] {
+        let response: PaginatedContentResponse = try await get(
+            "/content",
+            token: token,
+            queryItems: [URLQueryItem(name: "limit", value: "\(limit)")]
+        )
+        return response.items
+    }
+
+    // MARK: - Topic Clusters (IOS-008)
+
+    private struct TopicClustersResponse: Decodable {
+        let clusters: [TopicCluster]
+    }
+
+    func fetchTopicClusters(token: String) async throws -> [TopicCluster] {
+        let response: TopicClustersResponse = try await get("/topics", token: token)
+        return response.clusters
+    }
+
+    // MARK: - GET helper
+
+    private func get<R: Decodable>(
+        _ path: String,
+        token: String,
+        queryItems: [URLQueryItem] = []
+    ) async throws -> R {
+        var url = baseURL.appendingPathComponent(path)
+        if !queryItems.isEmpty,
+           var comps = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            comps.queryItems = queryItems
+            url = comps.url ?? url
+        }
+        var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -151,8 +198,7 @@ actor BrieflyAPI {
         guard (200...299).contains(http.statusCode) else {
             throw APIError.httpError(http.statusCode, BrieflyAPI.decodeErrorMessage(from: data))
         }
-        let decoder = JSONDecoder()
-        return try decoder.decode(R.self, from: data)
+        return try JSONDecoder().decode(R.self, from: data)
     }
 
     // MARK: - Swipe (Keep / Discard)
