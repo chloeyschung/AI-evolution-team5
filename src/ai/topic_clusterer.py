@@ -1,10 +1,11 @@
 """IOS-008: TF-IDF topic clustering with LLM Korean title generation.
 
 Groups user content into topic clusters using TF-IDF cosine similarity (K-means).
-LLM generates short Korean cluster titles from top keywords.
+LLM generates short Korean cluster titles from top keywords (spec §6 프롬프트 설계).
 No external ML deps — TF-IDF and K-means are implemented from scratch.
 """
 
+import json
 import logging
 import math
 import re
@@ -16,7 +17,7 @@ from src.utils.http_client import async_client_context
 
 logger = logging.getLogger(__name__)
 
-_MIN_ITEMS = 4       # skip clustering if user has fewer items
+_MIN_ITEMS = 4
 _MAX_CLUSTERS = 7
 _TITLE_TIMEOUT = 20.0
 
@@ -37,6 +38,25 @@ class ClusterResult:
     title_ko: str
     keywords_en: list[str]
     content_ids: list[int] = field(default_factory=list)
+
+
+# ── Input text builder (spec §6 클러스터링 알고리즘) ─────────────────────────────
+
+def build_item_text(title: str | None, summary: str | None, keywords_en: str | None) -> str:
+    """Build TF-IDF input text per spec: "{title}. {summary[:300]}. Keywords: {kws}"."""
+    t = (title or "").strip()
+    s = (summary or "")[:300].strip()
+    k = (keywords_en or "").strip()
+
+    parts = [t]
+    if s:
+        parts.append(s)
+    if k:
+        # keywords_en is stored as a comma-separated string from the DB
+        kw_list = [w.strip() for w in k.split(",") if w.strip()]
+        if kw_list:
+            parts.append(f"Keywords: {', '.join(kw_list)}")
+    return ". ".join(p for p in parts if p)
 
 
 # ── TF-IDF helpers ─────────────────────────────────────────────────────────────
@@ -79,7 +99,6 @@ def _cosine(a: dict[str, float], b: dict[str, float]) -> float:
 
 def _kmeans(vectors: list[dict[str, float]], k: int, iterations: int = 20) -> list[int]:
     n = len(vectors)
-    # Spread initial centroids evenly across sorted indices
     centroid_indices = [i * (n // k) for i in range(k)]
     centroids = [dict(vectors[i]) for i in centroid_indices]
     labels = [0] * n
@@ -93,7 +112,6 @@ def _kmeans(vectors: list[dict[str, float]], k: int, iterations: int = 20) -> li
             break
         labels = new_labels
 
-        # Recompute centroids as mean of assigned vectors
         totals: list[dict[str, float]] = [{} for _ in range(k)]
         counts = [0] * k
         for idx, label in enumerate(labels):
@@ -115,9 +133,26 @@ def _top_keywords(vectors: list[dict[str, float]], n: int = 5) -> list[str]:
     return [t for t, _ in sorted(agg.items(), key=lambda x: -x[1])[:n]]
 
 
-# ── LLM title generation ───────────────────────────────────────────────────────
+# ── LLM title generation (spec §6 섹션 네이밍 설계) ──────────────────────────────
 
-async def _generate_korean_title(keywords: list[str]) -> str:
+_LLM_SYSTEM = "당신은 콘텐츠 큐레이터입니다."
+
+def _build_title_prompt(keywords: list[str], count: int) -> str:
+    kw_str = ", ".join(keywords[:5])
+    return (
+        f"아래 키워드들로 묶인 콘텐츠 그룹의 섹션 제목을 한국어로 지어주세요.\n\n"
+        f"규칙:\n"
+        f"- 15자 이내\n"
+        f"- 담백하고 자연스러운 문장 (과장·감탄사 금지)\n"
+        f"- 키워드를 직접 나열하지 말고 주제를 함축\n"
+        f"- 예시 스타일: \"AI가 바꾸는 헬스케어\", \"조용히 뜨는 기술들\", \"스타트업의 요즘 고민\"\n\n"
+        f"키워드: {kw_str}\n"
+        f"콘텐츠 수: {count}개\n"
+        f"JSON으로만 응답: {{\"title\": \"...\"}}"
+    )
+
+
+async def _generate_korean_title(keywords: list[str], count: int) -> str:
     modal_tokens_ok = bool(
         getattr(settings, "MODAL_PROXY_TOKEN_ID", "") and
         getattr(settings, "MODAL_PROXY_TOKEN_SECRET", "")
@@ -127,16 +162,14 @@ async def _generate_korean_title(keywords: list[str]) -> str:
         extra_headers["Modal-Key"] = settings.MODAL_PROXY_TOKEN_ID
         extra_headers["Modal-Secret"] = settings.MODAL_PROXY_TOKEN_SECRET
 
-    kw_str = ", ".join(keywords[:5])
-    prompt = (
-        f"Keywords: {kw_str}\n"
-        "Write a short Korean topic label (max 10 characters, noun phrase only, no punctuation)."
-    )
     payload = {
         "model": settings.SUMMARY_MODEL,
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 30,
-        "temperature": 0.3,
+        "messages": [
+            {"role": "system", "content": _LLM_SYSTEM},
+            {"role": "user", "content": _build_title_prompt(keywords, count)},
+        ],
+        "max_tokens": 40,
+        "temperature": 0.4,
     }
 
     try:
@@ -151,21 +184,35 @@ async def _generate_korean_title(keywords: list[str]) -> str:
                 timeout=_TITLE_TIMEOUT,
             )
             resp.raise_for_status()
-            text = resp.json()["choices"][0]["message"]["content"].strip()
-            return text[:15]
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
+            # Try to parse JSON; fall back to raw text
+            try:
+                parsed = json.loads(raw)
+                title = parsed.get("title", "").strip()
+            except (json.JSONDecodeError, AttributeError):
+                # LLM sometimes wraps in markdown code block
+                m = re.search(r'"title"\s*:\s*"([^"]+)"', raw)
+                title = m.group(1).strip() if m else raw.strip()
+            return title[:15] if title else _fallback_title(keywords)
     except Exception as exc:
         logger.warning("topic title LLM failed: %s", exc)
-        return keywords[0].capitalize() if keywords else "기타"
+        return _fallback_title(keywords)
 
 
-# ── Public API ─────────────────────────────────────────────────────────────────
+def _fallback_title(keywords: list[str]) -> str:
+    """Spec §6: 상위 키워드 2개를 · 로 연결."""
+    parts = [k.capitalize() for k in keywords[:2] if k]
+    return " · ".join(parts) if parts else "기타"
+
+
+# ── Core clustering ────────────────────────────────────────────────────────────
 
 async def cluster_user_content(items: list[tuple[int, str]]) -> list[ClusterResult]:
     """Cluster content items and generate Korean titles.
 
     Args:
-        items: List of (server_content_id, combined_text) where
-               combined_text = title + space + summary + space + keywords_en joined.
+        items: List of (server_content_id, combined_text). Use build_item_text()
+               to construct the text from title/summary/keywords_en.
 
     Returns:
         ClusterResult list sorted by cluster size descending.
@@ -177,7 +224,6 @@ async def cluster_user_content(items: list[tuple[int, str]]) -> list[ClusterResu
     ids = [item[0] for item in items]
     docs = [_tokenize(item[1]) for item in items]
 
-    # Filter out empty docs
     valid_pairs = [(ids[i], docs[i]) for i in range(len(ids)) if docs[i]]
     if len(valid_pairs) < _MIN_ITEMS:
         return []
@@ -199,7 +245,7 @@ async def cluster_user_content(items: list[tuple[int, str]]) -> list[ClusterResu
         if len(cids) < 2:
             continue
         top_kws = _top_keywords(cluster_vecs[label])
-        title_ko = await _generate_korean_title(top_kws)
+        title_ko = await _generate_korean_title(top_kws, len(cids))
         results.append(ClusterResult(
             title_ko=title_ko,
             keywords_en=top_kws[:3],
@@ -207,3 +253,60 @@ async def cluster_user_content(items: list[tuple[int, str]]) -> list[ClusterResu
         ))
 
     return sorted(results, key=lambda r: -len(r.content_ids))
+
+
+# ── Per-user save helper (used by scheduler + on-demand trigger) ──────────────
+
+async def cluster_and_save_for_user(user_id: int) -> int:
+    """Run clustering for one user and persist results. Returns cluster count."""
+    from sqlalchemy import delete as sql_delete, select
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+    from src.data.database import engine
+    from src.data.models import Content, UserTopicCluster
+    from src.utils.datetime_utils import utc_now
+
+    AsyncSession_ = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with AsyncSession_() as session:
+        rows = await session.execute(
+            select(
+                Content.id,
+                Content.title,
+                Content.summary,
+                Content.auto_tag_keywords_en,
+            ).where(
+                Content.user_id == user_id,
+                Content.is_deleted == False,  # noqa: E712
+            )
+        )
+        content_rows = rows.fetchall()
+
+    if not content_rows:
+        return 0
+
+    items = [
+        (cid, build_item_text(title, summary, kw_en))
+        for cid, title, summary, kw_en in content_rows
+    ]
+
+    cluster_results = await cluster_user_content(items)
+    if not cluster_results:
+        return 0
+
+    async with AsyncSession_() as session:
+        await session.execute(
+            sql_delete(UserTopicCluster).where(UserTopicCluster.user_id == user_id)
+        )
+        for c in cluster_results:
+            session.add(UserTopicCluster(
+                user_id=user_id,
+                title_ko=c.title_ko,
+                keywords_en=c.keywords_en,
+                content_ids=c.content_ids,
+                generated_at=utc_now(),
+            ))
+        await session.commit()
+
+    logger.info("IOS-008 clustering: user=%d clusters=%d", user_id, len(cluster_results))
+    return len(cluster_results)

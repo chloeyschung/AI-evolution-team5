@@ -1,6 +1,10 @@
-"""Topics router — GET /api/v1/topics (IOS-008)."""
+"""Topics router — GET /api/v1/topics (IOS-008).
 
-from fastapi import APIRouter, Depends
+On first call with no existing clusters, triggers background clustering so the
+next pull-to-refresh shows dynamic topic sections.
+"""
+
+from fastapi import APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +29,7 @@ class TopicClustersResponse(BaseModel):
 
 @router.get("", response_model=TopicClustersResponse)
 async def get_topic_clusters(
+    background_tasks: BackgroundTasks,
     user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> TopicClustersResponse:
@@ -34,6 +39,13 @@ async def get_topic_clusters(
         .order_by(UserTopicCluster.generated_at.desc())
     )
     clusters = result.scalars().all()
+
+    if not clusters:
+        # First call with no clusters — schedule background generation.
+        # Response returns [] immediately; next refresh will show clusters.
+        from ...ai.topic_clusterer import cluster_and_save_for_user
+        background_tasks.add_task(cluster_and_save_for_user, user_id)
+
     return TopicClustersResponse(
         clusters=[
             TopicClusterResponse(

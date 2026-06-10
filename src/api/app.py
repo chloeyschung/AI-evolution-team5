@@ -110,72 +110,24 @@ def _seconds_until_next_cluster_run() -> float:
 
 async def _run_clustering_job() -> None:
     """IOS-008: Cluster all active users' content and persist results."""
+    from sqlalchemy import select
     from sqlalchemy.ext.asyncio import async_sessionmaker
 
-    from ..ai.topic_clusterer import cluster_user_content
+    from ..ai.topic_clusterer import cluster_and_save_for_user
     from ..data.database import engine
-    from ..data.models import Content, UserProfile, UserTopicCluster
-    from ..utils.datetime_utils import utc_now
+    from ..data.models import UserProfile
 
     AsyncSession_ = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async with AsyncSession_() as session:
-        from sqlalchemy import delete as sql_delete, select
-
-        # Load all non-deleted users
-        users_result = await session.execute(
+        result = await session.execute(
             select(UserProfile.id).where(UserProfile.is_deleted == False)  # noqa: E712
         )
-        user_ids = [row[0] for row in users_result.fetchall()]
+        user_ids = [row[0] for row in result.fetchall()]
 
     for uid in user_ids:
         try:
-            async with AsyncSession_() as session:
-                from sqlalchemy import select
-
-                rows = await session.execute(
-                    select(
-                        Content.id,
-                        Content.title,
-                        Content.summary,
-                        Content.auto_tag_keywords_en,
-                    ).where(
-                        Content.user_id == uid,
-                        Content.is_deleted == False,  # noqa: E712
-                    )
-                )
-                content_rows = rows.fetchall()
-
-            if not content_rows:
-                continue
-
-            items: list[tuple[int, str]] = []
-            for row in content_rows:
-                cid, title, summary, kw_en = row
-                parts = [title or "", summary or "", kw_en or ""]
-                items.append((cid, " ".join(p for p in parts if p)))
-
-            clusters = await cluster_user_content(items)
-            if not clusters:
-                continue
-
-            async with AsyncSession_() as session:
-                from sqlalchemy import delete as sql_delete
-
-                await session.execute(
-                    sql_delete(UserTopicCluster).where(UserTopicCluster.user_id == uid)
-                )
-                for c in clusters:
-                    session.add(UserTopicCluster(
-                        user_id=uid,
-                        title_ko=c.title_ko,
-                        keywords_en=c.keywords_en,
-                        content_ids=c.content_ids,
-                        generated_at=utc_now(),
-                    ))
-                await session.commit()
-            logger.info("IOS-008 clustering: user=%d clusters=%d", uid, len(clusters))
-
+            await cluster_and_save_for_user(uid)
         except Exception as exc:
             logger.exception("IOS-008 clustering error for user %d: %s", uid, exc)
 
