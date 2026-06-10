@@ -146,6 +146,34 @@ final class StorageService {
         }
     }
 
+    // MARK: - IOS-007: 서버 summary · auto-tag 병합
+
+    /// 서버 fetch 결과를 로컬 SavedItem에 병합합니다.
+    /// serverContentId 매칭 → auto-tag(서버 값 있을 때만) · summary(로컬 미완료 시) 업데이트.
+    func mergeServerData(_ serverItems: [ServerContent]) {
+        guard let defaults else { return }
+        var items = decode(from: defaults, key: mainKey)
+        var updated = false
+        for server in serverItems {
+            guard let idx = items.firstIndex(where: { $0.serverContentId == server.id }) else { continue }
+            // auto-tag: 서버에 category 값이 있을 때만 덮어씀 (FR-6)
+            if let category = server.autoTagCategory {
+                items[idx].autoTagCategory = category
+                items[idx].autoTagKeywordsEn = server.autoTagKeywordsEn
+                items[idx].autoTagKeywordsOriginal = server.autoTagKeywordsOriginal
+            }
+            // summary: 로컬에 아직 없는 경우만 서버 값으로 업데이트 (FR-7)
+            if items[idx].summaryStatus != .done, let summary = server.summary {
+                items[idx].summary = summary
+                items[idx].summaryStatus = .done
+            }
+            updated = true
+        }
+        if updated {
+            encode(items, to: defaults, key: mainKey)
+        }
+    }
+
     // MARK: - Private helpers
 
     private func decode(from defaults: UserDefaults, key: String) -> [SavedItem] {

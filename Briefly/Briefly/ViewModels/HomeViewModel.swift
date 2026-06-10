@@ -81,6 +81,12 @@ final class HomeViewModel: ObservableObject {
         let serverItems = (try? await serverTask)  ?? []
         let clusters    = (try? await clusterTask) ?? []
 
+        // IOS-007: summary · auto-tag를 로컬 SavedItem에 병합 후 재로드
+        if !serverItems.isEmpty {
+            StorageService.shared.mergeServerData(serverItems)
+            localItems = StorageService.shared.loadAll().filter { $0.status != .deleted }
+        }
+
         // 로컬에 있는 serverContentId와 중복되는 서버 항목 제거
         let localServerIds = Set(localItems.compactMap(\.serverContentId))
         let newServerItems = serverItems
