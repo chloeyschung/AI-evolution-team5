@@ -110,7 +110,7 @@ export default function ContentDrawer({ contentId, onClose }: ContentDrawerProps
           ) : null}
 
           <section className={styles.section}>
-            <h3>Summary</h3>
+            <h3>AI Summary</h3>
             <p>{detail.summary || 'No summary is available yet for this item.'}</p>
           </section>
 
@@ -138,12 +138,12 @@ export default function ContentDrawer({ contentId, onClose }: ContentDrawerProps
 
           {questionsLoading ? (
             <section className={styles.section}>
-              <h3>Reflection questions</h3>
+              <h3>Dive deeper</h3>
               <p className={styles.loadingText}>Generating questions…</p>
             </section>
           ) : questions.length > 0 ? (
             <section className={styles.section}>
-              <h3>Reflection questions</h3>
+              <h3>Dive deeper</h3>
               <ul className={styles.questionList}>
                 {questions.map((q, i) => (
                   <li key={i} className={styles.questionPill}>{q}</li>

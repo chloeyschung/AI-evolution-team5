@@ -97,7 +97,7 @@ export default function Dashboard() {
     }, 3200);
     pendingActionRef.current = { item, action, index, timeoutId };
     setActionStrip({
-      message: action === 'keep' ? 'Moved to archived.' : 'Moved to trash.',
+      message: action === 'keep' ? 'Item archived.' : 'Item discarded.',
       mode: 'pending',
       action,
       item,
@@ -177,7 +177,7 @@ export default function Dashboard() {
     <>
     <ConfirmModal
       isOpen={pendingDiscard !== null}
-      message="Move this item to trash?"
+      message="Discard this item?"
       onConfirm={handleConfirmDiscard}
       onCancel={handleCancelDiscard}
     />

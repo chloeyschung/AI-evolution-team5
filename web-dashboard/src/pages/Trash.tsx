@@ -102,11 +102,11 @@ export default function Trash() {
   };
 
   return (
-    <section className={styles.page} data-testid="trash-page">
+    <section className={styles.page} data-testid="discarded-page">
       <header className={styles.hero}>
         <div className={styles.heroText}>
-          <h1>Trash</h1>
-          <p className={styles.subtitle}>Items deleted in the last 30 days</p>
+          <h1>Discarded</h1>
+          <p className={styles.subtitle}>Items discarded in the last 30 days</p>
         </div>
       </header>
 
@@ -128,9 +128,9 @@ export default function Trash() {
       ) : null}
 
       {isLoading ? (
-        <p className={styles.message}>Loading trash…</p>
+        <p className={styles.message}>Loading discarded items…</p>
       ) : items.length === 0 ? (
-        <p className={styles.message}>Trash is empty.</p>
+        <p className={styles.message}>No discarded items.</p>
       ) : (
         <ul className={styles.list}>
           {items.map((item) => (

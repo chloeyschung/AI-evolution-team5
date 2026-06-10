@@ -103,12 +103,16 @@ const router = createBrowserRouter([
         ),
       },
       {
-        path: 'trash',
+        path: 'discarded',
         element: (
           <ProtectedRoute>
             <Trash />
           </ProtectedRoute>
         ),
+      },
+      {
+        path: 'trash',
+        element: <Navigate to="/discarded" replace />,
       },
       {
         path: 'analytics',

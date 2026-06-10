@@ -68,7 +68,7 @@ const navItems = [
   { label: 'Dashboard', to: '/dashboard', icon: <IconDashboard /> },
   { label: 'Library',   to: '/inbox',     icon: <IconInbox />     },
   { label: 'Archive',   to: '/archive',   icon: <IconArchive />   },
-  { label: 'Trash',     to: '/trash',     icon: <IconTrash />     },
+  { label: 'Discarded', to: '/discarded', icon: <IconTrash />     },
   { label: 'Analytics', to: '/analytics', icon: <IconAnalytics /> },
   { label: 'Settings',  to: '/settings',  icon: <IconSettings />  },
 ];

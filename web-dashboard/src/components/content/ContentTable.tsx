@@ -125,7 +125,7 @@ export default function ContentTable({
     },
     {
       key: 'summary',
-      header: 'Summary',
+      header: 'AI Summary',
       width: '20%',
       render: (item) => <span className={styles.summary}>{flattenSummary(item.summary)}</span>,
     },
