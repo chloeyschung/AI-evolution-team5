@@ -102,7 +102,7 @@ export default function Trash() {
   };
 
   return (
-    <section className={styles.page} data-testid="trash-page">
+    <section className={styles.page} data-testid="discarded-page">
       <header className={styles.hero}>
         <div className={styles.heroText}>
           <h1>Discarded</h1>

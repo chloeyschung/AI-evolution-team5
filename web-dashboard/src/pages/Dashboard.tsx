@@ -97,7 +97,7 @@ export default function Dashboard() {
     }, 3200);
     pendingActionRef.current = { item, action, index, timeoutId };
     setActionStrip({
-      message: action === 'keep' ? 'Moved to archived.' : 'Moved to discarded.',
+      message: action === 'keep' ? 'Item archived.' : 'Item discarded.',
       mode: 'pending',
       action,
       item,
