@@ -100,11 +100,20 @@ final class HomeViewModel: ObservableObject {
     // MARK: Section building
 
     private func rebuildSections(clusters: [TopicCluster]?) {
-        // 주제별 섹션은 항상 상단 고정 (FR-15)
-        let topicFixed = topicSections(clusters: clusters)
+        let allTopic = topicSections(clusters: clusters)
 
-        // 날짜별·출처별은 하단에서 하루 1회 셔플
-        var utility = dateSections() + sourceSections()
+        // 실제 콘텐츠가 있는 주제 섹션만 상단 고정 (플레이스홀더는 하단 셔플로)
+        let topicFixed = allTopic.filter {
+            if case .topicPlaceholder = $0.kind { return false }
+            return true
+        }
+        let topicPlaceholders = allTopic.filter {
+            if case .topicPlaceholder = $0.kind { return true }
+            return false
+        }
+
+        // 날짜별·출처별 + 플레이스홀더는 하단에서 하루 1회 셔플
+        var utility = dateSections() + sourceSections() + topicPlaceholders
         var rng = DailySeededRNG()
         utility.shuffle(using: &rng)
 

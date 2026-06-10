@@ -5,6 +5,7 @@ LLM generates short Korean cluster titles from top keywords (spec §6 프롬프�
 No external ML deps — TF-IDF and K-means are implemented from scratch.
 """
 
+import asyncio
 import json
 import logging
 import math
@@ -18,6 +19,7 @@ from src.utils.http_client import async_client_context
 logger = logging.getLogger(__name__)
 
 _MIN_ITEMS = 4
+_cluster_locks: dict[int, asyncio.Lock] = {}
 _MAX_CLUSTERS = 7
 _TITLE_TIMEOUT = 20.0
 
@@ -258,7 +260,20 @@ async def cluster_user_content(items: list[tuple[int, str]]) -> list[ClusterResu
 # ── Per-user save helper (used by scheduler + on-demand trigger) ──────────────
 
 async def cluster_and_save_for_user(user_id: int) -> int:
-    """Run clustering for one user and persist results. Returns cluster count."""
+    """Run clustering for one user and persist results. Returns cluster count.
+
+    Uses a per-user asyncio.Lock to prevent concurrent DELETE+INSERT races
+    when the background scheduler and on-demand trigger fire simultaneously.
+    """
+    lock = _cluster_locks.setdefault(user_id, asyncio.Lock())
+    if lock.locked():
+        logger.info("IOS-008 clustering already in progress for user=%d, skipping", user_id)
+        return 0
+    async with lock:
+        return await _cluster_and_save_inner(user_id)
+
+
+async def _cluster_and_save_inner(user_id: int) -> int:
     from sqlalchemy import delete as sql_delete, select
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
