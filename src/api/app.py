@@ -4,7 +4,7 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,13 +24,16 @@ from ..ingestion.share_handler import ShareHandler
 from ..middleware.rate_limiter import limiter, rate_limit_exceeded_handler
 from ..middleware.security_headers import security_headers_middleware
 from ..utils.http_client import HttpClientPool
-from .routers import account, ai, auth, config, content, integrations, stats, swipe, user, well_known
+from .routers import account, ai, auth, config, content, integrations, stats, swipe, topics, user, well_known
 from .routers.integrations import _background_tasks
 
 logger = logging.getLogger(__name__)
 
 # DAT-003: background purge task handle
 _purge_task: asyncio.Task | None = None
+
+# IOS-008: background clustering task handle
+_cluster_task: asyncio.Task | None = None
 
 PURGE_INTERVAL_SECONDS = 86_400  # 24 hours
 RECOVERY_WINDOW_DAYS = 30
@@ -89,6 +92,106 @@ async def _purge_expired_soft_deletes() -> None:
             logger.exception("DAT-003 purge task error: %s", exc)
 
 
+def _seconds_until_next_cluster_run() -> float:
+    """Return seconds until next Mon or Thu 00:00 KST.
+
+    Mon/Thu 00:00 KST = Sun/Wed 15:00 UTC (KST = UTC+9).
+    datetime.weekday(): 0=Mon … 6=Sun → targets Sun(6) and Wed(2).
+    """
+    now = datetime.now(timezone.utc)
+    for days_ahead in range(1, 8):
+        candidate = (now + timedelta(days=days_ahead)).replace(
+            hour=15, minute=0, second=0, microsecond=0
+        )
+        if candidate.weekday() in {6, 2}:
+            return (candidate - now).total_seconds()
+    return 3 * 86400  # fallback: 3 days
+
+
+async def _run_clustering_job() -> None:
+    """IOS-008: Cluster all active users' content and persist results."""
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    from ..ai.topic_clusterer import cluster_user_content
+    from ..data.database import engine
+    from ..data.models import Content, UserProfile, UserTopicCluster
+    from ..utils.datetime_utils import utc_now
+
+    AsyncSession_ = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with AsyncSession_() as session:
+        from sqlalchemy import delete as sql_delete, select
+
+        # Load all non-deleted users
+        users_result = await session.execute(
+            select(UserProfile.id).where(UserProfile.is_deleted == False)  # noqa: E712
+        )
+        user_ids = [row[0] for row in users_result.fetchall()]
+
+    for uid in user_ids:
+        try:
+            async with AsyncSession_() as session:
+                from sqlalchemy import select
+
+                rows = await session.execute(
+                    select(
+                        Content.id,
+                        Content.title,
+                        Content.summary,
+                        Content.auto_tag_keywords_en,
+                    ).where(
+                        Content.user_id == uid,
+                        Content.is_deleted == False,  # noqa: E712
+                    )
+                )
+                content_rows = rows.fetchall()
+
+            if not content_rows:
+                continue
+
+            items: list[tuple[int, str]] = []
+            for row in content_rows:
+                cid, title, summary, kw_en = row
+                parts = [title or "", summary or "", kw_en or ""]
+                items.append((cid, " ".join(p for p in parts if p)))
+
+            clusters = await cluster_user_content(items)
+            if not clusters:
+                continue
+
+            async with AsyncSession_() as session:
+                from sqlalchemy import delete as sql_delete
+
+                await session.execute(
+                    sql_delete(UserTopicCluster).where(UserTopicCluster.user_id == uid)
+                )
+                for c in clusters:
+                    session.add(UserTopicCluster(
+                        user_id=uid,
+                        title_ko=c.title_ko,
+                        keywords_en=c.keywords_en,
+                        content_ids=c.content_ids,
+                        generated_at=utc_now(),
+                    ))
+                await session.commit()
+            logger.info("IOS-008 clustering: user=%d clusters=%d", uid, len(clusters))
+
+        except Exception as exc:
+            logger.exception("IOS-008 clustering error for user %d: %s", uid, exc)
+
+
+async def _cluster_schedule_loop() -> None:
+    """IOS-008: Wake on Mon/Thu 00:00 KST and run the clustering job."""
+    while True:
+        delay = _seconds_until_next_cluster_run()
+        logger.info("IOS-008 clustering: next run in %.0f s", delay)
+        await asyncio.sleep(delay)
+        try:
+            await _run_clustering_job()
+        except Exception as exc:
+            logger.exception("IOS-008 cluster job failed: %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifecycle."""
@@ -132,9 +235,19 @@ async def lifespan(app: FastAPI):
     # DAT-003: Start daily soft-delete purge task
     _purge_task = asyncio.create_task(_purge_expired_soft_deletes())
 
+    # IOS-008: Start Mon/Thu topic clustering scheduler
+    _cluster_task = asyncio.create_task(_cluster_schedule_loop())
+
     yield
 
     # Shutdown: cancel background tasks and close HTTP client pool
+    if _cluster_task and not _cluster_task.done():
+        _cluster_task.cancel()
+        try:
+            await _cluster_task
+        except asyncio.CancelledError:
+            pass
+
     if _purge_task and not _purge_task.done():
         _purge_task.cancel()
         try:
@@ -245,6 +358,7 @@ app.include_router(user.router, prefix="/api/v1", tags=["user"])
 app.include_router(integrations.router, prefix="/api/v1", tags=["integrations"])
 app.include_router(ai.router, prefix="/api/v1", tags=["ai"])
 app.include_router(stats.router, prefix="/api/v1", tags=["stats"])
+app.include_router(topics.router, prefix="/api/v1", tags=["topics"])
 
 
 @app.get("/")

@@ -548,3 +548,20 @@ class IdempotencyRecord(Base):
     created_at = Column(DateTime, default=utc_now, nullable=False, index=True)
 
     __table_args__ = (sqlalchemy.UniqueConstraint("user_id", "idempotency_key", name="uq_idempotency_user_key"),)
+
+
+class UserTopicCluster(Base):
+    """Dynamically generated topic clusters per user (IOS-008).
+
+    Regenerated Mon/Thu 00:00 KST by the background clustering job.
+    Old rows for the user are replaced on each run.
+    """
+
+    __tablename__ = "user_topic_clusters"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("user_profile.id", ondelete="CASCADE"), nullable=False, index=True)
+    title_ko = Column(String(100), nullable=False)
+    keywords_en = Column(JSON, nullable=False, default=list)
+    content_ids = Column(JSON, nullable=False, default=list)
+    generated_at = Column(DateTime, default=utc_now, nullable=False)
