@@ -18,6 +18,50 @@ actor MetadataService {
         return URLSession(configuration: config)
     }()
 
+    /// LinkedIn oEmbed API로 메타데이터를 빠르게 취득합니다 (인증 불필요, 공개 게시물 한정).
+    func fetchLinkedInMetadata(for url: URL) async throws -> PageMetadata {
+        let encoded = url.absoluteString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        guard let oembedURL = URL(string: "https://www.linkedin.com/oembed?url=\(encoded)&format=json") else {
+            throw URLError(.badURL)
+        }
+        let (data, _) = try await session.data(from: oembedURL)
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw URLError(.cannotParseResponse)
+        }
+        var meta = PageMetadata()
+        // LinkedIn oEmbed "title" 필드 = 포스팅 본문 전체.
+        // 저장은 전체 텍스트로, 표시 시 축약은 SavedItem.displayTitle에서 처리.
+        let postText = json["title"] as? String
+        meta.ogTitle = postText
+        meta.ogDescription = postText
+        meta.siteName = "LinkedIn"
+        if let thumbURL = json["thumbnail_url"] as? String {
+            meta.ogImageURL = URL(string: thumbURL)
+        }
+        return meta
+    }
+
+    /// YouTube oEmbed API로 메타데이터를 빠르게 취득합니다 (전체 HTML 파싱 불필요).
+    func fetchYouTubeMetadata(for url: URL) async throws -> PageMetadata {
+        let encoded = url.absoluteString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        guard let oembedURL = URL(string: "https://www.youtube.com/oembed?url=\(encoded)&format=json") else {
+            throw URLError(.badURL)
+        }
+        let (data, _) = try await session.data(from: oembedURL)
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw URLError(.cannotParseResponse)
+        }
+        var meta = PageMetadata()
+        meta.ogTitle = json["title"] as? String
+        meta.ogDescription = json["author_name"] as? String
+        meta.siteName = "YouTube"
+        // oEmbed thumbnail → og:image 대신 사용
+        if let thumbURL = json["thumbnail_url"] as? String {
+            meta.ogImageURL = URL(string: thumbURL)
+        }
+        return meta
+    }
+
     func fetchMetadata(for url: URL) async throws -> PageMetadata {
         var request = URLRequest(url: url)
         request.setValue(

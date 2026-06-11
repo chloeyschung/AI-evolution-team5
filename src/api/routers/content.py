@@ -46,6 +46,7 @@ from ..schemas import (
     PaginatedContentResponse,
     PlatformCount,
     ReflectionQuestionsResponse,
+    RescanRequest,
     ShareRequest,
     ShareResponse,
     StatsResponse,
@@ -117,7 +118,7 @@ async def create_content(
 async def list_content(
     request: Request,
     response: Response,
-    limit: int = Query(50, gt=0, le=100),
+    limit: int = Query(50, gt=0, le=200),
     offset: int = Query(0, ge=0),
     cursor: str | None = Query(None),
     status: str | None = Query(None, pattern="^(inbox|archived)$"),
@@ -448,17 +449,52 @@ async def get_content_tags(
     return ContentTagsResponse(content_id=content_id, tags=tags)
 
 
+def _read_lang_cache(raw: str, lang: str) -> list[str] | None:
+    """Read per-language cache. Legacy flat-list cache is treated as 'en'."""
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, list) and parsed:
+            return parsed if lang == "en" else None
+        if isinstance(parsed, dict):
+            cached = parsed.get(lang)
+            if isinstance(cached, list) and cached:
+                return cached
+    except (ValueError, TypeError):
+        pass
+    return None
+
+
+def _merge_lang_cache(existing_raw: str | None, lang: str, questions: list[str]) -> str:
+    """Merge new questions into per-language cache dict. Migrates legacy flat list."""
+    cache: dict = {}
+    if existing_raw:
+        try:
+            parsed = json.loads(existing_raw)
+            if isinstance(parsed, dict):
+                cache = parsed
+            elif isinstance(parsed, list) and parsed:
+                cache["en"] = parsed  # migrate legacy flat list
+        except (ValueError, TypeError):
+            pass
+    cache[lang] = questions
+    return json.dumps(cache)
+
+
 @router.get("/content/{content_id}/reflection-questions", response_model=ReflectionQuestionsResponse)
 async def get_reflection_questions(
     content_id: int,
+    lang: str = Query(default="en", max_length=10),
     user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ReflectionQuestionsResponse:
     """Generate 3 open-ended reflection questions for an article.
 
     Uses the existing Modal/SUMMARY endpoint. Returns empty questions list on AI failure.
+    lang: BCP-47 language code from the client device locale (e.g. 'ko', 'en').
     """
     from src.ai.reflection import generate_questions
+
+    lang = lang[:2].lower()  # normalise to 2-char code
 
     content_repo = ContentRepository(db)
     content = await content_repo.get_by_id(content_id)
@@ -469,14 +505,11 @@ async def get_reflection_questions(
             detail={"error": ErrorCode.CONTENT_NOT_FOUND, "message": "Content not found."},
         )
 
-    # Return cached questions if available
+    # Return cached questions for this language if available
     if getattr(content, "reflection_questions", None):
-        try:
-            cached = json.loads(content.reflection_questions)
-            if isinstance(cached, list) and cached:
-                return ReflectionQuestionsResponse(content_id=content_id, questions=cached)
-        except (ValueError, TypeError):
-            pass
+        cached = _read_lang_cache(content.reflection_questions, lang)
+        if cached:
+            return ReflectionQuestionsResponse(content_id=content_id, questions=cached)
 
     keywords: list[str] = []
     if getattr(content, "auto_tag_keywords_en", None):
@@ -489,10 +522,14 @@ async def get_reflection_questions(
         summary=content.summary,
         keywords=[k for k in keywords if k],
         settings=settings,
+        lang=lang,
     )
 
     if questions:
-        await content_repo.save_reflection_questions(content_id, user_id, questions)
+        raw_json = _merge_lang_cache(
+            getattr(content, "reflection_questions", None), lang, questions
+        )
+        await content_repo.save_reflection_questions(content_id, user_id, raw_json)
 
     return ReflectionQuestionsResponse(content_id=content_id, questions=questions)
 
@@ -846,6 +883,21 @@ async def _background_autotag(
             await ContentRepository(db).update_auto_tags(content_id, user_id, "failed")
 
 
+def _is_low_quality_text(text: str) -> bool:
+    """서버 사이드 스크래핑 결과가 요약 불가한 저품질인지 판별한다.
+
+    True를 반환하면 요약 저장을 건너뜀 → is_ai_summarized=False 유지 → iOS rescan 가능.
+    """
+    if len(text.strip()) < 300:
+        return True
+    lower = text.lower()
+    boilerplate_signals = [
+        "sign in", "log in", "로그인", "create account", "register to",
+        "please enable javascript", "enable cookies", "you need to enable",
+    ]
+    return any(signal in lower for signal in boilerplate_signals)
+
+
 async def _background_summarize(
     content_id: int,
     user_id: int,
@@ -872,10 +924,28 @@ async def _background_summarize(
 
     try:
         # Fetch page text — use pre-extracted text from client if provided (e.g. LinkedIn, Facebook),
-        # otherwise fall back to server-side fetch. Failure is non-fatal.
+        # try YouTube transcript for YouTube URLs, LinkedIn oEmbed for LinkedIn URLs,
+        # otherwise fall back to server-side HTML fetch.
+        from src.ingestion.linkedin_extractor import fetch_linkedin_text, is_linkedin_url
+        from src.ingestion.youtube_transcript import extract_video_id, fetch_youtube_text
+
         text_content = ""
         if page_text:
             text_content = page_text
+        elif extract_video_id(url):
+            yt_text = await fetch_youtube_text(url)
+            if yt_text:
+                text_content = yt_text
+            else:
+                try:
+                    _, text_content = await content_extractor.fetch_html_and_text(url)
+                except Exception as exc:  # noqa: BLE001
+                    logging.warning("Content extraction failed for content %s: %s", content_id, exc)
+        elif is_linkedin_url(url):
+            # LinkedIn blocks unauthenticated scraping — use oEmbed (title + author) instead.
+            # If oEmbed also fails, skip summarization rather than summarizing the login page.
+            linkedin_text = await fetch_linkedin_text(url)
+            text_content = linkedin_text or ""
         else:
             try:
                 _, text_content = await content_extractor.fetch_html_and_text(url)
@@ -892,7 +962,17 @@ async def _background_summarize(
             final_title = content.title or ""
 
             # Summarization + title generation — only when text was fetched and not yet done.
-            already_summarized = bool(getattr(content, "is_ai_summarized", False)) or bool(content.summary)
+            # page_text indicates the client has better text (e.g. WKWebView), so allow override.
+            already_summarized = (
+                bool(getattr(content, "is_ai_summarized", False)) or bool(content.summary)
+            ) and not page_text
+            # page_text가 없는 경우(서버 사이드 스크래핑)는 품질 검사 후 저품질이면 저장 않음.
+            # → is_ai_summarized=False 유지 → iOS rescan이 나중에 좋은 본문으로 덮어씀.
+            skip_low_quality = (not page_text) and _is_low_quality_text(text_content)
+            if skip_low_quality:
+                logging.info("_background_summarize: low-quality text skipped for content %s", content_id)
+                text_content = ""
+
             if text_content and summarizer is not None and not already_summarized:
                 summary = await summarizer.summarize(text_content, max_retries=1)
                 await repo.update_summary(content_id, user_id, summary)
@@ -1005,6 +1085,43 @@ async def share_content(
         is_ai_titled=bool(getattr(content, "is_ai_titled", False)),
         created_at=serialize_datetime(content.created_at),
     )
+
+
+@router.post("/content/{content_id}/rescan", status_code=202)
+@limiter.limit("30/minute")
+async def rescan_content(
+    request: Request,
+    content_id: int,
+    data: RescanRequest,
+    background_tasks: BackgroundTasks,
+    user_id: int = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    share_handler: ShareHandler = Depends(get_share_handler),
+) -> dict:
+    """Re-summarize content using client-provided page text.
+
+    Called by iOS after FetchCoordinator successfully extracts article text via WKWebView,
+    allowing AI summaries for JavaScript-rendered SPA sites that server-side scraping cannot handle.
+    """
+    repo = ContentRepository(db)
+    content = await repo.get_by_id(content_id)
+    if not content or content.user_id != user_id or content.is_deleted:
+        raise HTTPException(status_code=404, detail="Content not found.")
+
+    already = bool(getattr(content, "is_ai_summarized", False)) or bool(content.summary)
+    if already and not data.force:
+        return {"status": "skipped", "reason": "already_summarized"}
+
+    background_tasks.add_task(
+        _background_summarize,
+        content_id,
+        user_id,
+        content.url,
+        share_handler._content_extractor,
+        share_handler._summarizer,
+        data.page_text,
+    )
+    return {"status": "queued"}
 
 
 @router.post("/content/remove-duplicates", response_model=DeleteContentResponse)

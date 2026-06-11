@@ -17,13 +17,25 @@ logger = logging.getLogger(__name__)
 _TIMEOUT = 25.0       # per-attempt HTTP timeout
 _TOTAL_TIMEOUT = 55.0  # absolute cap — Modal cold-start can take ~30-50s for large models
 
+_LANG_NAMES: dict[str, str] = {
+    "ko": "Korean",
+    "en": "English",
+    "ja": "Japanese",
+    "zh": "Chinese",
+    "fr": "French",
+    "de": "German",
+    "es": "Spanish",
+    "pt": "Portuguese",
+}
 
-def _build_prompt(summary: str | None, keywords: list[str]) -> str:
+
+def _build_prompt(summary: str | None, keywords: list[str], lang: str = "en") -> str:
     parts = []
     if summary:
         parts.append(f"Article summary:\n{summary}")
     if keywords:
         parts.append(f"Key topics: {', '.join(keywords)}")
+    lang_name = _LANG_NAMES.get(lang[:2].lower(), "English")
     parts.append(
         "\nGenerate exactly 3 reflection questions for a reader of this article.\n"
         "Requirements:\n"
@@ -33,6 +45,7 @@ def _build_prompt(summary: str | None, keywords: list[str]) -> str:
         "- Good examples: 'What second-order effects might this change trigger?', "
         "'Whose perspective is absent from this account?', "
         "'How could this apply to your own context?'\n"
+        f"- IMPORTANT: Write all 3 questions in {lang_name} only.\n"
         "Return ONLY a JSON array of exactly 3 question strings. No explanation, no keys."
     )
     return "\n".join(parts)
@@ -59,6 +72,7 @@ async def generate_questions(
     summary: str | None,
     keywords: list[str],
     settings,
+    lang: str = "en",
 ) -> list[str]:
     """Call the OpenAI-compatible endpoint to generate 3 reflection questions.
 
@@ -79,7 +93,7 @@ async def generate_questions(
     url = settings.SUMMARY_BASE_URL
     payload = {
         "model": settings.SUMMARY_MODEL,
-        "messages": [{"role": "user", "content": _build_prompt(summary, keywords)}],
+        "messages": [{"role": "user", "content": _build_prompt(summary, keywords, lang)}],
         "max_tokens": 512,
         "chat_template_kwargs": {"enable_thinking": False},
     }

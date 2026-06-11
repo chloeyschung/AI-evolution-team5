@@ -16,7 +16,7 @@ actor BrieflyAPI {
     /// DevServerSheet와 init이 같은 값을 보도록 single source.
     static var defaultDebugURL: String {
         #if targetEnvironment(simulator)
-        return "http://localhost:8000/api/v1"
+        return "http://127.0.0.1:8000/api/v1"
         #else
         return defaultDevURL
         #endif
@@ -88,14 +88,50 @@ actor BrieflyAPI {
         return try await post("/share", body: body, token: token)
     }
 
+    // MARK: - Rescan (page_text 기반 재요약 트리거)
+
+    struct RescanPayload: Encodable {
+        let pageText: String
+        let force: Bool
+
+        enum CodingKeys: String, CodingKey {
+            case pageText = "page_text"
+            case force
+        }
+    }
+
+    private struct RescanResult: Decodable {
+        let status: String
+    }
+
+    func rescan(contentId: Int, pageText: String, token: String, force: Bool = false) async throws {
+        let body = RescanPayload(pageText: pageText, force: force)
+        let _: RescanResult = try await post("/content/\(contentId)/rescan", body: body, token: token)
+    }
+
     // MARK: - Content Detail
 
     struct ContentDetail: Decodable {
         let id: Int
         let summary: String?
+        let autoTagCategory: String?
+        let autoTagKeywordsEn: [String]
+        let autoTagKeywordsOriginal: [String]
 
         enum CodingKeys: String, CodingKey {
             case id, summary
+            case autoTagCategory      = "auto_tag_category"
+            case autoTagKeywordsEn    = "auto_tag_keywords_en"
+            case autoTagKeywordsOriginal = "auto_tag_keywords_original"
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id      = try  c.decode(Int.self,    forKey: .id)
+            summary = try? c.decode(String.self, forKey: .summary)
+            autoTagCategory         = try? c.decode(String.self,   forKey: .autoTagCategory)
+            autoTagKeywordsEn       = (try? c.decode([String].self, forKey: .autoTagKeywordsEn))       ?? []
+            autoTagKeywordsOriginal = (try? c.decode([String].self, forKey: .autoTagKeywordsOriginal)) ?? []
         }
     }
 
@@ -103,8 +139,77 @@ actor BrieflyAPI {
         return try await get("/content/\(contentId)", token: token)
     }
 
-    private func get<R: Decodable>(_ path: String, token: String) async throws -> R {
-        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+    // MARK: - Content List (IOS-006)
+
+    private struct PaginatedContentResponse: Decodable {
+        let items: [ServerContent]
+        let total: Int
+        let hasMore: Bool
+        let nextOffset: Int?
+
+        enum CodingKeys: String, CodingKey {
+            case items, total
+            case hasMore     = "has_more"
+            case nextOffset  = "next_offset"
+        }
+    }
+
+    func fetchServerContent(token: String, limit: Int = 200) async throws -> [ServerContent] {
+        let response: PaginatedContentResponse = try await get(
+            "/content",
+            token: token,
+            queryItems: [URLQueryItem(name: "limit", value: "\(limit)")]
+        )
+        return response.items
+    }
+
+    // MARK: - Topic Clusters (IOS-008)
+
+    private struct TopicClustersResponse: Decodable {
+        let clusters: [TopicCluster]
+    }
+
+    func fetchTopicClusters(token: String) async throws -> [TopicCluster] {
+        let response: TopicClustersResponse = try await get("/topics", token: token)
+        return response.clusters
+    }
+
+    // MARK: - Dive Deeper (IOS-015)
+
+    private struct DiveDeeperResponse: Decodable {
+        let contentId: Int
+        let questions: [String]
+
+        enum CodingKeys: String, CodingKey {
+            case contentId = "content_id"
+            case questions
+        }
+    }
+
+    func fetchDiveDeeperQuestions(contentId: Int, token: String) async throws -> [String] {
+        let langCode = Locale.current.language.languageCode?.identifier ?? "en"
+        let response: DiveDeeperResponse = try await get(
+            "/content/\(contentId)/reflection-questions",
+            token: token,
+            queryItems: [URLQueryItem(name: "lang", value: langCode)]
+        )
+        return response.questions
+    }
+
+    // MARK: - GET helper
+
+    private func get<R: Decodable>(
+        _ path: String,
+        token: String,
+        queryItems: [URLQueryItem] = []
+    ) async throws -> R {
+        var url = baseURL.appendingPathComponent(path)
+        if !queryItems.isEmpty,
+           var comps = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            comps.queryItems = queryItems
+            url = comps.url ?? url
+        }
+        var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -115,11 +220,10 @@ actor BrieflyAPI {
         guard (200...299).contains(http.statusCode) else {
             throw APIError.httpError(http.statusCode, BrieflyAPI.decodeErrorMessage(from: data))
         }
-        let decoder = JSONDecoder()
-        return try decoder.decode(R.self, from: data)
+        return try JSONDecoder().decode(R.self, from: data)
     }
 
-    // MARK: - Swipe (Keep / Delete)
+    // MARK: - Swipe (Keep / Discard)
 
     enum SwipeAction: String, Encodable {
         case keep

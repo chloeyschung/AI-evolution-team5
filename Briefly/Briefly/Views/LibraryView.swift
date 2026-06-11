@@ -4,8 +4,8 @@ import SwiftUI
 
 enum LibraryFilter: String, CaseIterable {
     case inbox    = "Inbox"
-    case archived = "Archived"
-    case deleted  = "Deleted"
+    case archived = "Saved"
+    case deleted  = "Discarded"
 }
 
 // Inbox 카드 리더 진입 시 전체 목록과 시작 인덱스를 함께 전달
@@ -45,9 +45,9 @@ struct LibraryView: View {
         case .inbox:
             return filteredItems.isEmpty ? "Inbox" : "Inbox \(filteredItems.count)"
         case .archived:
-            return "Archived"
+            return "Saved"
         case .deleted:
-            return "Deleted"
+            return "Discarded"
         }
     }
 
@@ -161,9 +161,9 @@ struct LibraryView: View {
             case .inbox:
                 return ("tray", "Inbox가 비어있어요", "공유하기 → Save Document to Briefly 로\n링크를 저장해보세요")
             case .archived:
-                return ("archivebox", "Archived가 비어있어요", "Inbox에서 Keep한 링크가 여기에 표시됩니다")
+                return ("archivebox", "Saved가 비어있어요", "Inbox에서 Keep한 링크가 여기에 표시됩니다")
             case .deleted:
-                return ("trash", "Deleted가 비어있어요", "Inbox에서 Delete한 링크가 여기에 표시됩니다")
+                return ("trash", "Discarded가 비어있어요", "Inbox에서 Discard한 링크가 여기에 표시됩니다")
             }
         }()
 
@@ -230,6 +230,11 @@ struct LibraryCardView: View {
                         .font(.brieflyBodySm)
                         .foregroundStyle(Color.brieflyTextSecondary)
                         .lineLimit(3)
+
+                    if !item.autoTagKeywordsEn.isEmpty {
+                        KeywordPillRow(keywords: item.autoTagKeywordsEn, maxCount: 3)
+                            .padding(.top, 2)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 

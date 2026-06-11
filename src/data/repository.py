@@ -225,12 +225,12 @@ class ContentRepository(BaseRepository[Content]):
         )
         await self.session.commit()
 
-    async def save_reflection_questions(self, content_id: int, user_id: int, questions: list[str]) -> None:
+    async def save_reflection_questions(self, content_id: int, user_id: int, raw_json: str) -> None:
         """Cache generated reflection questions on the content row."""
         await self.session.execute(
             update(Content)
             .where(Content.id == content_id, Content.user_id == user_id)
-            .values(reflection_questions=json.dumps(questions), updated_at=utc_now())
+            .values(reflection_questions=raw_json, updated_at=utc_now())
         )
         await self.session.commit()
 

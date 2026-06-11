@@ -22,11 +22,23 @@ struct SavedItem: Codable, Identifiable, Hashable {
 
     // Phase 2b — AI 요약
     var summary: String?
+    var summaryStatus: SummaryStatus
+
+    // Phase 2c — AI 자동 태깅
+    var autoTagCategory: String?
+    var autoTagKeywordsEn: [String]
+    var autoTagKeywordsOriginal: [String]
+
+    enum SummaryStatus: String, Codable {
+        case unknown    // 초기 상태 (기존 데이터 하위 호환용)
+        case failed     // 타임아웃 초과 — 수동 재시도 필요
+        case done       // 요약 완료
+    }
 
     enum Status: String, Codable {
         case unread, read, discarded
-        case kept       // Keep 선택 → Archived 탭
-        case deleted    // Delete 선택 → Deleted 탭
+        case kept       // Keep 선택 → Saved 탭
+        case deleted    // Discard 선택 → Discarded 탭
     }
 
     enum FetchStatus: String, Codable {
@@ -44,11 +56,44 @@ struct SavedItem: Codable, Identifiable, Hashable {
         self.savedAt = Date()
         self.status = .unread
         self.fetchStatus = .pending
+        self.summaryStatus = .unknown
+        self.autoTagCategory = nil
+        self.autoTagKeywordsEn = []
+        self.autoTagKeywordsOriginal = []
+    }
+
+    // summaryStatus 필드가 없는 기존 JSON과 하위 호환
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id            = try c.decode(UUID.self, forKey: .id)
+        url           = try c.decode(URL.self, forKey: .url)
+        title         = try? c.decode(String.self, forKey: .title)
+        savedAt       = try c.decode(Date.self, forKey: .savedAt)
+        status        = try c.decode(Status.self, forKey: .status)
+        serverContentId = try? c.decode(Int.self, forKey: .serverContentId)
+        ogTitle       = try? c.decode(String.self, forKey: .ogTitle)
+        ogImageURL    = try? c.decode(URL.self, forKey: .ogImageURL)
+        ogDescription = try? c.decode(String.self, forKey: .ogDescription)
+        siteName      = try? c.decode(String.self, forKey: .siteName)
+        articleText   = try? c.decode(String.self, forKey: .articleText)
+        fetchStatus   = (try? c.decode(FetchStatus.self, forKey: .fetchStatus)) ?? .pending
+        summary       = try? c.decode(String.self, forKey: .summary)
+        summaryStatus = (try? c.decode(SummaryStatus.self, forKey: .summaryStatus)) ?? .unknown
+        autoTagCategory         = try? c.decode(String.self,   forKey: .autoTagCategory)
+        autoTagKeywordsEn       = (try? c.decode([String].self, forKey: .autoTagKeywordsEn))       ?? []
+        autoTagKeywordsOriginal = (try? c.decode([String].self, forKey: .autoTagKeywordsOriginal)) ?? []
     }
 
     /// 표시용 제목 — ogTitle → title → 도메인
     var displayTitle: String {
-        ogTitle ?? title ?? url.host ?? url.absoluteString
+        let raw = ogTitle ?? title ?? url.host ?? url.absoluteString
+        // LinkedIn 포스팅은 별도 제목이 없어 ogTitle에 본문 전체가 담기므로 20자로 축약.
+        // siteName 대신 URL로 감지 — oEmbed 실패 시 siteName이 미설정인 경우도 처리.
+        let isLinkedIn = url.host?.lowercased().contains("linkedin.com") ?? false
+        if isLinkedIn, raw.count > 20 {
+            return String(raw.prefix(20)) + "..."
+        }
+        return raw
     }
 
     /// 도메인만 추출 (예: "medium.com")
