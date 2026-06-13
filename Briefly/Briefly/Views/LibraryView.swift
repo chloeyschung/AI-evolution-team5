@@ -40,19 +40,26 @@ struct LibraryView: View {
         }
     }
 
-    private var navigationTitle: String {
-        switch selectedFilter {
-        case .inbox:
-            return filteredItems.isEmpty ? "Inbox" : "Inbox \(filteredItems.count)"
-        case .archived:
-            return filteredItems.isEmpty ? "Saved" : "Saved \(filteredItems.count)"
-        case .deleted:
-            return filteredItems.isEmpty ? "Discarded" : "Discarded \(filteredItems.count)"
+    private var titleHeaderView: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(selectedFilter.rawValue)
+                .font(.largeTitle.bold())
+                .foregroundStyle(Color.brieflyTextPrimary)
+            if !filteredItems.isEmpty {
+                Text("\(filteredItems.count)")
+                    .font(.largeTitle.bold())
+                    .foregroundStyle(Color.brieflyPrimary500)
+            }
+            Spacer()
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 
     var body: some View {
         NavigationStack(path: $path) {
+            VStack(spacing: 0) {
+            titleHeaderView
             ZStack(alignment: .bottom) {
 
                 // MARK: Content
@@ -110,8 +117,8 @@ struct LibraryView: View {
                 .brieflyShadow3()
                 .padding(.bottom, 20)
             }
-            .navigationTitle(navigationTitle)
-            .navigationBarTitleDisplayMode(.large)
+            } // VStack
+            .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: InboxNavigation.self) { nav in
                 ItemDetailView(items: nav.items, startIndex: nav.startIndex, showActions: true)
             }
