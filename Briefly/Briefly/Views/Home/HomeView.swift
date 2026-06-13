@@ -13,8 +13,7 @@ struct HomeView: View {
                 contentView
             }
         }
-        .navigationTitle("Briefly")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(isPresented: Binding(
             get: { selectedSavedItem != nil },
             set: { if !$0 { selectedSavedItem = nil } }
@@ -28,13 +27,19 @@ struct HomeView: View {
     private var contentView: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: BrieflySpacing.s8) {
+                Image("logo_full")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 36)
+                    .padding(.horizontal, BrieflySpacing.s4)
+                    .padding(.top, BrieflySpacing.s2)
                 ForEach(viewModel.sections) { section in
                     HomeSectionView(section: section) { item in
                         switch item {
                         case .local(let savedItem):
                             selectedSavedItem = savedItem
-                        case .server:
-                            UIApplication.shared.open(item.url)
+                        case .server(let content):
+                            selectedSavedItem = SavedItem(serverContent: content)
                         }
                     }
                 }
@@ -64,5 +69,27 @@ struct HomeView: View {
 #Preview {
     NavigationStack {
         HomeView(viewModel: HomeViewModel())
+    }
+}
+
+private extension SavedItem {
+    init(serverContent: ServerContent) {
+        self.id = UUID()
+        self.url = serverContent.url
+        self.title = serverContent.title
+        self.savedAt = serverContent.createdAt
+        self.status = .unread
+        self.serverContentId = serverContent.id
+        self.ogTitle = serverContent.title
+        self.ogImageURL = serverContent.thumbnailURL
+        self.ogDescription = nil
+        self.siteName = nil
+        self.articleText = nil
+        self.fetchStatus = .done
+        self.summary = serverContent.summary
+        self.summaryStatus = serverContent.summary != nil ? .done : .unknown
+        self.autoTagCategory = serverContent.autoTagCategory
+        self.autoTagKeywordsEn = serverContent.autoTagKeywordsEn
+        self.autoTagKeywordsOriginal = serverContent.autoTagKeywordsOriginal
     }
 }

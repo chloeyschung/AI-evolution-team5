@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - Filter
+// MARK: - Enums
 
 enum LibraryFilter: String, CaseIterable {
     case inbox    = "Inbox"
@@ -8,7 +8,6 @@ enum LibraryFilter: String, CaseIterable {
     case deleted  = "Discarded"
 }
 
-// Inbox 카드 리더 진입 시 전체 목록과 시작 인덱스를 함께 전달
 struct InboxNavigation: Hashable {
     let items: [SavedItem]
     let startIndex: Int
@@ -30,9 +29,14 @@ struct LibraryView: View {
     @State private var selectedFilter: LibraryFilter = .inbox
     @State private var path = NavigationPath()
     @State private var pendingDeepLinkURL: URL?
+    @State private var selectedCategories: Set<String> = []
+    @State private var selectedDomains: Set<String>    = []
+    @State private var activeDropdown: FilterDropdown? = nil
     @Environment(\.scenePhase) private var scenePhase
 
-    private var filteredItems: [SavedItem] {
+    // MARK: - Data
+
+    private var tabItems: [SavedItem] {
         switch selectedFilter {
         case .inbox:    return viewModel.items.filter { $0.status == .unread }
         case .archived: return viewModel.items.filter { $0.status == .kept || $0.status == .read || $0.status == .discarded }
@@ -40,78 +44,112 @@ struct LibraryView: View {
         }
     }
 
-    private var navigationTitle: String {
-        switch selectedFilter {
-        case .inbox:
-            return filteredItems.isEmpty ? "Inbox" : "Inbox \(filteredItems.count)"
-        case .archived:
-            return "Saved"
-        case .deleted:
-            return "Discarded"
-        }
+    private var displayedItems: [SavedItem] {
+        tabItems
+            .filter { selectedCategories.isEmpty || ($0.autoTagCategory.map { selectedCategories.contains($0) } ?? false) }
+            .filter { selectedDomains.isEmpty || selectedDomains.contains($0.url.normalizedDomain) }
     }
+
+    private var availableCategories: [String] {
+        Array(Set(viewModel.items.compactMap(\.autoTagCategory))).sorted()
+    }
+
+    private var availableDomains: [String] {
+        Array(Set(viewModel.items.map { $0.url.normalizedDomain })).sorted()
+    }
+
+    // MARK: - Subviews
+
+    private var titleHeaderView: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(selectedFilter.rawValue)
+                .font(.largeTitle.bold())
+                .foregroundStyle(Color.brieflyTextPrimary)
+            if !displayedItems.isEmpty {
+                Text("\(displayedItems.count)")
+                    .font(.largeTitle.bold())
+                    .foregroundStyle(Color.brieflyPrimary500)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+    }
+
+    // MARK: - Body
 
     var body: some View {
         NavigationStack(path: $path) {
-            ZStack(alignment: .bottom) {
+            VStack(spacing: 0) {
+                titleHeaderView
+                CategoryPlatformFilterBar(
+                    availableCategories: availableCategories,
+                    availableDomains: availableDomains,
+                    selectedCategories: $selectedCategories,
+                    selectedDomains: $selectedDomains,
+                    activeDropdown: $activeDropdown
+                ) {
+                    ZStack(alignment: .bottom) {
 
-                // MARK: Content
-                if filteredItems.isEmpty {
-                    emptyView
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
-                                if selectedFilter == .inbox {
-                                    NavigationLink(value: InboxNavigation(items: filteredItems, startIndex: index)) {
-                                        LibraryCardView(item: item)
+                        // MARK: Content
+                        if displayedItems.isEmpty {
+                            emptyView
+                        } else {
+                            ScrollView {
+                                LazyVStack(spacing: 0) {
+                                    ForEach(Array(displayedItems.enumerated()), id: \.element.id) { index, item in
+                                        if selectedFilter == .inbox {
+                                            NavigationLink(value: InboxNavigation(items: displayedItems, startIndex: index)) {
+                                                LibraryCardView(item: item)
+                                            }
+                                            .buttonStyle(.plain)
+                                        } else {
+                                            NavigationLink(value: item) {
+                                                LibraryCardView(item: item)
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+
+                                        Divider()
+                                            .overlay(Color.brieflyBorder)
+                                            .padding(.leading, 16)
                                     }
-                                    .buttonStyle(.plain)
-                                } else {
-                                    NavigationLink(value: item) {
-                                        LibraryCardView(item: item)
-                                    }
-                                    .buttonStyle(.plain)
                                 }
-
-                                Divider()
-                                    .overlay(Color.brieflyBorder)
-                                    .padding(.leading, 16)
+                                .padding(.bottom, 80)
                             }
                         }
-                        .padding(.bottom, 80)
-                    }
-                }
 
-                // MARK: Floating Filter Tab
-                HStack(spacing: 2) {
-                    ForEach(LibraryFilter.allCases, id: \.self) { filter in
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                selectedFilter = filter
+                        // MARK: Floating Filter Tab
+                        HStack(spacing: 2) {
+                            ForEach(LibraryFilter.allCases, id: \.self) { filter in
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        selectedFilter = filter
+                                        activeDropdown = nil
+                                    }
+                                } label: {
+                                    Text(filter.rawValue)
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(selectedFilter == filter ? Color.brieflyTextPrimary : Color.brieflyInk400)
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 9)
+                                        .background(
+                                            selectedFilter == filter
+                                                ? Color.brieflyBgSurface
+                                                : Color.clear
+                                        )
+                                        .clipShape(Capsule())
+                                }
                             }
-                        } label: {
-                            Text(filter.rawValue)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(selectedFilter == filter ? Color.brieflyTextPrimary : Color.brieflyInk400)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 9)
-                                .background(
-                                    selectedFilter == filter
-                                        ? Color.brieflyBgSurface
-                                        : Color.clear
-                                )
-                                .clipShape(Capsule())
                         }
+                        .padding(4)
+                        .background(Color.brieflyBgApp.opacity(0.92), in: Capsule())
+                        .brieflyShadow3()
+                        .padding(.bottom, 20)
                     }
                 }
-                .padding(4)
-                .background(Color.brieflyBgApp.opacity(0.92), in: Capsule())
-                .brieflyShadow3()
-                .padding(.bottom, 20)
-            }
-            .navigationTitle(navigationTitle)
-            .navigationBarTitleDisplayMode(.large)
+            } // VStack
+            .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: InboxNavigation.self) { nav in
                 ItemDetailView(items: nav.items, startIndex: nav.startIndex, showActions: true)
             }
@@ -238,7 +276,6 @@ struct LibraryCardView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                // 썸네일 — OG Image (없으면 placeholder)
                 Group {
                     if let imageURL = item.ogImageURL {
                         AsyncImage(url: imageURL) { phase in

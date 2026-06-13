@@ -75,12 +75,14 @@ struct ItemDetailView: View {
         }
         .onAppear {
             refreshLiveItem()
+            RecentlyViewedStore.shared.record(currentItem.id)
         }
-        .onChange(of: currentIndex) { _ in
+        .onChange(of: currentIndex) { newIndex in
             summaryPollId = UUID()
             diveDeeperQuestions = []
             diveDeeperPollId = UUID()
             refreshLiveItem()
+            RecentlyViewedStore.shared.record(items[newIndex].id)
         }
         .onReceive(NotificationCenter.default.publisher(for: .fetchCoordinatorDidUpdate)) { _ in
             refreshLiveItem()
