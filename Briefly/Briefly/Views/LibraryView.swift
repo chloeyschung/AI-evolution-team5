@@ -30,9 +30,11 @@ struct LibraryView: View {
     @State private var selectedFilter: LibraryFilter = .inbox
     @State private var path = NavigationPath()
     @State private var pendingDeepLinkURL: URL?
+    @State private var selectedCategory: String? = nil
+    @State private var selectedDomain: String?   = nil
     @Environment(\.scenePhase) private var scenePhase
 
-    private var filteredItems: [SavedItem] {
+    private var tabItems: [SavedItem] {
         switch selectedFilter {
         case .inbox:    return viewModel.items.filter { $0.status == .unread }
         case .archived: return viewModel.items.filter { $0.status == .kept || $0.status == .read || $0.status == .discarded }
@@ -40,13 +42,27 @@ struct LibraryView: View {
         }
     }
 
+    private var displayedItems: [SavedItem] {
+        tabItems
+            .filter { selectedCategory == nil || $0.autoTagCategory == selectedCategory }
+            .filter { selectedDomain   == nil || $0.url.normalizedDomain == selectedDomain }
+    }
+
+    private var availableCategories: [String] {
+        Array(Set(viewModel.items.compactMap(\.autoTagCategory))).sorted()
+    }
+
+    private var availableDomains: [String] {
+        Array(Set(viewModel.items.map { $0.url.normalizedDomain })).sorted()
+    }
+
     private var titleHeaderView: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(selectedFilter.rawValue)
                 .font(.largeTitle.bold())
                 .foregroundStyle(Color.brieflyTextPrimary)
-            if !filteredItems.isEmpty {
-                Text("\(filteredItems.count)")
+            if !displayedItems.isEmpty {
+                Text("\(displayedItems.count)")
                     .font(.largeTitle.bold())
                     .foregroundStyle(Color.brieflyPrimary500)
             }
@@ -60,17 +76,23 @@ struct LibraryView: View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
             titleHeaderView
+            LibraryFilterBar(
+                categories: availableCategories,
+                domains: availableDomains,
+                selectedCategory: $selectedCategory,
+                selectedDomain: $selectedDomain
+            )
             ZStack(alignment: .bottom) {
 
                 // MARK: Content
-                if filteredItems.isEmpty {
+                if displayedItems.isEmpty {
                     emptyView
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 0) {
-                            ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
+                            ForEach(Array(displayedItems.enumerated()), id: \.element.id) { index, item in
                                 if selectedFilter == .inbox {
-                                    NavigationLink(value: InboxNavigation(items: filteredItems, startIndex: index)) {
+                                    NavigationLink(value: InboxNavigation(items: displayedItems, startIndex: index)) {
                                         LibraryCardView(item: item)
                                     }
                                     .buttonStyle(.plain)
@@ -300,6 +322,99 @@ struct LibraryCardView: View {
                     .foregroundStyle(Color.brieflyInk300)
                     .font(.brieflyH3)
             }
+    }
+}
+
+// MARK: - Filter Bar
+
+struct LibraryFilterBar: View {
+    let categories: [String]
+    let domains: [String]
+    @Binding var selectedCategory: String?
+    @Binding var selectedDomain: String?
+
+    private let showCategories: Bool
+    private let showDomains: Bool
+
+    init(categories: [String], domains: [String],
+         selectedCategory: Binding<String?>, selectedDomain: Binding<String?>) {
+        self.categories = categories
+        self.domains = domains
+        self._selectedCategory = selectedCategory
+        self._selectedDomain = selectedDomain
+        self.showCategories = categories.count > 1
+        self.showDomains = domains.count > 1
+    }
+
+    var body: some View {
+        if showCategories || showDomains {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    if showCategories {
+                        ForEach(categories, id: \.self) { cat in
+                            LibraryFilterChip(
+                                label: categoryLabel(cat),
+                                isSelected: selectedCategory == cat
+                            ) {
+                                selectedCategory = selectedCategory == cat ? nil : cat
+                            }
+                        }
+                    }
+                    if showCategories && showDomains {
+                        Rectangle()
+                            .fill(Color.brieflyBorder)
+                            .frame(width: 1, height: 16)
+                            .padding(.horizontal, 2)
+                    }
+                    if showDomains {
+                        ForEach(domains, id: \.self) { domain in
+                            LibraryFilterChip(
+                                label: domain,
+                                isSelected: selectedDomain == domain
+                            ) {
+                                selectedDomain = selectedDomain == domain ? nil : domain
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+            .padding(.bottom, 8)
+        }
+    }
+
+    private func categoryLabel(_ value: String) -> String {
+        switch value {
+        case "Tech":      return "기술"
+        case "Business":  return "비즈니스"
+        case "Essays":    return "에세이"
+        case "Research":  return "연구"
+        case "Lifestyle": return "라이프스타일"
+        case "News":      return "뉴스"
+        case "Culture":   return "문화"
+        case "Other":     return "기타"
+        default:          return value
+        }
+    }
+}
+
+struct LibraryFilterChip: View {
+    let label: String
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(isSelected ? Color.white : Color.brieflyInk500)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(isSelected ? Color.brieflyPrimary500 : Color.brieflyInk100)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .animation(.easeInOut(duration: 0.15), value: isSelected)
     }
 }
 
