@@ -33,8 +33,8 @@ struct LibraryView: View {
     @State private var selectedFilter: LibraryFilter = .inbox
     @State private var path = NavigationPath()
     @State private var pendingDeepLinkURL: URL?
-    @State private var selectedCategory: String? = nil
-    @State private var selectedDomain: String?   = nil
+    @State private var selectedCategories: Set<String> = []
+    @State private var selectedDomains: Set<String>    = []
     @State private var activeDropdown: FilterDropdown? = nil
     @Environment(\.scenePhase) private var scenePhase
 
@@ -50,8 +50,8 @@ struct LibraryView: View {
 
     private var displayedItems: [SavedItem] {
         tabItems
-            .filter { selectedCategory == nil || $0.autoTagCategory == selectedCategory }
-            .filter { selectedDomain   == nil || $0.url.normalizedDomain == selectedDomain }
+            .filter { selectedCategories.isEmpty || ($0.autoTagCategory.map { selectedCategories.contains($0) } ?? false) }
+            .filter { selectedDomains.isEmpty || selectedDomains.contains($0.url.normalizedDomain) }
     }
 
     private var availableCategories: [String] {
@@ -85,6 +85,18 @@ struct LibraryView: View {
         }
     }
 
+    // MARK: - Chip Labels
+
+    private var categoryChipLabel: String {
+        if selectedCategories.isEmpty { return L("카테고리", "Category") }
+        return selectedCategories.sorted().map { categoryLabel($0) }.joined(separator: ", ")
+    }
+
+    private var domainChipLabel: String {
+        if selectedDomains.isEmpty { return L("플랫폼", "Platform") }
+        return selectedDomains.sorted().joined(separator: ", ")
+    }
+
     // MARK: - Subviews
 
     private var titleHeaderView: some View {
@@ -106,8 +118,8 @@ struct LibraryView: View {
     private var filterChipRow: some View {
         HStack(spacing: 8) {
             FilterDropdownChip(
-                label: selectedCategory.map { categoryLabel($0) } ?? L("카테고리", "Category"),
-                isActive: selectedCategory != nil,
+                label: categoryChipLabel,
+                isActive: !selectedCategories.isEmpty,
                 isOpen: activeDropdown == .category
             ) {
                 withAnimation(.easeInOut(duration: 0.15)) {
@@ -116,8 +128,8 @@ struct LibraryView: View {
             }
 
             FilterDropdownChip(
-                label: selectedDomain ?? L("플랫폼", "Platform"),
-                isActive: selectedDomain != nil,
+                label: domainChipLabel,
+                isActive: !selectedDomains.isEmpty,
                 isOpen: activeDropdown == .platform
             ) {
                 withAnimation(.easeInOut(duration: 0.15)) {
@@ -154,26 +166,23 @@ struct LibraryView: View {
     }
 
     private func dropdownCard(for kind: FilterDropdown) -> some View {
-        let (items, selected, makeLabel): ([String], String?, (String) -> String) = {
-            switch kind {
-            case .category: return (availableCategories, selectedCategory, { categoryLabel($0) })
-            case .platform:  return (availableDomains,    selectedDomain,   { $0 })
-            }
-        }()
+        let items: [String] = kind == .category ? availableCategories : availableDomains
+        let selectedSet: Set<String> = kind == .category ? selectedCategories : selectedDomains
+        let makeLabel: (String) -> String = kind == .category ? { categoryLabel($0) } : { $0 }
 
         return VStack(alignment: .leading, spacing: 0) {
             Button {
                 withAnimation(.easeInOut(duration: 0.15)) {
-                    if kind == .category { selectedCategory = nil } else { selectedDomain = nil }
+                    if kind == .category { selectedCategories = [] } else { selectedDomains = [] }
                     activeDropdown = nil
                 }
             } label: {
                 HStack {
                     Text(L("전체", "All"))
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(selected == nil ? Color.brieflyPrimary500 : Color.brieflyTextPrimary)
+                        .foregroundStyle(selectedSet.isEmpty ? Color.brieflyPrimary500 : Color.brieflyTextPrimary)
                     Spacer()
-                    if selected == nil {
+                    if selectedSet.isEmpty {
                         Image(systemName: "checkmark")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(Color.brieflyPrimary500)
@@ -189,19 +198,20 @@ struct LibraryView: View {
                 Button {
                     withAnimation(.easeInOut(duration: 0.15)) {
                         if kind == .category {
-                            selectedCategory = selectedCategory == item ? nil : item
+                            if selectedCategories.contains(item) { selectedCategories.remove(item) }
+                            else { selectedCategories.insert(item) }
                         } else {
-                            selectedDomain = selectedDomain == item ? nil : item
+                            if selectedDomains.contains(item) { selectedDomains.remove(item) }
+                            else { selectedDomains.insert(item) }
                         }
-                        activeDropdown = nil
                     }
                 } label: {
                     HStack {
                         Text(makeLabel(item))
                             .font(.system(size: 14))
-                            .foregroundStyle(selected == item ? Color.brieflyPrimary500 : Color.brieflyTextPrimary)
+                            .foregroundStyle(selectedSet.contains(item) ? Color.brieflyPrimary500 : Color.brieflyTextPrimary)
                         Spacer()
-                        if selected == item {
+                        if selectedSet.contains(item) {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(Color.brieflyPrimary500)
