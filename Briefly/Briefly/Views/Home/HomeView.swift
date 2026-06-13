@@ -13,8 +13,15 @@ struct HomeView: View {
                 contentView
             }
         }
-        .navigationTitle("Briefly")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Image("logo_full")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 28)
+            }
+        }
         .navigationDestination(isPresented: Binding(
             get: { selectedSavedItem != nil },
             set: { if !$0 { selectedSavedItem = nil } }
