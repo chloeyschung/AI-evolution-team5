@@ -38,8 +38,8 @@ struct HomeView: View {
                         switch item {
                         case .local(let savedItem):
                             selectedSavedItem = savedItem
-                        case .server:
-                            UIApplication.shared.open(item.url)
+                        case .server(let content):
+                            selectedSavedItem = SavedItem(serverContent: content)
                         }
                     }
                 }
@@ -69,5 +69,27 @@ struct HomeView: View {
 #Preview {
     NavigationStack {
         HomeView(viewModel: HomeViewModel())
+    }
+}
+
+private extension SavedItem {
+    init(serverContent: ServerContent) {
+        self.id = UUID()
+        self.url = serverContent.url
+        self.title = serverContent.title
+        self.savedAt = serverContent.createdAt
+        self.status = .unread
+        self.serverContentId = serverContent.id
+        self.ogTitle = serverContent.title
+        self.ogImageURL = serverContent.thumbnailURL
+        self.ogDescription = nil
+        self.siteName = nil
+        self.articleText = nil
+        self.fetchStatus = .done
+        self.summary = serverContent.summary
+        self.summaryStatus = serverContent.summary != nil ? .done : .unknown
+        self.autoTagCategory = serverContent.autoTagCategory
+        self.autoTagKeywordsEn = serverContent.autoTagKeywordsEn
+        self.autoTagKeywordsOriginal = serverContent.autoTagKeywordsOriginal
     }
 }
