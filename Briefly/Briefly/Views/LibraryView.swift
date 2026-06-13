@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - Filter
+// MARK: - Enums
 
 enum LibraryFilter: String, CaseIterable {
     case inbox    = "Inbox"
@@ -8,7 +8,10 @@ enum LibraryFilter: String, CaseIterable {
     case deleted  = "Discarded"
 }
 
-// Inbox 카드 리더 진입 시 전체 목록과 시작 인덱스를 함께 전달
+private enum FilterDropdown: Equatable {
+    case category, platform
+}
+
 struct InboxNavigation: Hashable {
     let items: [SavedItem]
     let startIndex: Int
@@ -32,7 +35,10 @@ struct LibraryView: View {
     @State private var pendingDeepLinkURL: URL?
     @State private var selectedCategory: String? = nil
     @State private var selectedDomain: String?   = nil
+    @State private var activeDropdown: FilterDropdown? = nil
     @Environment(\.scenePhase) private var scenePhase
+
+    // MARK: - Data
 
     private var tabItems: [SavedItem] {
         switch selectedFilter {
@@ -56,6 +62,31 @@ struct LibraryView: View {
         Array(Set(viewModel.items.map { $0.url.normalizedDomain })).sorted()
     }
 
+    // MARK: - Localization
+
+    private var isKorean: Bool {
+        Locale.current.language.languageCode?.identifier == "ko"
+    }
+
+    private func L(_ ko: String, _ en: String) -> String { isKorean ? ko : en }
+
+    private func categoryLabel(_ value: String) -> String {
+        guard isKorean else { return value }
+        switch value {
+        case "Tech":      return "기술"
+        case "Business":  return "비즈니스"
+        case "Essays":    return "에세이"
+        case "Research":  return "연구"
+        case "Lifestyle": return "라이프스타일"
+        case "News":      return "뉴스"
+        case "Culture":   return "문화"
+        case "Other":     return "기타"
+        default:          return value
+        }
+    }
+
+    // MARK: - Subviews
+
     private var titleHeaderView: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(selectedFilter.rawValue)
@@ -72,73 +103,189 @@ struct LibraryView: View {
         .padding(.vertical, 8)
     }
 
+    private var filterChipRow: some View {
+        HStack(spacing: 8) {
+            FilterDropdownChip(
+                label: selectedCategory.map { categoryLabel($0) } ?? L("카테고리", "Category"),
+                isActive: selectedCategory != nil,
+                isOpen: activeDropdown == .category
+            ) {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    activeDropdown = activeDropdown == .category ? nil : .category
+                }
+            }
+
+            FilterDropdownChip(
+                label: selectedDomain ?? L("플랫폼", "Platform"),
+                isActive: selectedDomain != nil,
+                isOpen: activeDropdown == .platform
+            ) {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    activeDropdown = activeDropdown == .platform ? nil : .platform
+                }
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
+    }
+
+    @ViewBuilder
+    private var dropdownContent: some View {
+        if let active = activeDropdown {
+            ZStack(alignment: .topLeading) {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            activeDropdown = nil
+                        }
+                    }
+
+                dropdownCard(for: active)
+                    .frame(maxWidth: 220, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .topLeading)))
+            }
+        }
+    }
+
+    private func dropdownCard(for kind: FilterDropdown) -> some View {
+        let (items, selected, makeLabel): ([String], String?, (String) -> String) = {
+            switch kind {
+            case .category: return (availableCategories, selectedCategory, { categoryLabel($0) })
+            case .platform:  return (availableDomains,    selectedDomain,   { $0 })
+            }
+        }()
+
+        return VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    if kind == .category { selectedCategory = nil } else { selectedDomain = nil }
+                    activeDropdown = nil
+                }
+            } label: {
+                HStack {
+                    Text(L("전체", "All"))
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(selected == nil ? Color.brieflyPrimary500 : Color.brieflyTextPrimary)
+                    Spacer()
+                    if selected == nil {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.brieflyPrimary500)
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+            }
+            .buttonStyle(.plain)
+
+            ForEach(items, id: \.self) { item in
+                Divider().padding(.horizontal, 8)
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        if kind == .category {
+                            selectedCategory = selectedCategory == item ? nil : item
+                        } else {
+                            selectedDomain = selectedDomain == item ? nil : item
+                        }
+                        activeDropdown = nil
+                    }
+                } label: {
+                    HStack {
+                        Text(makeLabel(item))
+                            .font(.system(size: 14))
+                            .foregroundStyle(selected == item ? Color.brieflyPrimary500 : Color.brieflyTextPrimary)
+                        Spacer()
+                        if selected == item {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Color.brieflyPrimary500)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 11)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .background(Color.brieflyBgSurface)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 4)
+    }
+
+    // MARK: - Body
+
     var body: some View {
         NavigationStack(path: $path) {
             VStack(spacing: 0) {
-            titleHeaderView
-            LibraryFilterBar(
-                categories: availableCategories,
-                domains: availableDomains,
-                selectedCategory: $selectedCategory,
-                selectedDomain: $selectedDomain
-            )
-            ZStack(alignment: .bottom) {
+                titleHeaderView
+                filterChipRow
+                ZStack(alignment: .bottom) {
 
-                // MARK: Content
-                if displayedItems.isEmpty {
-                    emptyView
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            ForEach(Array(displayedItems.enumerated()), id: \.element.id) { index, item in
-                                if selectedFilter == .inbox {
-                                    NavigationLink(value: InboxNavigation(items: displayedItems, startIndex: index)) {
-                                        LibraryCardView(item: item)
+                    // MARK: Content
+                    if displayedItems.isEmpty {
+                        emptyView
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 0) {
+                                ForEach(Array(displayedItems.enumerated()), id: \.element.id) { index, item in
+                                    if selectedFilter == .inbox {
+                                        NavigationLink(value: InboxNavigation(items: displayedItems, startIndex: index)) {
+                                            LibraryCardView(item: item)
+                                        }
+                                        .buttonStyle(.plain)
+                                    } else {
+                                        NavigationLink(value: item) {
+                                            LibraryCardView(item: item)
+                                        }
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(.plain)
-                                } else {
-                                    NavigationLink(value: item) {
-                                        LibraryCardView(item: item)
-                                    }
-                                    .buttonStyle(.plain)
+
+                                    Divider()
+                                        .overlay(Color.brieflyBorder)
+                                        .padding(.leading, 16)
                                 }
-
-                                Divider()
-                                    .overlay(Color.brieflyBorder)
-                                    .padding(.leading, 16)
                             }
-                        }
-                        .padding(.bottom, 80)
-                    }
-                }
-
-                // MARK: Floating Filter Tab
-                HStack(spacing: 2) {
-                    ForEach(LibraryFilter.allCases, id: \.self) { filter in
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                selectedFilter = filter
-                            }
-                        } label: {
-                            Text(filter.rawValue)
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(selectedFilter == filter ? Color.brieflyTextPrimary : Color.brieflyInk400)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 9)
-                                .background(
-                                    selectedFilter == filter
-                                        ? Color.brieflyBgSurface
-                                        : Color.clear
-                                )
-                                .clipShape(Capsule())
+                            .padding(.bottom, 80)
                         }
                     }
+
+                    // MARK: Floating Filter Tab
+                    HStack(spacing: 2) {
+                        ForEach(LibraryFilter.allCases, id: \.self) { filter in
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    selectedFilter = filter
+                                    activeDropdown = nil
+                                }
+                            } label: {
+                                Text(filter.rawValue)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(selectedFilter == filter ? Color.brieflyTextPrimary : Color.brieflyInk400)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 9)
+                                    .background(
+                                        selectedFilter == filter
+                                            ? Color.brieflyBgSurface
+                                            : Color.clear
+                                    )
+                                    .clipShape(Capsule())
+                            }
+                        }
+                    }
+                    .padding(4)
+                    .background(Color.brieflyBgApp.opacity(0.92), in: Capsule())
+                    .brieflyShadow3()
+                    .padding(.bottom, 20)
                 }
-                .padding(4)
-                .background(Color.brieflyBgApp.opacity(0.92), in: Capsule())
-                .brieflyShadow3()
-                .padding(.bottom, 20)
-            }
+                .overlay(alignment: .topLeading) {
+                    dropdownContent
+                }
             } // VStack
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: InboxNavigation.self) { nav in
@@ -214,6 +361,41 @@ struct LibraryView: View {
     }
 }
 
+// MARK: - FilterDropdownChip
+
+struct FilterDropdownChip: View {
+    let label: String
+    let isActive: Bool
+    let isOpen: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 4) {
+                Text(label)
+                    .font(.system(size: 13, weight: .medium))
+                    .lineLimit(1)
+                Image(systemName: isOpen ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+            }
+            .foregroundStyle(isActive || isOpen ? Color.white : Color.brieflyTextPrimary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(isActive || isOpen ? Color.brieflyPrimary500 : Color.brieflyBgSurface)
+            .clipShape(Capsule())
+            .overlay(
+                Capsule().stroke(
+                    isActive || isOpen ? Color.clear : Color.brieflyBorder,
+                    lineWidth: 1
+                )
+            )
+        }
+        .buttonStyle(.plain)
+        .animation(.easeInOut(duration: 0.15), value: isActive)
+        .animation(.easeInOut(duration: 0.15), value: isOpen)
+    }
+}
+
 // MARK: - Card
 
 struct LibraryCardView: View {
@@ -267,7 +449,6 @@ struct LibraryCardView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                // 썸네일 — OG Image (없으면 placeholder)
                 Group {
                     if let imageURL = item.ogImageURL {
                         AsyncImage(url: imageURL) { phase in
@@ -322,99 +503,6 @@ struct LibraryCardView: View {
                     .foregroundStyle(Color.brieflyInk300)
                     .font(.brieflyH3)
             }
-    }
-}
-
-// MARK: - Filter Bar
-
-struct LibraryFilterBar: View {
-    let categories: [String]
-    let domains: [String]
-    @Binding var selectedCategory: String?
-    @Binding var selectedDomain: String?
-
-    private let showCategories: Bool
-    private let showDomains: Bool
-
-    init(categories: [String], domains: [String],
-         selectedCategory: Binding<String?>, selectedDomain: Binding<String?>) {
-        self.categories = categories
-        self.domains = domains
-        self._selectedCategory = selectedCategory
-        self._selectedDomain = selectedDomain
-        self.showCategories = categories.count > 1
-        self.showDomains = domains.count > 1
-    }
-
-    var body: some View {
-        if showCategories || showDomains {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    if showCategories {
-                        ForEach(categories, id: \.self) { cat in
-                            LibraryFilterChip(
-                                label: categoryLabel(cat),
-                                isSelected: selectedCategory == cat
-                            ) {
-                                selectedCategory = selectedCategory == cat ? nil : cat
-                            }
-                        }
-                    }
-                    if showCategories && showDomains {
-                        Rectangle()
-                            .fill(Color.brieflyBorder)
-                            .frame(width: 1, height: 16)
-                            .padding(.horizontal, 2)
-                    }
-                    if showDomains {
-                        ForEach(domains, id: \.self) { domain in
-                            LibraryFilterChip(
-                                label: domain,
-                                isSelected: selectedDomain == domain
-                            ) {
-                                selectedDomain = selectedDomain == domain ? nil : domain
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal, 16)
-            }
-            .padding(.bottom, 8)
-        }
-    }
-
-    private func categoryLabel(_ value: String) -> String {
-        switch value {
-        case "Tech":      return "기술"
-        case "Business":  return "비즈니스"
-        case "Essays":    return "에세이"
-        case "Research":  return "연구"
-        case "Lifestyle": return "라이프스타일"
-        case "News":      return "뉴스"
-        case "Culture":   return "문화"
-        case "Other":     return "기타"
-        default:          return value
-        }
-    }
-}
-
-struct LibraryFilterChip: View {
-    let label: String
-    let isSelected: Bool
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            Text(label)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(isSelected ? Color.white : Color.brieflyInk500)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(isSelected ? Color.brieflyPrimary500 : Color.brieflyInk100)
-                .clipShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .animation(.easeInOut(duration: 0.15), value: isSelected)
     }
 }
 
