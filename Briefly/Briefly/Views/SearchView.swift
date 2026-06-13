@@ -29,6 +29,10 @@ struct SearchView: View {
         Array(Set(allItems.map { $0.url.normalizedDomain })).sorted()
     }
 
+    private var recentItems: [SavedItem] {
+        RecentlyViewedStore.shared.recentItems(from: allItems)
+    }
+
     private var results: [SavedItem] {
         guard hasActiveSearch else { return [] }
         var items = allItems
@@ -217,7 +221,7 @@ struct SearchView: View {
             filterChipRow
             Group {
                 if !hasActiveSearch {
-                    emptyPrompt
+                    if recentItems.isEmpty { emptyPrompt } else { recentlyViewedSection }
                 } else if results.isEmpty {
                     noResults
                 } else {
@@ -236,6 +240,31 @@ struct SearchView: View {
         .navigationDestination(for: SavedItem.self) { item in
             ItemDetailView(items: [item], startIndex: 0, showActions: true)
         }
+    }
+
+    // MARK: - Recently Viewed
+
+    private var recentlyViewedSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("최근에 본 항목")
+                .font(.brieflyH3)
+                .foregroundStyle(Color.brieflyTextPrimary)
+                .padding(.horizontal, 16)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(recentItems) { item in
+                        NavigationLink(value: item) {
+                            RecentlyViewedCard(item: item)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+        .padding(.top, 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     // MARK: - States
@@ -286,6 +315,69 @@ struct SearchView: View {
         }
         .listStyle(.plain)
         .background(Color.brieflyBgApp)
+    }
+}
+
+// MARK: - RecentlyViewedCard
+
+private struct RecentlyViewedCard: View {
+    let item: SavedItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ZStack {
+                Color.brieflyInk100
+                if let url = item.ogImageURL {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let img): img.resizable().scaledToFill()
+                        default: domainInitial
+                        }
+                    }
+                } else {
+                    domainInitial
+                }
+            }
+            .frame(height: 100)
+            .clipped()
+
+            VStack(alignment: .leading, spacing: BrieflySpacing.s1) {
+                Text(item.displayTitle)
+                    .font(.brieflyBodySm)
+                    .foregroundStyle(Color.brieflyTextPrimary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text("\(item.url.normalizedDomain) · \(item.savedAt.recentRelative)")
+                    .font(.brieflyCaption)
+                    .foregroundStyle(Color.brieflyInk400)
+                    .lineLimit(1)
+            }
+            .padding(BrieflySpacing.s2)
+        }
+        .frame(width: 160)
+        .background(Color.brieflyBgSurface)
+        .clipShape(RoundedRectangle(cornerRadius: BrieflyRadius.md))
+        .overlay(
+            RoundedRectangle(cornerRadius: BrieflyRadius.md)
+                .stroke(Color.brieflyBorder, lineWidth: 1)
+        )
+        .brieflyShadow1()
+    }
+
+    private var domainInitial: some View {
+        Text(String(item.url.normalizedDomain.prefix(1)).uppercased())
+            .font(.system(size: 28, weight: .semibold))
+            .foregroundStyle(Color.brieflyInk300)
+    }
+}
+
+private extension Date {
+    var recentRelative: String {
+        let f = RelativeDateTimeFormatter()
+        f.locale = Locale.current
+        f.unitsStyle = .abbreviated
+        return f.localizedString(for: self, relativeTo: Date())
     }
 }
 
