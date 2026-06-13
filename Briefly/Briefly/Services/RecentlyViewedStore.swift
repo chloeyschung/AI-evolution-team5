@@ -6,6 +6,7 @@ final class RecentlyViewedStore {
     private let maxCount = 20
 
     func record(_ id: UUID) {
+        guard StorageService.shared.loadAll().contains(where: { $0.id == id }) else { return }
         var ids = loadIDs()
         ids.removeAll { $0 == id.uuidString }
         ids.insert(id.uuidString, at: 0)

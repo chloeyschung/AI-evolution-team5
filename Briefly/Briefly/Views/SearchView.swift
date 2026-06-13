@@ -1,9 +1,5 @@
 import SwiftUI
 
-private enum FilterDropdown: Equatable {
-    case category, platform
-}
-
 struct SearchView: View {
     @State private var query = ""
     @State private var selectedCategories: Set<String> = []
@@ -70,173 +66,28 @@ struct SearchView: View {
         return items.sorted { $0.savedAt > $1.savedAt }
     }
 
-    // MARK: - Localization
-
-    private var isKorean: Bool {
-        Locale.current.language.languageCode?.identifier == "ko"
-    }
-
-    private func L(_ ko: String, _ en: String) -> String { isKorean ? ko : en }
-
-    private func categoryLabel(_ value: String) -> String {
-        guard isKorean else { return value }
-        switch value {
-        case "Tech":      return "기술"
-        case "Business":  return "비즈니스"
-        case "Essays":    return "에세이"
-        case "Research":  return "연구"
-        case "Lifestyle": return "라이프스타일"
-        case "News":      return "뉴스"
-        case "Culture":   return "문화"
-        case "Other":     return "기타"
-        default:          return value
-        }
-    }
-
-    // MARK: - Chip Labels
-
-    private var categoryChipLabel: String {
-        if selectedCategories.isEmpty { return L("카테고리", "Category") }
-        return selectedCategories.sorted().map { categoryLabel($0) }.joined(separator: ", ")
-    }
-
-    private var domainChipLabel: String {
-        if selectedDomains.isEmpty { return L("플랫폼", "Platform") }
-        return selectedDomains.sorted().joined(separator: ", ")
-    }
-
-    // MARK: - Filter UI
-
-    private var filterChipRow: some View {
-        HStack(spacing: 8) {
-            FilterDropdownChip(
-                label: categoryChipLabel,
-                isActive: !selectedCategories.isEmpty,
-                isOpen: activeDropdown == .category
-            ) {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    activeDropdown = activeDropdown == .category ? nil : .category
-                }
-            }
-
-            FilterDropdownChip(
-                label: domainChipLabel,
-                isActive: !selectedDomains.isEmpty,
-                isOpen: activeDropdown == .platform
-            ) {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    activeDropdown = activeDropdown == .platform ? nil : .platform
-                }
-            }
-
-            Spacer()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-    }
-
-    @ViewBuilder
-    private var dropdownContent: some View {
-        if let active = activeDropdown {
-            ZStack(alignment: .topLeading) {
-                Color.clear
-                    .contentShape(Rectangle())
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .onTapGesture {
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            activeDropdown = nil
-                        }
-                    }
-
-                dropdownCard(for: active)
-                    .frame(maxWidth: 220, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 4)
-                    .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .topLeading)))
-            }
-        }
-    }
-
-    private func dropdownCard(for kind: FilterDropdown) -> some View {
-        let items: [String] = kind == .category ? availableCategories : availableDomains
-        let selectedSet: Set<String> = kind == .category ? selectedCategories : selectedDomains
-        let makeLabel: (String) -> String = kind == .category ? { categoryLabel($0) } : { $0 }
-
-        return VStack(alignment: .leading, spacing: 0) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    if kind == .category { selectedCategories = [] } else { selectedDomains = [] }
-                    activeDropdown = nil
-                }
-            } label: {
-                HStack {
-                    Text(L("전체", "All"))
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(selectedSet.isEmpty ? Color.brieflyPrimary500 : Color.brieflyTextPrimary)
-                    Spacer()
-                    if selectedSet.isEmpty {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Color.brieflyPrimary500)
-                    }
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 11)
-            }
-            .buttonStyle(.plain)
-
-            ForEach(items, id: \.self) { item in
-                Divider().padding(.horizontal, 8)
-                Button {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        if kind == .category {
-                            if selectedCategories.contains(item) { selectedCategories.remove(item) }
-                            else { selectedCategories.insert(item) }
-                        } else {
-                            if selectedDomains.contains(item) { selectedDomains.remove(item) }
-                            else { selectedDomains.insert(item) }
-                        }
-                    }
-                } label: {
-                    HStack {
-                        Text(makeLabel(item))
-                            .font(.system(size: 14))
-                            .foregroundStyle(selectedSet.contains(item) ? Color.brieflyPrimary500 : Color.brieflyTextPrimary)
-                        Spacer()
-                        if selectedSet.contains(item) {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(Color.brieflyPrimary500)
-                        }
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 11)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .background(Color.brieflyBgSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 4)
-    }
-
     // MARK: - Body
 
     var body: some View {
         VStack(spacing: 0) {
-            filterChipRow
-            Group {
-                if !hasActiveSearch {
-                    if recentItemsCache.isEmpty { emptyPrompt } else { recentlyViewedSection }
-                } else if results.isEmpty {
-                    noResults
-                } else {
-                    resultList
+            CategoryPlatformFilterBar(
+                availableCategories: availableCategories,
+                availableDomains: availableDomains,
+                selectedCategories: $selectedCategories,
+                selectedDomains: $selectedDomains,
+                activeDropdown: $activeDropdown,
+                topPadding: 8
+            ) {
+                Group {
+                    if !hasActiveSearch {
+                        if recentItemsCache.isEmpty { emptyPrompt } else { recentlyViewedSection }
+                    } else if results.isEmpty {
+                        noResults
+                    } else {
+                        resultList
+                    }
                 }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .overlay(alignment: .topLeading) {
-                dropdownContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .background(Color.brieflyBgApp.ignoresSafeArea())
