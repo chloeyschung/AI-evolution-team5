@@ -45,9 +45,9 @@ struct LibraryView: View {
         case .inbox:
             return filteredItems.isEmpty ? "Inbox" : "Inbox \(filteredItems.count)"
         case .archived:
-            return "Saved"
+            return filteredItems.isEmpty ? "Saved" : "Saved \(filteredItems.count)"
         case .deleted:
-            return "Discarded"
+            return filteredItems.isEmpty ? "Discarded" : "Discarded \(filteredItems.count)"
         }
     }
 
@@ -92,7 +92,7 @@ struct LibraryView: View {
                             }
                         } label: {
                             Text(filter.rawValue)
-                                .font(.subheadline.weight(.semibold))
+                                .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(selectedFilter == filter ? Color.brieflyTextPrimary : Color.brieflyInk400)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 9)
