@@ -376,7 +376,6 @@
 				A1B2C3D4E5F600002222CCCC /* ServerContent.swift in Sources */,
 				FB5126CC4C836132192D774D /* ShareViewController.swift in Sources */,
 				914DF7A63D9ECA0A9C711C89 /* StorageService.swift in Sources */,
-				1D03D97A548B4B0382707D5F /* RecentlyViewedStore.swift in Sources */,
 				A1B2C3D4E5F600003333CCCC /* TopicCluster.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -418,6 +417,7 @@
 				A1B2C3D4E5F600002222BBBB /* ServerContent.swift in Sources */,
 				11846E5C9AD790FC47AA0AED /* SplashView.swift in Sources */,
 				965F9DB85DF04980B9EFC48B /* StorageService.swift in Sources */,
+				1D03D97A548B4B0382707D5F /* RecentlyViewedStore.swift in Sources */,
 				FD8B9E2F680381F4EE06DA01 /* SyncService.swift in Sources */,
 				A1B2C3D4E5F600003333BBBB /* TopicCluster.swift in Sources */,
 				960BE20A93F5BBEC5ACFE33A /* WebContentService.swift in Sources */,
