@@ -9,6 +9,12 @@ struct SearchView: View {
     @State private var selectedCategories: Set<String> = []
     @State private var selectedDomains: Set<String>    = []
     @State private var activeDropdown: FilterDropdown? = nil
+    @State private var recentItemsCache: [SavedItem]   = []
+
+    init() {
+        let all = StorageService.shared.loadAll().filter { $0.status != .deleted }
+        _recentItemsCache = State(initialValue: RecentlyViewedStore.shared.recentItems(from: all))
+    }
 
     private var trimmed: String { query.trimmingCharacters(in: .whitespaces) }
     private var hasActiveSearch: Bool {
@@ -29,8 +35,8 @@ struct SearchView: View {
         Array(Set(allItems.map { $0.url.normalizedDomain })).sorted()
     }
 
-    private var recentItems: [SavedItem] {
-        RecentlyViewedStore.shared.recentItems(from: allItems)
+    private func refreshRecentItems() {
+        recentItemsCache = RecentlyViewedStore.shared.recentItems(from: allItems)
     }
 
     private var results: [SavedItem] {
@@ -221,7 +227,7 @@ struct SearchView: View {
             filterChipRow
             Group {
                 if !hasActiveSearch {
-                    if recentItems.isEmpty { emptyPrompt } else { recentlyViewedSection }
+                    if recentItemsCache.isEmpty { emptyPrompt } else { recentlyViewedSection }
                 } else if results.isEmpty {
                     noResults
                 } else {
@@ -234,6 +240,7 @@ struct SearchView: View {
             }
         }
         .background(Color.brieflyBgApp.ignoresSafeArea())
+        .onAppear { refreshRecentItems() }
         .navigationTitle("Search")
         .navigationBarTitleDisplayMode(.large)
         .searchable(text: $query, prompt: "제목, 키워드, 본문 검색...")
@@ -253,7 +260,7 @@ struct SearchView: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    ForEach(recentItems) { item in
+                    ForEach(recentItemsCache) { item in
                         NavigationLink(value: item) {
                             RecentlyViewedCard(item: item)
                         }
