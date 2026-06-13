@@ -14,14 +14,6 @@ struct HomeView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Image("logo_full")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: 28)
-            }
-        }
         .navigationDestination(isPresented: Binding(
             get: { selectedSavedItem != nil },
             set: { if !$0 { selectedSavedItem = nil } }
@@ -35,6 +27,12 @@ struct HomeView: View {
     private var contentView: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: BrieflySpacing.s8) {
+                Image("logo_full")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 36)
+                    .padding(.horizontal, BrieflySpacing.s4)
+                    .padding(.top, BrieflySpacing.s2)
                 ForEach(viewModel.sections) { section in
                     HomeSectionView(section: section) { item in
                         switch item {
