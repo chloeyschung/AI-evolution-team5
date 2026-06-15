@@ -73,7 +73,6 @@ function IconSettings() {
 }
 
 const navItems = [
-  { label: 'Home',      to: '/home',      icon: <IconHome />      },
   { label: 'Dashboard', to: '/dashboard', icon: <IconDashboard /> },
   { label: 'Library',   to: '/inbox',     icon: <IconInbox />     },
   { label: 'Archive',   to: '/archive',   icon: <IconArchive />   },

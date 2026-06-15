@@ -18,7 +18,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-const Home = lazyLoad(() => import('../pages/Home'));
 const Dashboard = lazyLoad(() => import('../pages/Dashboard'));
 const Inbox = lazyLoad(() => import('../pages/Inbox'));
 const Archive = lazyLoad(() => import('../pages/Archive'));
@@ -77,15 +76,7 @@ const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <Navigate to="/home" replace />,
-      },
-      {
-        path: 'home',
-        element: (
-          <ProtectedRoute>
-            <Home />
-          </ProtectedRoute>
-        ),
+        element: <Navigate to="/dashboard" replace />,
       },
       {
         path: 'dashboard',
