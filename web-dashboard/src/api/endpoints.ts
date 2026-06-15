@@ -9,6 +9,8 @@ import type {
   ContentFilters,
   ContentSort,
   SwipeAction,
+  TopicCluster,
+  TopicClustersResponse,
 } from '../types';
 
 // Auth
@@ -257,4 +259,11 @@ export async function getReflectionQuestions(id: number, signal?: AbortSignal): 
     { signal, timeout: 60000 },
   );
   return response.data.questions ?? [];
+}
+
+// Topics (IOS-008)
+export async function getTopicClusters(): Promise<TopicCluster[]> {
+  const client = getApiClient();
+  const response = await client.get<TopicClustersResponse>('/api/v1/topics');
+  return response.data.clusters ?? [];
 }

@@ -2,6 +2,14 @@ import { NavLink } from 'react-router-dom';
 import styles from './NavRail.module.css';
 import { LogoShort } from '../Logo';
 
+function IconHome() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M1.5 7L8 1.5 14.5 7V14a.5.5 0 0 1-.5.5H10V10H6v4.5H2a.5.5 0 0 1-.5-.5V7Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function IconDashboard() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -65,6 +73,7 @@ function IconSettings() {
 }
 
 const navItems = [
+  { label: 'Home',      to: '/home',      icon: <IconHome />      },
   { label: 'Dashboard', to: '/dashboard', icon: <IconDashboard /> },
   { label: 'Library',   to: '/inbox',     icon: <IconInbox />     },
   { label: 'Archive',   to: '/archive',   icon: <IconArchive />   },
