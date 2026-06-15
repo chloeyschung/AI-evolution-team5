@@ -31,22 +31,15 @@ function normalizeDomain(url: string): string {
 export default function ContentCarouselCard({ content }: Props) {
   const [thumbError, setThumbError] = useState(false);
 
-  const openSource = () => {
-    window.open(content.url, '_blank', 'noopener,noreferrer');
-  };
-
   const domain = normalizeDomain(content.url);
   const ago = timeAgo(content.created_at);
 
   return (
-    <article
+    <a
+      href={content.url}
+      target="_blank"
+      rel="noopener noreferrer"
       className={styles.card}
-      onClick={openSource}
-      role="link"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') openSource();
-      }}
       aria-label={content.title || domain}
       data-testid={`carousel-card-${content.id}`}
     >
@@ -73,6 +66,6 @@ export default function ContentCarouselCard({ content }: Props) {
           {domain} · {ago}
         </p>
       </div>
-    </article>
+    </a>
   );
 }

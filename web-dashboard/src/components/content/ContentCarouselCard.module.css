@@ -1,6 +1,9 @@
 .card {
+  display: block;
   flex-shrink: 0;
   width: 172px;
+  text-decoration: none;
+  color: inherit;
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
   background: var(--color-surface);
