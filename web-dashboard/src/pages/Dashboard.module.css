@@ -1,7 +1,10 @@
 .page {
   display: grid;
-  gap: 14px;
+  gap: 24px;
+  padding-bottom: 64px;
 }
+
+/* ── Hero ─────────────────────────────────────────────────────────────────── */
 
 .heroPlane {
   position: relative;
@@ -43,14 +46,14 @@
   color: var(--color-ink-secondary);
 }
 
-.workLane {
-  position: relative;
-  border: 1px solid var(--color-border-muted);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--color-surface) 96%, var(--color-canvas) 4%);
-  padding: 16px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+.message {
+  text-align: center;
+  padding: 48px 0;
+  font-size: 0.9rem;
+  color: var(--color-ink-muted);
 }
+
+/* ── Action strip (undo / redo toast) ─────────────────────────────────────── */
 
 .actionStrip {
   position: fixed;
@@ -96,18 +99,128 @@
 }
 
 @keyframes stripIn {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
+  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
-.grid {
-  display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+/* ── Sections ─────────────────────────────────────────────────────────────── */
+
+.sections {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+.clusterHint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--color-ink-muted);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border-muted);
+  border-radius: 999px;
+  padding: 4px 12px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sectionHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.sectionTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sectionIcon {
+  font-size: 1.05rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.sectionTitle {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--color-ink-primary);
+  margin: 0;
+}
+
+.sectionCount {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-ink-muted);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border-muted);
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+
+.keywordChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding-left: 29px;
+}
+
+.chip {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-signal) 10%, var(--color-surface));
+  color: var(--color-signal);
+  border: 1px solid color-mix(in srgb, var(--color-signal) 22%, var(--color-border));
+  white-space: nowrap;
+}
+
+/* ── Carousel ─────────────────────────────────────────────────────────────── */
+
+.carouselItem {
+  flex-shrink: 0;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Make ContentCard fill its slot so all cards in a row share the same height */
+.carouselItem > * {
+  flex: 1;
+  min-height: 0;
+}
+
+.carousel {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+.carousel::-webkit-scrollbar {
+  height: 3px;
+}
+
+.carousel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.carousel::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 2px;
 }
