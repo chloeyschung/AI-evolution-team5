@@ -43,6 +43,16 @@ class Settings:
         raise RuntimeError("GOOGLE_CLIENT_SECRET environment variable is required for OAuth code exchange")
     GOOGLE_CLIENT_SECRET: str = _google_client_secret
 
+    # Web OAuth client credentials — separate from the native/iOS client.
+    # Native (iOS/Android) clients are public: no secret, verified via id_token
+    # audience against GOOGLE_CLIENT_ID. The web dashboard is a confidential
+    # client doing server-side authorization-code exchange, which Google issues
+    # under a DIFFERENT client_id + client_secret. Using the iOS client_id to
+    # exchange a web-issued code yields `invalid_client`.
+    # Falls back to GOOGLE_CLIENT_ID/SECRET when unset (backward compatible).
+    GOOGLE_WEB_CLIENT_ID: str = os.getenv("GOOGLE_WEB_CLIENT_ID") or _google_client_id
+    GOOGLE_WEB_CLIENT_SECRET: str = os.getenv("GOOGLE_WEB_CLIENT_SECRET") or _google_client_secret
+
     _google_redirect_uri: str | None = os.getenv("GOOGLE_REDIRECT_URI")
     if _google_redirect_uri is None:
         raise RuntimeError("GOOGLE_REDIRECT_URI environment variable is required for OAuth code exchange")
