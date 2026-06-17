@@ -72,7 +72,7 @@ final class HomeViewModel: ObservableObject {
                 return
             }
             async let serverTask  = BrieflyAPI.shared.fetchServerContent(token: token)
-            async let clusterTask = BrieflyAPI.shared.fetchTopicClusters(token: token)
+            async let clusterTask = BrieflyAPI.shared.refreshTopicClusters(token: token)
             let serverItems = (try? await serverTask)  ?? []
             let clusters    = (try? await clusterTask) ?? []
 
@@ -144,11 +144,10 @@ final class HomeViewModel: ObservableObject {
         var utility = dateSections() + sourceSections() + topicPlaceholders
 
         if randomSeed {
-            // 데모 Refresh: 주제 섹션 포함 전체를 완전 랜덤 셔플
-            var all = topicFixed + utility
-            all.shuffle()
+            // 데모 Refresh: 주제 섹션 상단 고정 유지 + 날짜·출처 완전 랜덤 셔플
+            utility.shuffle()
             withAnimation(.easeInOut(duration: 0.4)) {
-                sections = all
+                sections = topicFixed + utility
             }
         } else {
             // 앱 진입: 주제 섹션 상단 고정 + 나머지 DailySeededRNG 셔플
