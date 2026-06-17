@@ -33,7 +33,10 @@ struct HomeView: View {
                         .scaledToFit()
                         .frame(height: 36)
                     Spacer()
-                    Button(action: { viewModel.demoRefresh() }) {
+                    Button(action: {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        viewModel.demoRefresh()
+                    }) {
                         if viewModel.isRefreshing {
                             ProgressView().scaleEffect(0.8)
                         } else {

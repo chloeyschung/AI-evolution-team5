@@ -131,7 +131,6 @@ final class HomeViewModel: ObservableObject {
     private func rebuildSections(clusters: [TopicCluster]?, randomSeed: Bool = false) {
         let allTopic = topicSections(clusters: clusters)
 
-        // 실제 콘텐츠가 있는 주제 섹션만 상단 고정 (플레이스홀더는 하단 셔플로)
         let topicFixed = allTopic.filter {
             if case .topicPlaceholder = $0.kind { return false }
             return true
@@ -141,17 +140,21 @@ final class HomeViewModel: ObservableObject {
             return false
         }
 
-        // 날짜별·출처별 + 플레이스홀더는 하단에서 셔플
-        // randomSeed=true(데모 Refresh): 시스템 랜덤, false(앱 진입): DailySeededRNG 유지
         var utility = dateSections() + sourceSections() + topicPlaceholders
+
         if randomSeed {
-            utility.shuffle()
+            // 데모 Refresh: 주제 섹션 포함 전체를 완전 랜덤 셔플
+            var all = topicFixed + utility
+            all.shuffle()
+            withAnimation(.easeInOut(duration: 0.4)) {
+                sections = all
+            }
         } else {
+            // 앱 진입: 주제 섹션 상단 고정 + 나머지 DailySeededRNG 셔플
             var rng = DailySeededRNG()
             utility.shuffle(using: &rng)
+            sections = topicFixed + utility
         }
-
-        sections = topicFixed + utility
     }
 
     private func dateSections() -> [HomeCardSection] {
