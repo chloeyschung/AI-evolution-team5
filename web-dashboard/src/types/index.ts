@@ -113,6 +113,21 @@ export const DEFAULT_SETTINGS: AppSettings = {
   itemsPerPage: 20,
 };
 
+// Topic Clustering (IOS-008)
+
+export interface TopicCluster {
+  id: number;
+  title_ko: string;
+  keywords_en: string[];
+  content_ids: number[];
+  generated_at: string;
+}
+
+export interface TopicClustersResponse {
+  clusters: TopicCluster[];
+  generated_at: string | null;
+}
+
 // Storage keys
 export const ACCESS_TOKEN_KEY = 'briefly_access_token';
 export const REFRESH_TOKEN_KEY = 'briefly_refresh_token';
