@@ -74,16 +74,23 @@ final class HomeViewModel: ObservableObject {
         Task {
             defer { isRefreshing = false }
             guard let token = AuthTokenStore.shared.accessToken else {
-                print("[HomeViewModel] demoRefresh: 토큰 없음 — 로그인 필요")
                 rebuildSections(clusters: existingClusters.isEmpty ? nil : existingClusters)
                 return
             }
-            print("[HomeViewModel] demoRefresh: 클러스터링 요청 중...")
             async let serverTask  = BrieflyAPI.shared.fetchServerContent(token: token)
             async let clusterTask = BrieflyAPI.shared.refreshTopicClusters(token: token)
-            let serverItems   = (try? await serverTask)  ?? []
-            let freshClusters = (try? await clusterTask) ?? []
-            print("[HomeViewModel] demoRefresh: 새 클러스터 \(freshClusters.count)개 수신")
+            let serverItems: [ServerContent]
+            let freshClusters: [TopicCluster]
+            do {
+                serverItems   = (try? await serverTask)  ?? []
+                freshClusters = try await clusterTask
+            } catch {
+                #if DEBUG
+                print("[HomeViewModel] demoRefresh 실패: \(error.localizedDescription)")
+                #endif
+                rebuildSections(clusters: existingClusters.isEmpty ? nil : existingClusters)
+                return
+            }
 
             // 새 클러스터가 있으면 사용, 없으면 기존 클러스터 유지
             let clusters = freshClusters.isEmpty ? existingClusters : freshClusters

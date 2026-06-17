@@ -288,7 +288,10 @@ async def _cluster_and_save_inner(user_id: int) -> int:
 
         discarded_ids = (
             select(SwipeHistory.content_id)
-            .where(SwipeHistory.action == SwipeAction.DISCARD)
+            .where(
+                SwipeHistory.user_id == user_id,
+                SwipeHistory.action == SwipeAction.DISCARD,
+            )
             .scalar_subquery()
         )
 

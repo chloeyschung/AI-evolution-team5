@@ -5,13 +5,14 @@ next pull-to-refresh shows dynamic topic sections.
 POST /api/v1/topics/refresh — demo mode: force re-clustering synchronously.
 """
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from pydantic import BaseModel
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...data.database import get_db
 from ...data.models import UserTopicCluster
+from ...middleware.rate_limiter import limiter
 from ..dependencies import get_current_user
 
 router = APIRouter(prefix="/topics", tags=["topics"])
@@ -61,7 +62,9 @@ async def get_topic_clusters(
 
 
 @router.post("/refresh", response_model=TopicClustersResponse)
+@limiter.limit("20/minute")
 async def refresh_topic_clusters(
+    request: Request,
     user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> TopicClustersResponse:
