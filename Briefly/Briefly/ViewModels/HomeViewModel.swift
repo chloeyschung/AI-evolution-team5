@@ -153,10 +153,12 @@ final class HomeViewModel: ObservableObject {
         var utility = dateSections() + sourceSections() + topicPlaceholders
 
         if randomSeed {
-            // 데모 Refresh: 주제 섹션 상단 고정 유지 + 날짜·출처 완전 랜덤 셔플
+            // 데모 Refresh: 주제 섹션끼리 순서 셔플(상단 유지) + 날짜·출처도 랜덤 셔플
+            var shuffledTopics = topicFixed
+            shuffledTopics.shuffle()
             utility.shuffle()
             withAnimation(.easeInOut(duration: 0.4)) {
-                sections = topicFixed + utility
+                sections = shuffledTopics + utility
             }
         } else {
             // 앱 진입: 주제 섹션 상단 고정 + 나머지 DailySeededRNG 셔플
