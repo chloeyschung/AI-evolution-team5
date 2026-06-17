@@ -62,18 +62,19 @@ async def get_topic_clusters(
 
 @router.post("/refresh", response_model=TopicClustersResponse)
 async def refresh_topic_clusters(
+    background_tasks: BackgroundTasks,
     user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> TopicClustersResponse:
-    """Demo mode: force re-clustering and return fresh clusters.
+    """Demo mode: trigger re-clustering in background and return current clusters immediately.
 
-    cluster_and_save_for_user() handles the atomic delete+insert internally,
-    so we do NOT pre-delete here — that would leave the user with no clusters
-    if generation produces 0 results.
+    Unlike GET /topics (triggers only when empty), this always schedules
+    a new clustering run. iOS receives the current clusters instantly and
+    shuffles them; the next Refresh call will show the newly generated clusters.
     """
     from ...ai.topic_clusterer import cluster_and_save_for_user
 
-    await cluster_and_save_for_user(user_id)
+    background_tasks.add_task(cluster_and_save_for_user, user_id)
 
     result = await db.execute(
         select(UserTopicCluster)
