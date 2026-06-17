@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // MARK: - HomeCardSection
 
@@ -47,6 +48,7 @@ private struct DailySeededRNG: RandomNumberGenerator {
 final class HomeViewModel: ObservableObject {
     @Published var sections: [HomeCardSection] = []
     @Published var isLoadingServer = false
+    @Published var isRefreshing = false
 
     /// ContentView의 FetchCoordinator 호출에 사용
     private(set) var localItems: [SavedItem] = []
@@ -58,6 +60,55 @@ final class HomeViewModel: ObservableObject {
     }
 
     func reload() { load() }
+
+    /// 데모용 수동 새로고침 — 서버 재클러스터링 후 새 클러스터 표시
+    func demoRefresh() {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+
+        // refresh 실패 시 폴백용으로 현재 표시 중인 클러스터 보존
+        let existingClusters: [TopicCluster] = sections.compactMap {
+            if case .topic(let c) = $0.kind { return c } else { return nil }
+        }
+
+        Task {
+            defer { isRefreshing = false }
+            guard let token = AuthTokenStore.shared.accessToken else {
+                rebuildSections(clusters: existingClusters.isEmpty ? nil : existingClusters)
+                return
+            }
+            async let serverTask  = BrieflyAPI.shared.fetchServerContent(token: token)
+            async let clusterTask = BrieflyAPI.shared.refreshTopicClusters(token: token)
+            let serverItems: [ServerContent]
+            let freshClusters: [TopicCluster]
+            do {
+                serverItems   = (try? await serverTask)  ?? []
+                freshClusters = try await clusterTask
+            } catch {
+                #if DEBUG
+                print("[HomeViewModel] demoRefresh 실패: \(error.localizedDescription)")
+                #endif
+                rebuildSections(clusters: existingClusters.isEmpty ? nil : existingClusters)
+                return
+            }
+
+            // 새 클러스터가 있으면 사용, 없으면 기존 클러스터 유지
+            let clusters = freshClusters.isEmpty ? existingClusters : freshClusters
+
+            if !serverItems.isEmpty {
+                StorageService.shared.mergeServerData(serverItems)
+                localItems = StorageService.shared.loadAll().filter { $0.status != .deleted }
+            }
+            let localServerIds = Set(localItems.compactMap(\.serverContentId))
+            let newServerItems = serverItems
+                .filter { !localServerIds.contains($0.id) }
+                .map { HomeItem.server($0) }
+            allItems = localItems.map { .local($0) } + newServerItems
+            withAnimation(.easeInOut(duration: 0.4)) {
+                rebuildSections(clusters: clusters.isEmpty ? nil : clusters)
+            }
+        }
+    }
 
     // MARK: Phase 1 — Local
 
@@ -102,7 +153,6 @@ final class HomeViewModel: ObservableObject {
     private func rebuildSections(clusters: [TopicCluster]?) {
         let allTopic = topicSections(clusters: clusters)
 
-        // 실제 콘텐츠가 있는 주제 섹션만 상단 고정 (플레이스홀더는 하단 셔플로)
         let topicFixed = allTopic.filter {
             if case .topicPlaceholder = $0.kind { return false }
             return true
@@ -112,11 +162,9 @@ final class HomeViewModel: ObservableObject {
             return false
         }
 
-        // 날짜별·출처별 + 플레이스홀더는 하단에서 하루 1회 셔플
         var utility = dateSections() + sourceSections() + topicPlaceholders
         var rng = DailySeededRNG()
         utility.shuffle(using: &rng)
-
         sections = topicFixed + utility
     }
 

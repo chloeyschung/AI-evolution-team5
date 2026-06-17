@@ -174,6 +174,12 @@ actor BrieflyAPI {
         return response.clusters
     }
 
+    /// 데모용 강제 재클러스터링 — 서버에서 동기 실행 후 새 클러스터 반환 (IOS-020)
+    func refreshTopicClusters(token: String) async throws -> [TopicCluster] {
+        let response: TopicClustersResponse = try await post("/topics/refresh", body: [String: String](), token: token)
+        return response.clusters
+    }
+
     // MARK: - Dive Deeper (IOS-015)
 
     private struct DiveDeeperResponse: Decodable {
