@@ -284,6 +284,17 @@ async def _cluster_and_save_inner(user_id: int) -> int:
     AsyncSession_ = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async with AsyncSession_() as session:
+        from src.data.models import SwipeHistory, SwipeAction
+
+        discarded_ids = (
+            select(SwipeHistory.content_id)
+            .where(
+                SwipeHistory.user_id == user_id,
+                SwipeHistory.action == SwipeAction.DISCARD,
+            )
+            .scalar_subquery()
+        )
+
         rows = await session.execute(
             select(
                 Content.id,
@@ -293,6 +304,7 @@ async def _cluster_and_save_inner(user_id: int) -> int:
             ).where(
                 Content.user_id == user_id,
                 Content.is_deleted == False,  # noqa: E712
+                Content.id.not_in(discarded_ids),
             )
         )
         content_rows = rows.fetchall()
