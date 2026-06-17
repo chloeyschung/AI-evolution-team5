@@ -99,6 +99,18 @@
   color: var(--color-signal-on);
 }
 
+.subLink {
+  margin-left: 18px;
+  min-height: 36px;
+  font-size: 0.875rem;
+}
+
+.subLink .iconWrap {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+}
+
 @media (max-width: 980px) {
   .rail {
     position: static;

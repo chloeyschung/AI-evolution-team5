@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useContentStore } from '../stores/useContentStore';
 import ContentCard from '../components/content/ContentCard';
+import ContentDrawer from '../components/content/ContentDrawer';
 import ContentTable from '../components/content/ContentTable';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import type { Content, SwipeAction, ViewMode } from '../types';
@@ -21,6 +22,7 @@ function loadDefaultView(): ViewMode {
 export default function Dashboard() {
   const contentStore = useContentStore();
   const [viewMode] = useState<ViewMode>(loadDefaultView);
+  const [selectedContentId, setSelectedContentId] = useState<number | null>(null);
   const stripTimerRef = useRef<number | null>(null);
   const pendingActionRef = useRef<{
     item: Content;
@@ -181,6 +183,10 @@ export default function Dashboard() {
       onConfirm={handleConfirmDiscard}
       onCancel={handleCancelDiscard}
     />
+    <ContentDrawer
+      contentId={selectedContentId}
+      onClose={() => setSelectedContentId(null)}
+    />
     <section className={styles.page} data-testid="dashboard-page">
       <header className={styles.heroPlane} data-testid="dashboard-hero-plane">
         <p className={styles.kicker}>TODAY&apos;S READING FLOW</p>
@@ -235,6 +241,7 @@ export default function Dashboard() {
                 content={item}
                 onDelete={handleDelete}
                 onSwipe={handleSwipe}
+                onOpen={setSelectedContentId}
               />
             ))}
           </div>
