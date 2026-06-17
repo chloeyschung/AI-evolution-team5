@@ -47,6 +47,7 @@ private struct DailySeededRNG: RandomNumberGenerator {
 final class HomeViewModel: ObservableObject {
     @Published var sections: [HomeCardSection] = []
     @Published var isLoadingServer = false
+    @Published var isRefreshing = false
 
     /// ContentView의 FetchCoordinator 호출에 사용
     private(set) var localItems: [SavedItem] = []
@@ -58,6 +59,34 @@ final class HomeViewModel: ObservableObject {
     }
 
     func reload() { load() }
+
+    /// 데모용 수동 새로고침 — UUID 기반 완전 랜덤 시드로 섹션 재셔플
+    func demoRefresh() {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        Task {
+            defer { isRefreshing = false }
+            guard let token = AuthTokenStore.shared.accessToken else {
+                rebuildSections(clusters: nil, randomSeed: true)
+                return
+            }
+            async let serverTask  = BrieflyAPI.shared.fetchServerContent(token: token)
+            async let clusterTask = BrieflyAPI.shared.fetchTopicClusters(token: token)
+            let serverItems = (try? await serverTask)  ?? []
+            let clusters    = (try? await clusterTask) ?? []
+
+            if !serverItems.isEmpty {
+                StorageService.shared.mergeServerData(serverItems)
+                localItems = StorageService.shared.loadAll().filter { $0.status != .deleted }
+            }
+            let localServerIds = Set(localItems.compactMap(\.serverContentId))
+            let newServerItems = serverItems
+                .filter { !localServerIds.contains($0.id) }
+                .map { HomeItem.server($0) }
+            allItems = localItems.map { .local($0) } + newServerItems
+            rebuildSections(clusters: clusters.isEmpty ? nil : clusters, randomSeed: true)
+        }
+    }
 
     // MARK: Phase 1 — Local
 
@@ -99,7 +128,7 @@ final class HomeViewModel: ObservableObject {
 
     // MARK: Section building
 
-    private func rebuildSections(clusters: [TopicCluster]?) {
+    private func rebuildSections(clusters: [TopicCluster]?, randomSeed: Bool = false) {
         let allTopic = topicSections(clusters: clusters)
 
         // 실제 콘텐츠가 있는 주제 섹션만 상단 고정 (플레이스홀더는 하단 셔플로)
@@ -112,10 +141,15 @@ final class HomeViewModel: ObservableObject {
             return false
         }
 
-        // 날짜별·출처별 + 플레이스홀더는 하단에서 하루 1회 셔플
+        // 날짜별·출처별 + 플레이스홀더는 하단에서 셔플
+        // randomSeed=true(데모 Refresh): 시스템 랜덤, false(앱 진입): DailySeededRNG 유지
         var utility = dateSections() + sourceSections() + topicPlaceholders
-        var rng = DailySeededRNG()
-        utility.shuffle(using: &rng)
+        if randomSeed {
+            utility.shuffle()
+        } else {
+            var rng = DailySeededRNG()
+            utility.shuffle(using: &rng)
+        }
 
         sections = topicFixed + utility
     }

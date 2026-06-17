@@ -27,12 +27,27 @@ struct HomeView: View {
     private var contentView: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: BrieflySpacing.s8) {
-                Image("logo_full")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: 36)
-                    .padding(.horizontal, BrieflySpacing.s4)
-                    .padding(.top, BrieflySpacing.s2)
+                HStack {
+                    Image("logo_full")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 36)
+                    Spacer()
+                    Button(action: { viewModel.demoRefresh() }) {
+                        if viewModel.isRefreshing {
+                            ProgressView().scaleEffect(0.8)
+                        } else {
+                            Text("Refresh")
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(Color.brieflyPrimary500)
+                        }
+                    }
+                    .disabled(viewModel.isRefreshing)
+                    .opacity(viewModel.isRefreshing ? 0.5 : 1.0)
+                    .frame(width: 72, alignment: .trailing)
+                }
+                .padding(.horizontal, BrieflySpacing.s4)
+                .padding(.top, BrieflySpacing.s2)
                 ForEach(viewModel.sections) { section in
                     HomeSectionView(section: section) { item in
                         switch item {
