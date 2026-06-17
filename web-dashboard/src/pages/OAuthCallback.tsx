@@ -24,7 +24,9 @@ export default function OAuthCallback() {
           throw new Error('OAuth code missing');
         }
 
-        const authData = await loginWithGoogleCode(code);
+        // Must match the redirect_uri used in the initial auth request (SignIn.tsx).
+        const redirectUri = window.location.origin + '/oauth-callback';
+        const authData = await loginWithGoogleCode(code, redirectUri);
         authStore.saveTokens(authData.access_token, authData.refresh_token);
         await authStore.performLogin({
           is_authenticated: true,

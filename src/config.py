@@ -4,6 +4,28 @@ import os
 from functools import lru_cache
 
 
+def _resolve_oauth_web_credentials(
+    web_id: str | None,
+    web_secret: str | None,
+    fallback_id: str,
+    fallback_secret: str,
+) -> tuple[str, str]:
+    """Resolve web OAuth client credentials, defaulting to the native ones.
+
+    Both must be provided together; a half-configured pair (e.g. web id + iOS
+    secret) silently reproduces the original `invalid_client` failure and is
+    painful to debug, so fail fast at startup instead.
+    """
+    web_id = web_id or None
+    web_secret = web_secret or None
+    if bool(web_id) != bool(web_secret):
+        raise RuntimeError(
+            "GOOGLE_WEB_CLIENT_ID and GOOGLE_WEB_CLIENT_SECRET must be set together "
+            "(or both left unset to fall back to GOOGLE_CLIENT_ID/SECRET)."
+        )
+    return web_id or fallback_id, web_secret or fallback_secret
+
+
 @lru_cache
 def get_settings():
     """Get application settings from environment variables.
@@ -49,9 +71,13 @@ class Settings:
     # client doing server-side authorization-code exchange, which Google issues
     # under a DIFFERENT client_id + client_secret. Using the iOS client_id to
     # exchange a web-issued code yields `invalid_client`.
-    # Falls back to GOOGLE_CLIENT_ID/SECRET when unset (backward compatible).
-    GOOGLE_WEB_CLIENT_ID: str = os.getenv("GOOGLE_WEB_CLIENT_ID") or _google_client_id
-    GOOGLE_WEB_CLIENT_SECRET: str = os.getenv("GOOGLE_WEB_CLIENT_SECRET") or _google_client_secret
+    # Falls back to GOOGLE_CLIENT_ID/SECRET when BOTH are unset (backward compatible).
+    GOOGLE_WEB_CLIENT_ID, GOOGLE_WEB_CLIENT_SECRET = _resolve_oauth_web_credentials(
+        os.getenv("GOOGLE_WEB_CLIENT_ID"),
+        os.getenv("GOOGLE_WEB_CLIENT_SECRET"),
+        _google_client_id,
+        _google_client_secret,
+    )
 
     _google_redirect_uri: str | None = os.getenv("GOOGLE_REDIRECT_URI")
     if _google_redirect_uri is None:
