@@ -48,6 +48,7 @@ struct HomeView: View {
                     .disabled(viewModel.isRefreshing)
                     .opacity(viewModel.isRefreshing ? 0.5 : 1.0)
                     .frame(width: 72, alignment: .trailing)
+                    .accessibilityLabel("새로고침")
                 }
                 .padding(.horizontal, BrieflySpacing.s4)
                 .padding(.top, BrieflySpacing.s2)
