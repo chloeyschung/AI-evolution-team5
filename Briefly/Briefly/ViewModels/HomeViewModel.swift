@@ -61,7 +61,7 @@ final class HomeViewModel: ObservableObject {
 
     func reload() { load() }
 
-    /// 데모용 수동 새로고침 — 서버 재클러스터링 + 날짜·출처 섹션 랜덤 재셔플
+    /// 데모용 수동 새로고침 — 서버 재클러스터링 후 새 클러스터 표시
     func demoRefresh() {
         guard !isRefreshing else { return }
         isRefreshing = true
@@ -74,13 +74,16 @@ final class HomeViewModel: ObservableObject {
         Task {
             defer { isRefreshing = false }
             guard let token = AuthTokenStore.shared.accessToken else {
-                rebuildSections(clusters: existingClusters.isEmpty ? nil : existingClusters, randomSeed: true)
+                print("[HomeViewModel] demoRefresh: 토큰 없음 — 로그인 필요")
+                rebuildSections(clusters: existingClusters.isEmpty ? nil : existingClusters)
                 return
             }
+            print("[HomeViewModel] demoRefresh: 클러스터링 요청 중...")
             async let serverTask  = BrieflyAPI.shared.fetchServerContent(token: token)
             async let clusterTask = BrieflyAPI.shared.refreshTopicClusters(token: token)
-            let serverItems  = (try? await serverTask)  ?? []
+            let serverItems   = (try? await serverTask)  ?? []
             let freshClusters = (try? await clusterTask) ?? []
+            print("[HomeViewModel] demoRefresh: 새 클러스터 \(freshClusters.count)개 수신")
 
             // 새 클러스터가 있으면 사용, 없으면 기존 클러스터 유지
             let clusters = freshClusters.isEmpty ? existingClusters : freshClusters
@@ -94,7 +97,9 @@ final class HomeViewModel: ObservableObject {
                 .filter { !localServerIds.contains($0.id) }
                 .map { HomeItem.server($0) }
             allItems = localItems.map { .local($0) } + newServerItems
-            rebuildSections(clusters: clusters.isEmpty ? nil : clusters, randomSeed: true)
+            withAnimation(.easeInOut(duration: 0.4)) {
+                rebuildSections(clusters: clusters.isEmpty ? nil : clusters)
+            }
         }
     }
 
@@ -138,7 +143,7 @@ final class HomeViewModel: ObservableObject {
 
     // MARK: Section building
 
-    private func rebuildSections(clusters: [TopicCluster]?, randomSeed: Bool = false) {
+    private func rebuildSections(clusters: [TopicCluster]?) {
         let allTopic = topicSections(clusters: clusters)
 
         let topicFixed = allTopic.filter {
@@ -151,21 +156,9 @@ final class HomeViewModel: ObservableObject {
         }
 
         var utility = dateSections() + sourceSections() + topicPlaceholders
-
-        if randomSeed {
-            // 데모 Refresh: 주제 섹션끼리 순서 셔플(상단 유지) + 날짜·출처도 랜덤 셔플
-            var shuffledTopics = topicFixed
-            shuffledTopics.shuffle()
-            utility.shuffle()
-            withAnimation(.easeInOut(duration: 0.4)) {
-                sections = shuffledTopics + utility
-            }
-        } else {
-            // 앱 진입: 주제 섹션 상단 고정 + 나머지 DailySeededRNG 셔플
-            var rng = DailySeededRNG()
-            utility.shuffle(using: &rng)
-            sections = topicFixed + utility
-        }
+        var rng = DailySeededRNG()
+        utility.shuffle(using: &rng)
+        sections = topicFixed + utility
     }
 
     private func dateSections() -> [HomeCardSection] {
