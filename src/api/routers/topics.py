@@ -65,15 +65,13 @@ async def refresh_topic_clusters(
     user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> TopicClustersResponse:
-    """Demo mode: delete existing clusters and run clustering synchronously.
-    Returns fresh clusters immediately after generation.
+    """Demo mode: force re-clustering and return fresh clusters.
+
+    cluster_and_save_for_user() handles the atomic delete+insert internally,
+    so we do NOT pre-delete here — that would leave the user with no clusters
+    if generation produces 0 results.
     """
     from ...ai.topic_clusterer import cluster_and_save_for_user
-
-    await db.execute(
-        delete(UserTopicCluster).where(UserTopicCluster.user_id == user_id)
-    )
-    await db.commit()
 
     await cluster_and_save_for_user(user_id)
 

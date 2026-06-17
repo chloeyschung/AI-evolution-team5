@@ -61,20 +61,29 @@ final class HomeViewModel: ObservableObject {
 
     func reload() { load() }
 
-    /// 데모용 수동 새로고침 — UUID 기반 완전 랜덤 시드로 섹션 재셔플
+    /// 데모용 수동 새로고침 — 서버 재클러스터링 + 날짜·출처 섹션 랜덤 재셔플
     func demoRefresh() {
         guard !isRefreshing else { return }
         isRefreshing = true
+
+        // refresh 실패 시 폴백용으로 현재 표시 중인 클러스터 보존
+        let existingClusters: [TopicCluster] = sections.compactMap {
+            if case .topic(let c) = $0.kind { return c } else { return nil }
+        }
+
         Task {
             defer { isRefreshing = false }
             guard let token = AuthTokenStore.shared.accessToken else {
-                rebuildSections(clusters: nil, randomSeed: true)
+                rebuildSections(clusters: existingClusters.isEmpty ? nil : existingClusters, randomSeed: true)
                 return
             }
             async let serverTask  = BrieflyAPI.shared.fetchServerContent(token: token)
             async let clusterTask = BrieflyAPI.shared.refreshTopicClusters(token: token)
-            let serverItems = (try? await serverTask)  ?? []
-            let clusters    = (try? await clusterTask) ?? []
+            let serverItems  = (try? await serverTask)  ?? []
+            let freshClusters = (try? await clusterTask) ?? []
+
+            // 새 클러스터가 있으면 사용, 없으면 기존 클러스터 유지
+            let clusters = freshClusters.isEmpty ? existingClusters : freshClusters
 
             if !serverItems.isEmpty {
                 StorageService.shared.mergeServerData(serverItems)
