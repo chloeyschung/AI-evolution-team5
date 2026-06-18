@@ -54,7 +54,7 @@ test.describe('Dashboard Dynamic Diagnostics', () => {
     const routes: Array<{ route: string; testId: string }> = [
       { route: '/dashboard', testId: 'dashboard-page' },
       { route: '/inbox', testId: 'inbox-page' },
-      { route: '/archive', testId: 'archive-page' },
+      { route: '/archive', testId: 'saved-page' },
       { route: '/analytics', testId: 'analytics-page' },
       { route: '/settings', testId: 'settings-page' },
     ];

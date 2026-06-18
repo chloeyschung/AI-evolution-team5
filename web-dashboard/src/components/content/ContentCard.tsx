@@ -109,7 +109,7 @@ export default function ContentCard({ content, onDelete, onSwipe, onOpen }: Cont
 
       <div className={styles.body}>
         {content.thumbnail_url && !thumbError ? (
-          <button type="button" className={styles.thumbButton} onClick={handleCardOpen} aria-label="Open detail">
+          <button type="button" className={styles.thumbButton} onClick={handleCardOpen} aria-label={onOpen ? 'Open detail' : 'Open source'}>
             <img
               src={content.thumbnail_url}
               alt=""
@@ -119,7 +119,7 @@ export default function ContentCard({ content, onDelete, onSwipe, onOpen }: Cont
             />
           </button>
         ) : (
-          <button type="button" className={styles.thumbButton} onClick={handleCardOpen} aria-label="Open detail">
+          <button type="button" className={styles.thumbButton} onClick={handleCardOpen} aria-label={onOpen ? 'Open detail' : 'Open source'}>
             <div className={styles.thumbPlaceholder} aria-hidden="true">
               <div className={styles.thumbLogoWrap}>
                 <LogoShort className={styles.thumbLogo} />
@@ -127,7 +127,13 @@ export default function ContentCard({ content, onDelete, onSwipe, onOpen }: Cont
             </div>
           </button>
         )}
-        <h3 className={styles.title} onClick={handleCardOpen} style={{ cursor: 'pointer' }}>{content.title || content.url}</h3>
+        <h3
+          className={styles.title}
+          onClick={handleCardOpen}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleCardOpen(); }}
+          role="button"
+          tabIndex={0}
+        >{content.title || content.url}</h3>
         {content.author ? <p className={styles.author}>by {content.author}</p> : null}
         {hasBulletSummary ? (
           <ul className={styles.summaryList}>
