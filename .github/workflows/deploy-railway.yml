@@ -1,0 +1,66 @@
+name: Deploy Backend (Railway)
+
+# Auto-deploy the FastAPI backend to Railway when backend code lands on main.
+# Only backend-relevant paths trigger a deploy, so iOS / web / extension-only
+# changes don't rebuild the server. Tests must pass before deploying.
+#
+# Requires repo secret RAILWAY_TOKEN — a Railway *project* token scoped to the
+# production environment (Railway dashboard → Project → Settings → Tokens).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'railway.toml'
+      - 'Procfile'
+      - '.github/workflows/deploy-railway.yml'
+  workflow_dispatch: {} # allow manual "Run workflow" from the Actions tab
+
+concurrency:
+  group: deploy-railway-production
+  cancel-in-progress: false # never interrupt an in-flight production deploy
+
+jobs:
+  deploy:
+    name: Test & Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Run tests (deploy gate)
+        run: uv run pytest tests/ -q
+        env:
+          JWT_SECRET_KEY: 'ci-test-secret-key-at-least-32-characters-long'
+          ENCRYPTION_KEY: 'ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM1Pg='
+          GOOGLE_CLIENT_ID: 'test-client-id.apps.googleusercontent.com'
+          GOOGLE_CLIENT_SECRET: 'test-client-secret'
+          GOOGLE_REDIRECT_URI: 'http://localhost:3001/oauth-callback'
+          EMAIL_LOOKUP_KEY: 'ci-test-email-lookup-key-at-least-32-chars'
+          SMTP_HOST: 'localhost'
+          APPLE_TEAM_ID: 'ABCDE12345'
+          APPLE_BUNDLE_ID: 'com.briefly.app'
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        run: railway up --service briefly-api --ci
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
