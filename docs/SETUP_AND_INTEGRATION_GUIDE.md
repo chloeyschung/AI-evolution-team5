@@ -182,8 +182,10 @@ npm run dev
 |---|---|---|
 | `JWT_SECRET_KEY` | 긴 랜덤 문자열 | 로그인 토큰 서명 |
 | `ENCRYPTION_KEY` | Fernet key | OAuth token 암호화 |
-| `GOOGLE_CLIENT_ID` | `...apps.googleusercontent.com` | Google 로그인 |
-| `GOOGLE_CLIENT_SECRET` | Google secret | OAuth code exchange |
+| `GOOGLE_CLIENT_ID` | `...apps.googleusercontent.com` | 네이티브(iOS) id_token audience 검증 |
+| `GOOGLE_CLIENT_SECRET` | Google secret | (레거시 폴백용) |
+| `GOOGLE_WEB_CLIENT_ID` | 웹 client `...apps.googleusercontent.com` | 웹 OAuth code exchange (미설정 시 `GOOGLE_CLIENT_ID`로 폴백) |
+| `GOOGLE_WEB_CLIENT_SECRET` | 웹 client secret (`GOCSPX-...`) | 웹 OAuth code exchange (미설정 시 `GOOGLE_CLIENT_SECRET`로 폴백) |
 | `GOOGLE_REDIRECT_URI` | `http://localhost:3001/oauth-callback` | 웹 callback |
 | `EMAIL_LOOKUP_KEY` | 긴 랜덤 문자열 | 이메일 로그인 보호 |
 | `SMTP_HOST` | `localhost` | 로컬 메일 서버 |
@@ -451,8 +453,12 @@ Google 로그인용 OAuth 클라이언트는 팀에서 이미 발급되어 있�
 
 루트 `.env`:
 ```env
-GOOGLE_CLIENT_ID=<Google OAuth Client ID — 팀 채널 확인>
-GOOGLE_CLIENT_SECRET=<Google OAuth Client Secret — 팀 채널 확인>
+# 네이티브(iOS) 클라이언트 — id_token audience 검증용
+GOOGLE_CLIENT_ID=<iOS Google OAuth Client ID — 팀 채널 확인>
+GOOGLE_CLIENT_SECRET=<레거시 폴백용 — 팀 채널 확인>
+# 웹 클라이언트 — 웹 대시보드의 OAuth code exchange용 (별도 "웹 애플리케이션" 클라이언트)
+GOOGLE_WEB_CLIENT_ID=<Web Google OAuth Client ID — 팀 채널 확인>
+GOOGLE_WEB_CLIENT_SECRET=<Web Google OAuth Client Secret (GOCSPX-...) — 팀 채널 확인>
 GOOGLE_REDIRECT_URI=http://localhost:3001/oauth-callback
 ```
 

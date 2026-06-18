@@ -453,14 +453,19 @@ async def google_login_with_code(
         )
 
     # Exchange code for tokens (backend has client_secret).
+    # Web/extension authorization-code flow uses the WEB OAuth client — a
+    # confidential client distinct from the native/iOS client used by
+    # /auth/google id_token verification. The code is issued for the web
+    # client_id, so it must be exchanged with that same client_id + secret,
+    # otherwise Google returns `invalid_client`.
     # Chrome extension flows use a chromiumapp.org redirect_uri that must match
     # what was sent in the initial auth request — accept it from the client when provided.
     effective_redirect_uri = data.redirect_uri or settings.GOOGLE_REDIRECT_URI
     try:
         id_token, google_user_info = await exchange_auth_code_for_tokens(
             code=data.code,
-            client_id=settings.GOOGLE_CLIENT_ID,
-            client_secret=settings.GOOGLE_CLIENT_SECRET,
+            client_id=settings.GOOGLE_WEB_CLIENT_ID,
+            client_secret=settings.GOOGLE_WEB_CLIENT_SECRET,
             redirect_uri=effective_redirect_uri,
         )
     except GoogleTokenVerificationError as e:
