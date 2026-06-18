@@ -71,8 +71,8 @@ class Content(Base):
     duplicate_group_key = Column(String(1024), nullable=True, index=True)
     duplicate_index = Column(Integer, nullable=True)
     status = Column(SQLEnum(ContentStatus), nullable=False, default=ContentStatus.INBOX, index=True)
-    created_at = Column(DateTime, default=utc_now, index=True)
-    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, index=True)
+    created_at = Column(DateTime, default=naive_utc_now, index=True)
+    updated_at = Column(DateTime, default=naive_utc_now, onupdate=naive_utc_now, index=True)
     # DAT-003: Soft delete support
     is_deleted = Column(Boolean, default=False, nullable=False, index=True)
     deleted_at = Column(DateTime, nullable=True)
@@ -106,7 +106,7 @@ class SwipeHistory(Base):
     user_id = Column(Integer, ForeignKey("user_profile.id"), nullable=False, index=True)
     content_id = Column(Integer, ForeignKey("content.id"), nullable=False, index=True)
     action = Column(SQLEnum(SwipeAction), nullable=False)
-    swiped_at = Column(DateTime, default=utc_now, index=True)
+    swiped_at = Column(DateTime, default=naive_utc_now, index=True)
 
     # Relationship to content
     content = relationship("Content", back_populates="swipe_history")
@@ -156,7 +156,7 @@ class UserPreferences(Base):
     notifications_enabled = Column(Boolean, nullable=False, default=True)
     daily_goal = Column(Integer, nullable=False, default=20)
     default_sort = Column(SQLEnum(DefaultSort), nullable=False, default=DefaultSort.RECENCY)
-    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, index=True)
+    updated_at = Column(DateTime, default=naive_utc_now, onupdate=naive_utc_now, index=True)
 
 
 class InterestTag(Base):
@@ -185,7 +185,7 @@ class AuthenticationToken(Base):
     access_token = Column(String(1000), nullable=False, index=True)
     refresh_token = Column(String(1000), nullable=False)
     expires_at = Column(DateTime, nullable=False, index=True)
-    created_at = Column(DateTime, default=utc_now, nullable=False)
+    created_at = Column(DateTime, default=naive_utc_now, nullable=False)
     revoked_at = Column(DateTime, nullable=True, index=True)  # For logout/account delete
 
     # Relationship to user profile
@@ -200,7 +200,7 @@ class AccountDeletion(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(320), unique=True, nullable=False, index=True)
     google_sub = Column(String(100), unique=True, nullable=True, index=True)
-    deleted_at = Column(DateTime, default=utc_now, nullable=False, index=True)
+    deleted_at = Column(DateTime, default=naive_utc_now, nullable=False, index=True)
     block_expires_at = Column(DateTime, nullable=False, index=True)  # deleted_at + 30 days
     confirmation_token = Column(String(100), nullable=True, index=True)  # For two-step deletion
 
@@ -213,7 +213,7 @@ class ContentTag(Base):
     id = Column(Integer, primary_key=True, index=True)
     content_id = Column(Integer, ForeignKey("content.id"), nullable=False, index=True)
     tag = Column(String(50), nullable=False, index=True)
-    created_at = Column(DateTime, default=utc_now, nullable=False)
+    created_at = Column(DateTime, default=naive_utc_now, nullable=False)
 
     # Relationship
     content = relationship("Content", backref="tags")
@@ -236,8 +236,8 @@ class IntegrationTokens(Base):
     access_token = Column(Text, nullable=False)  # Encrypted at rest
     refresh_token = Column(Text, nullable=False)  # Encrypted at rest
     expires_at = Column(DateTime, nullable=False, index=True)
-    created_at = Column(DateTime, default=utc_now, nullable=False)
-    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+    created_at = Column(DateTime, default=naive_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=naive_utc_now, onupdate=naive_utc_now, nullable=False)
 
     # Unique constraint for user_id + provider combination
     __table_args__ = (sqlalchemy.UniqueConstraint("user_id", "provider", name="unique_user_provider_tokens"),)
@@ -307,8 +307,8 @@ class IntegrationSyncConfig(Base):
     sync_frequency = Column(String(20), nullable=False)  # 'hourly', 'daily', 'weekly'
     is_active = Column(Boolean, nullable=False, default=True)
     last_sync_at = Column(DateTime, nullable=True, index=True)
-    created_at = Column(DateTime, default=utc_now, nullable=False)
-    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+    created_at = Column(DateTime, default=naive_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=naive_utc_now, onupdate=naive_utc_now, nullable=False)
 
     # Unique constraint for user_id + provider + resource_id combination
     __table_args__ = (sqlalchemy.UniqueConstraint("user_id", "provider", "resource_id", name="unique_sync_config"),)
@@ -327,7 +327,7 @@ class IntegrationSyncLog(Base):
     ingested_count = Column(Integer, nullable=False, default=0)
     skipped_count = Column(Integer, nullable=False, default=0)
     error_message = Column(Text, nullable=True)
-    executed_at = Column(DateTime, default=utc_now, nullable=False, index=True)
+    executed_at = Column(DateTime, default=naive_utc_now, nullable=False, index=True)
 
 
 class OAuthState(Base):
@@ -344,7 +344,7 @@ class OAuthState(Base):
     provider = Column(String(50), nullable=False, index=True)
     state_token = Column(String(64), nullable=False, unique=True, index=True)
     expires_at = Column(DateTime, nullable=False, index=True)
-    created_at = Column(DateTime, default=utc_now, nullable=False)
+    created_at = Column(DateTime, default=naive_utc_now, nullable=False)
 
 
 class DeviceToken(Base):
@@ -357,9 +357,9 @@ class DeviceToken(Base):
     device_token = Column(String(512), nullable=False, index=True)
     platform = Column(String(20), nullable=False, default="ios", index=True)
     is_active = Column(Boolean, nullable=False, default=True, index=True)
-    last_seen_at = Column(DateTime, default=utc_now, nullable=False, index=True)
-    created_at = Column(DateTime, default=utc_now, nullable=False)
-    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+    last_seen_at = Column(DateTime, default=naive_utc_now, nullable=False, index=True)
+    created_at = Column(DateTime, default=naive_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=naive_utc_now, onupdate=naive_utc_now, nullable=False)
 
     __table_args__ = (sqlalchemy.UniqueConstraint("user_id", "device_token", name="uq_device_token_user_token"),)
 
@@ -390,7 +390,7 @@ class UserAchievement(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("user_profile.id"), nullable=False, index=True)
     achievement_id = Column(Integer, ForeignKey("achievement_definitions.id"), nullable=False, index=True)
-    unlocked_at = Column(DateTime, default=utc_now, nullable=False, index=True)
+    unlocked_at = Column(DateTime, default=naive_utc_now, nullable=False, index=True)
     metadata_json = Column(Text)  # JSON: {"streak_days": 7, "platform_count": 5, etc.}
 
     # Relationships
@@ -412,7 +412,7 @@ class UserStreak(Base):
     longest_streak = Column(Integer, nullable=False, default=0)
     last_activity_date = Column(DateTime, nullable=True)
     total_active_days = Column(Integer, nullable=False, default=0)
-    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, index=True)
+    updated_at = Column(DateTime, default=naive_utc_now, onupdate=naive_utc_now, index=True)
 
     # Relationship
     user = relationship("UserProfile", backref="streak")
@@ -434,8 +434,8 @@ class ReminderPreference(Base):
     quiet_hours_start = Column(DateTime)  # Don't remind before this time (e.g., 22:00:00)
     quiet_hours_end = Column(DateTime)  # Don't remind after this time (e.g., 08:00:00)
     backlog_threshold = Column(Integer, nullable=False, default=10)  # Items before backlog reminder
-    created_at = Column(DateTime, default=utc_now, index=True)
-    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, index=True)
+    created_at = Column(DateTime, default=naive_utc_now, index=True)
+    updated_at = Column(DateTime, default=naive_utc_now, onupdate=naive_utc_now, index=True)
 
     # Relationship
     user = relationship("UserProfile", backref="reminder_preferences")
@@ -450,7 +450,7 @@ class ReminderLog(Base):
     user_id = Column(Integer, ForeignKey("user_profile.id"), nullable=False, index=True)
     reminder_type = Column(String(50), nullable=False, index=True)  # 'backlog', 'streak', 'time_based', 'reengagement'
     message = Column(Text, nullable=False)
-    sent_at = Column(DateTime, default=utc_now, nullable=False, index=True)
+    sent_at = Column(DateTime, default=naive_utc_now, nullable=False, index=True)
     action_taken = Column(Boolean, nullable=False, default=False)
     action_taken_at = Column(DateTime, nullable=True)
     dismissed_at = Column(DateTime, nullable=True)
@@ -470,8 +470,8 @@ class UserActivityPattern(Base):
     most_active_day = Column(Integer)  # 0-6, day of week with most activity (0=Monday)
     avg_daily_swipes = Column(Float, nullable=False, default=0.0)
     avg_session_duration = Column(Float, nullable=False, default=0.0)  # Minutes
-    created_at = Column(DateTime, default=utc_now, index=True)
-    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, index=True)
+    created_at = Column(DateTime, default=naive_utc_now, index=True)
+    updated_at = Column(DateTime, default=naive_utc_now, onupdate=naive_utc_now, index=True)
 
     # Relationship
     user = relationship("UserProfile", backref="activity_pattern")
@@ -499,8 +499,8 @@ class UserAuthMethod(Base):
     email_encrypted = Column(Text, nullable=True)  # Fernet-encrypted; NULL for OAuth rows
     email_verified = Column(Boolean, nullable=False, default=False)
     verified_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=utc_now, nullable=False)
-    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+    created_at = Column(DateTime, default=naive_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=naive_utc_now, onupdate=naive_utc_now, nullable=False)
 
     user = relationship("UserProfile", backref="auth_methods")
 
@@ -517,7 +517,7 @@ class EmailVerificationToken(Base):
     token_hash = Column(String(64), unique=True, nullable=False, index=True)
     expires_at = Column(DateTime, nullable=False, index=True)
     used_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=utc_now, nullable=False)
+    created_at = Column(DateTime, default=naive_utc_now, nullable=False)
 
 
 class PasswordResetToken(Base):
@@ -530,7 +530,7 @@ class PasswordResetToken(Base):
     token_hash = Column(String(64), unique=True, nullable=False, index=True)
     expires_at = Column(DateTime, nullable=False, index=True)
     used_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=utc_now, nullable=False)
+    created_at = Column(DateTime, default=naive_utc_now, nullable=False)
 
 
 class IdempotencyRecord(Base):
@@ -547,7 +547,7 @@ class IdempotencyRecord(Base):
     user_id = Column(Integer, ForeignKey("user_profile.id", ondelete="CASCADE"), nullable=False, index=True)
     idempotency_key = Column(String(128), nullable=False, index=True)
     content_id = Column(Integer, ForeignKey("content.id", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime, default=utc_now, nullable=False, index=True)
+    created_at = Column(DateTime, default=naive_utc_now, nullable=False, index=True)
 
     __table_args__ = (sqlalchemy.UniqueConstraint("user_id", "idempotency_key", name="uq_idempotency_user_key"),)
 
@@ -566,4 +566,4 @@ class UserTopicCluster(Base):
     title_ko = Column(String(100), nullable=False)
     keywords_en = Column(JSON, nullable=False, default=list)
     content_ids = Column(JSON, nullable=False, default=list)
-    generated_at = Column(DateTime, default=utc_now, nullable=False)
+    generated_at = Column(DateTime, default=naive_utc_now, nullable=False)

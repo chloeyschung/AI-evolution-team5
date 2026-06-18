@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth import tokens as token_utils
 from src.data.base_repository import BaseRepository
 from src.data.models import AuthenticationToken
-from src.utils.datetime_utils import convert_to_utc, utc_now
+from src.utils.datetime_utils import convert_to_utc, naive_utc_now, utc_now
 from src.utils.token_hashing import hash_access_token
 
 
@@ -61,8 +61,10 @@ class AuthenticationRepository(BaseRepository[AuthenticationToken]):
         # Generate opaque refresh token
         refresh_token = token_utils.create_refresh_token()
 
-        # Calculate expiry times
-        now = utc_now()
+        # Calculate expiry times.
+        # expires_at is written to a naive `DateTime` column (timestamp without
+        # time zone); bind naive UTC so asyncpg/PostgreSQL accepts it.
+        now = naive_utc_now()
         expires_at = now + timedelta(seconds=access_expires_in)
 
         # Check if tokens already exist and revoke them (token rotation)
@@ -204,7 +206,7 @@ class AuthenticationRepository(BaseRepository[AuthenticationToken]):
             # Generate new tokens (token rotation)
             new_access_token = token_utils.create_access_token(existing_token.user_id)
             new_refresh_token = token_utils.create_refresh_token()
-            new_expires_at = utc_now() + timedelta(seconds=access_expires_in)
+            new_expires_at = naive_utc_now() + timedelta(seconds=access_expires_in)
 
             # Update token record with hashed access and refresh tokens
             existing_token.access_token = hash_access_token(new_access_token)
@@ -243,7 +245,7 @@ class AuthenticationRepository(BaseRepository[AuthenticationToken]):
         token = result.scalar_one_or_none()
 
         if token:
-            token.revoked_at = utc_now()
+            token.revoked_at = naive_utc_now()
             await self.db.commit()
             return True
 
