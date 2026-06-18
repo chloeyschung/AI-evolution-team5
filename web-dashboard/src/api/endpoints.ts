@@ -32,7 +32,10 @@ export async function loginWithGoogle(
   return response.data;
 }
 
-export async function loginWithGoogleCode(code: string, redirectUri: string) {
+export async function loginWithGoogleCode(
+  code: string,
+  redirectUri: string = window.location.origin + '/oauth-callback',
+) {
   const client = getApiClient();
   const response = await client.post('/api/v1/auth/google/code', { code, redirect_uri: redirectUri });
   return response.data;
