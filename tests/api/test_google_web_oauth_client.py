@@ -36,8 +36,9 @@ def test_web_credentials_half_pair_fails_fast(web_id, web_secret):
 
 
 @pytest.mark.asyncio
-async def test_google_code_exchange_uses_web_client_credentials(async_client, db, monkeypatch):
+async def test_google_code_exchange_uses_web_client_credentials(async_client, monkeypatch):
     """POST /auth/google/code forwards GOOGLE_WEB_CLIENT_ID/SECRET (not the iOS client) to the exchange."""
+    # (async_client already pulls in the db fixture, so DB init is covered.)
     # Distinct values so a regression to the iOS client_id is unambiguous.
     monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", "ios-client.apps.googleusercontent.com")
     monkeypatch.setattr(settings, "GOOGLE_CLIENT_SECRET", "ios-secret-should-not-be-used")
@@ -66,5 +67,3 @@ async def test_google_code_exchange_uses_web_client_credentials(async_client, db
     kwargs = mock_exchange.call_args.kwargs
     assert kwargs["client_id"] == "web-client.apps.googleusercontent.com"
     assert kwargs["client_secret"] == "web-secret-expected"
-    # The iOS client must never be used for the web code exchange.
-    assert kwargs["client_id"] != "ios-client.apps.googleusercontent.com"
