@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.constants import AuthProvider
 from src.data.models import EmailVerificationToken, PasswordResetToken, UserAuthMethod
-from src.utils.datetime_utils import utc_now
+from src.utils.datetime_utils import naive_utc_now
 
 
 class EmailAuthRepository:
@@ -74,7 +74,7 @@ class EmailAuthRepository:
         result = await self._db.execute(select(UserAuthMethod).where(UserAuthMethod.id == method_id))
         method = result.scalar_one()
         method.email_verified = True
-        method.verified_at = utc_now()
+        method.verified_at = naive_utc_now()
         return method
 
     async def update_password(self, method_id: int, new_hash: str) -> UserAuthMethod:
@@ -101,18 +101,18 @@ class EmailAuthRepository:
             select(EmailVerificationToken).where(
                 EmailVerificationToken.token_hash == token_hash,
                 EmailVerificationToken.used_at.is_(None),
-                EmailVerificationToken.expires_at > utc_now(),
+                EmailVerificationToken.expires_at > naive_utc_now(),
             )
         )
         token = result.scalar_one_or_none()
         if token is None:
             return None
-        token.used_at = utc_now()
+        token.used_at = naive_utc_now()
         return token
 
     async def invalidate_verification_tokens_for_user(self, user_id: int) -> int:
         """Mark all active verification tokens for a user as used. Does NOT commit."""
-        now = utc_now()
+        now = naive_utc_now()
         result = await self._db.execute(
             select(EmailVerificationToken).where(
                 EmailVerificationToken.user_id == user_id,
@@ -140,11 +140,11 @@ class EmailAuthRepository:
             select(PasswordResetToken).where(
                 PasswordResetToken.token_hash == token_hash,
                 PasswordResetToken.used_at.is_(None),
-                PasswordResetToken.expires_at > utc_now(),
+                PasswordResetToken.expires_at > naive_utc_now(),
             )
         )
         token = result.scalar_one_or_none()
         if token is None:
             return None
-        token.used_at = utc_now()
+        token.used_at = naive_utc_now()
         return token

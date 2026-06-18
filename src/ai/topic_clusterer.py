@@ -274,17 +274,18 @@ async def cluster_and_save_for_user(user_id: int) -> int:
 
 
 async def _cluster_and_save_inner(user_id: int) -> int:
-    from sqlalchemy import delete as sql_delete, select
+    from sqlalchemy import delete as sql_delete
+    from sqlalchemy import select
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from src.data.database import engine
     from src.data.models import Content, UserTopicCluster
-    from src.utils.datetime_utils import utc_now
+    from src.utils.datetime_utils import naive_utc_now
 
     AsyncSession_ = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async with AsyncSession_() as session:
-        from src.data.models import SwipeHistory, SwipeAction
+        from src.data.models import SwipeAction, SwipeHistory
 
         discarded_ids = (
             select(SwipeHistory.content_id)
@@ -331,7 +332,7 @@ async def _cluster_and_save_inner(user_id: int) -> int:
                 title_ko=c.title_ko,
                 keywords_en=c.keywords_en,
                 content_ids=c.content_ids,
-                generated_at=utc_now(),
+                generated_at=naive_utc_now(),
             ))
         await session.commit()
 
