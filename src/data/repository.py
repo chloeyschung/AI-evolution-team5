@@ -34,6 +34,7 @@ from .models import (
     Theme,
     UserPreferences,
     UserProfile,
+    naive_utc_now,
     utc_now,
 )
 
@@ -115,7 +116,7 @@ class ContentRepository(BaseRepository[Content]):
             if metadata.summary is not None:
                 existing.summary = metadata.summary
                 existing.is_ai_summarized = True
-            existing.updated_at = utc_now()
+            existing.updated_at = naive_utc_now()
             await self.session.commit()
             return existing
         else:
@@ -189,7 +190,7 @@ class ContentRepository(BaseRepository[Content]):
         await self.session.execute(
             update(Content)
             .where(Content.id == content_id, Content.user_id == user_id)
-            .values(summary=summary, is_ai_summarized=True, updated_at=utc_now())
+            .values(summary=summary, is_ai_summarized=True, updated_at=naive_utc_now())
         )
         await self.session.commit()
 
@@ -198,7 +199,7 @@ class ContentRepository(BaseRepository[Content]):
         await self.session.execute(
             update(Content)
             .where(Content.id == content_id, Content.user_id == user_id)
-            .values(title=title, is_ai_titled=True, updated_at=utc_now())
+            .values(title=title, is_ai_titled=True, updated_at=naive_utc_now())
         )
         await self.session.commit()
 
@@ -220,7 +221,7 @@ class ContentRepository(BaseRepository[Content]):
                 auto_tag_category=category,
                 auto_tag_keywords_en=json.dumps(keywords_en) if keywords_en is not None else None,
                 auto_tag_keywords_original=json.dumps(keywords_original) if keywords_original is not None else None,
-                updated_at=utc_now(),
+                updated_at=naive_utc_now(),
             )
         )
         await self.session.commit()
@@ -230,7 +231,7 @@ class ContentRepository(BaseRepository[Content]):
         await self.session.execute(
             update(Content)
             .where(Content.id == content_id, Content.user_id == user_id)
-            .values(reflection_questions=raw_json, updated_at=utc_now())
+            .values(reflection_questions=raw_json, updated_at=naive_utc_now())
         )
         await self.session.commit()
 
@@ -239,7 +240,7 @@ class ContentRepository(BaseRepository[Content]):
         await self.session.execute(
             update(Content)
             .where(Content.id == content_id, Content.user_id == user_id)
-            .values(memo=text, updated_at=utc_now())
+            .values(memo=text, updated_at=naive_utc_now())
         )
         await self.session.commit()
 
@@ -248,7 +249,7 @@ class ContentRepository(BaseRepository[Content]):
         await self.session.execute(
             update(Content)
             .where(Content.id == content_id, Content.user_id == user_id)
-            .values(memo=None, updated_at=utc_now())
+            .values(memo=None, updated_at=naive_utc_now())
         )
         await self.session.commit()
 
@@ -370,7 +371,7 @@ class ContentRepository(BaseRepository[Content]):
             raise RuntimeError(f"Content with ID {content_id} not found")
 
         content.status = new_status
-        content.updated_at = utc_now()
+        content.updated_at = naive_utc_now()
         await self.session.commit()
         await self.session.refresh(content)
         return content
@@ -959,7 +960,7 @@ class ContentRepository(BaseRepository[Content]):
     def _soft_delete(obj) -> None:
         """Set is_deleted=True and deleted_at=utc_now() on any model instance (DAT-003)."""
         obj.is_deleted = True
-        obj.deleted_at = utc_now()
+        obj.deleted_at = naive_utc_now()
 
     async def soft_delete_content(self, content_id: int, user_id: int) -> Content | None:
         """Soft-delete content by setting is_deleted=True (DAT-003).
@@ -1125,7 +1126,7 @@ class SwipeRepository(BaseRepository[SwipeHistory]):
             content_id=content_id,
             action=action,
             user_id=user_id,
-            swiped_at=utc_now(),
+            swiped_at=naive_utc_now(),
         )
         self.session.add(history)
 
@@ -1170,7 +1171,7 @@ class SwipeRepository(BaseRepository[SwipeHistory]):
         stmt = (
             update(Content)
             .where(Content.id == content_id, Content.user_id == user_id)
-            .values(status=new_status, updated_at=utc_now())
+            .values(status=new_status, updated_at=naive_utc_now())
         )
         await self.session.execute(stmt)
 
@@ -1335,7 +1336,7 @@ class UserProfileRepository(BaseRepository[UserProfile]):
         if timezone is not None:
             profile.timezone = timezone
 
-        profile.updated_at = utc_now()
+        profile.updated_at = naive_utc_now()
         await self.session.commit()
         await self.session.refresh(profile)
 
@@ -1398,7 +1399,7 @@ class UserProfileRepository(BaseRepository[UserProfile]):
         if default_sort is not None:
             preferences.default_sort = default_sort
 
-        preferences.updated_at = utc_now()
+        preferences.updated_at = naive_utc_now()
         await self.session.commit()
         await self.session.refresh(preferences)
 
@@ -1599,8 +1600,6 @@ class UserProfileRepository(BaseRepository[UserProfile]):
         Returns:
             Created UserProfile.
         """
-        from src.utils.datetime_utils import naive_utc_now
-
         # user_profiles timestamp columns are naive `DateTime` (timestamp without
         # time zone). Bind naive UTC so asyncpg/PostgreSQL accepts it.
         now = naive_utc_now()
@@ -1631,8 +1630,6 @@ class UserProfileRepository(BaseRepository[UserProfile]):
         profile = result.scalar_one_or_none()
 
         if profile:
-            from src.utils.datetime_utils import naive_utc_now
-
             # last_login_at is a naive `DateTime` column — bind naive UTC so
             # asyncpg/PostgreSQL doesn't reject an offset-aware value.
             profile.last_login_at = naive_utc_now()
@@ -1970,8 +1967,6 @@ class DeviceTokenRepository:
         return token
 
     async def deactivate(self, user_id: int, device_token: str) -> "DeviceToken | None":
-        from src.utils.datetime_utils import utc_now
-
         result = await self.session.execute(
             select(DeviceToken).where(
                 DeviceToken.user_id == user_id,
@@ -1982,7 +1977,7 @@ class DeviceTokenRepository:
         if token is None:
             return None
         token.is_active = False
-        token.updated_at = utc_now()
+        token.updated_at = naive_utc_now()
         await self.session.flush()
         await self.session.refresh(token)
         return token
