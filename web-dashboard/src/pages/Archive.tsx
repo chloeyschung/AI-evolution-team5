@@ -39,9 +39,9 @@ export default function Archive() {
   };
 
   return (
-    <section className={styles.page} data-testid="archive-page">
+    <section className={styles.page} data-testid="saved-page">
       <header className={styles.hero}>
-        <h1>Archive</h1>
+        <h1>Saved</h1>
         <p className={styles.subtitle}>Completed and deferred items</p>
       </header>
 

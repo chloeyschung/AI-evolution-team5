@@ -175,6 +175,7 @@
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 1.06rem;
+  cursor: pointer;
   line-height: 1.32;
   letter-spacing: -0.012em;
   margin: 0;

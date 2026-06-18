@@ -8,9 +8,10 @@ interface ContentCardProps {
   content: Content;
   onDelete: (id: number) => void;
   onSwipe?: (action: SwipeAction) => void;
+  onOpen?: (id: number) => void;
 }
 
-export default function ContentCard({ content, onDelete, onSwipe }: ContentCardProps) {
+export default function ContentCard({ content, onDelete, onSwipe, onOpen }: ContentCardProps) {
   const [copyFeedback, setCopyFeedback] = useState('');
   const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [thumbError, setThumbError] = useState(false);
@@ -35,6 +36,10 @@ export default function ContentCard({ content, onDelete, onSwipe }: ContentCardP
   };
   const openSource = () => {
     window.open(content.url, '_blank', 'noopener,noreferrer');
+  };
+  const handleCardOpen = () => {
+    if (onOpen) onOpen(content.id);
+    else openSource();
   };
 
   const copySource = async () => {
@@ -104,7 +109,7 @@ export default function ContentCard({ content, onDelete, onSwipe }: ContentCardP
 
       <div className={styles.body}>
         {content.thumbnail_url && !thumbError ? (
-          <button type="button" className={styles.thumbButton} onClick={openSource} aria-label="Open source">
+          <button type="button" className={styles.thumbButton} onClick={handleCardOpen} aria-label={onOpen ? 'Open detail' : 'Open source'}>
             <img
               src={content.thumbnail_url}
               alt=""
@@ -114,13 +119,21 @@ export default function ContentCard({ content, onDelete, onSwipe }: ContentCardP
             />
           </button>
         ) : (
-          <div className={styles.thumbPlaceholder} aria-hidden="true">
-            <div className={styles.thumbLogoWrap}>
-              <LogoShort className={styles.thumbLogo} />
+          <button type="button" className={styles.thumbButton} onClick={handleCardOpen} aria-label={onOpen ? 'Open detail' : 'Open source'}>
+            <div className={styles.thumbPlaceholder} aria-hidden="true">
+              <div className={styles.thumbLogoWrap}>
+                <LogoShort className={styles.thumbLogo} />
+              </div>
             </div>
-          </div>
+          </button>
         )}
-        <h3 className={styles.title}>{content.title || content.url}</h3>
+        <h3
+          className={styles.title}
+          onClick={handleCardOpen}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleCardOpen(); }}
+          role="button"
+          tabIndex={0}
+        >{content.title || content.url}</h3>
         {content.author ? <p className={styles.author}>by {content.author}</p> : null}
         {hasBulletSummary ? (
           <ul className={styles.summaryList}>

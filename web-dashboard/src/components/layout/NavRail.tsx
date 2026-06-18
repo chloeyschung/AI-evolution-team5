@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import styles from './NavRail.module.css';
 import { LogoShort } from '../Logo';
@@ -64,11 +65,17 @@ function IconSettings() {
   );
 }
 
-const navItems = [
+type NavItem = { label: string; to: string; icon: ReactNode; children?: NavItem[] };
+
+const navItems: NavItem[] = [
   { label: 'Dashboard', to: '/dashboard', icon: <IconDashboard /> },
-  { label: 'Library',   to: '/inbox',     icon: <IconInbox />     },
-  { label: 'Archive',   to: '/archive',   icon: <IconArchive />   },
-  { label: 'Discarded', to: '/discarded', icon: <IconTrash />     },
+  {
+    label: 'Library', to: '/inbox', icon: <IconInbox />,
+    children: [
+      { label: 'Saved',     to: '/archive',   icon: <IconArchive /> },
+      { label: 'Discarded', to: '/discarded', icon: <IconTrash />   },
+    ],
+  },
   { label: 'Analytics', to: '/analytics', icon: <IconAnalytics /> },
   { label: 'Settings',  to: '/settings',  icon: <IconSettings />  },
 ];
@@ -88,10 +95,18 @@ export default function NavRail() {
 
       <nav className={styles.nav} aria-label="Primary">
         {navItems.map((item) => (
-          <NavLink key={item.to} to={item.to} className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ''}`}>
-            <span className={styles.iconWrap} aria-hidden="true">{item.icon}</span>
-            <span>{item.label}</span>
-          </NavLink>
+          <div key={item.to}>
+            <NavLink to={item.to} className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ''}`}>
+              <span className={styles.iconWrap} aria-hidden="true">{item.icon}</span>
+              <span>{item.label}</span>
+            </NavLink>
+            {item.children?.map((child) => (
+              <NavLink key={child.to} to={child.to} className={({ isActive }) => `${styles.link} ${styles.subLink} ${isActive ? styles.active : ''}`}>
+                <span className={styles.iconWrap} aria-hidden="true">{child.icon}</span>
+                <span>{child.label}</span>
+              </NavLink>
+            ))}
+          </div>
         ))}
       </nav>
     </aside>

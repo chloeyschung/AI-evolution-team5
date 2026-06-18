@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { deleteContent, getContent, getTopicClusters, recordSwipe } from '../api/endpoints';
 import ContentCard from '../components/content/ContentCard';
+import ContentDrawer from '../components/content/ContentDrawer';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import type { Content, SwipeAction, TopicCluster } from '../types';
 import styles from './Dashboard.module.css';
@@ -110,6 +111,7 @@ export default function Dashboard() {
   const [clusters, setClusters] = useState<TopicCluster[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [clustersLoading, setClustersLoading] = useState(true);
+  const [selectedContentId, setSelectedContentId] = useState<number | null>(null);
   const [pendingDiscard, setPendingDiscard] = useState<{ item: Content; action: SwipeAction } | null>(null);
 
   // ── Action strip (undo/redo) ───────────────────────────────────────────────
@@ -337,6 +339,10 @@ export default function Dashboard() {
         onConfirm={handleConfirmDiscard}
         onCancel={() => setPendingDiscard(null)}
       />
+      <ContentDrawer
+        contentId={selectedContentId}
+        onClose={() => setSelectedContentId(null)}
+      />
 
       <section className={styles.page} data-testid="dashboard-page">
         <header className={styles.heroPlane} data-testid="dashboard-hero-plane">
@@ -394,6 +400,7 @@ export default function Dashboard() {
                         content={item}
                         onDelete={handleDelete}
                         onSwipe={handleSwipe}
+                        onOpen={setSelectedContentId}
                       />
                     </div>
                   ))}
