@@ -15,7 +15,7 @@ from src.constants import (
     SwipeAction,
     Theme,
 )
-from src.utils.datetime_utils import utc_now
+from src.utils.datetime_utils import naive_utc_now, utc_now
 
 Base = declarative_base()
 
@@ -132,8 +132,10 @@ class UserProfile(Base):
     bio = Column(String(500))
     timezone = Column(String(64), default="UTC", nullable=True)
     last_login_at = Column(DateTime, nullable=True, index=True)  # AUTH-002
-    created_at = Column(DateTime, default=utc_now, index=True)
-    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, index=True)
+    # Naive UTC: these are `timestamp without time zone` columns in PostgreSQL,
+    # which asyncpg rejects for tz-aware values. naive_utc_now binds safely.
+    created_at = Column(DateTime, default=naive_utc_now, index=True)
+    updated_at = Column(DateTime, default=naive_utc_now, onupdate=naive_utc_now, index=True)
     # DAT-003: Soft delete support
     is_deleted = Column(Boolean, default=False, nullable=False, index=True)
     deleted_at = Column(DateTime, nullable=True)

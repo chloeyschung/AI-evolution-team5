@@ -2,11 +2,28 @@
 
 from datetime import UTC, datetime
 
-from src.utils.datetime_utils import serialize_datetime
+from src.utils.datetime_utils import naive_utc_now, serialize_datetime, utc_now
 
 
 def test_serialize_datetime_none_returns_none():
     assert serialize_datetime(None) is None
+
+
+def test_naive_utc_now_is_tz_naive():
+    """naive_utc_now must be tz-naive (for PostgreSQL `timestamp` columns)."""
+    n = naive_utc_now()
+    assert n.tzinfo is None
+
+
+def test_utc_now_is_tz_aware():
+    """utc_now stays tz-aware (regression guard against the two diverging)."""
+    assert utc_now().tzinfo is not None
+
+
+def test_naive_and_aware_represent_same_instant():
+    """Both should be UTC 'now' — within a small delta, ignoring tzinfo."""
+    delta = abs((utc_now().replace(tzinfo=None) - naive_utc_now()).total_seconds())
+    assert delta < 5
 
 
 def test_serialize_datetime_naive_treated_as_utc_with_z_suffix():

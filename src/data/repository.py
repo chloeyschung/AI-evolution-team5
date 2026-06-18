@@ -1599,7 +1599,11 @@ class UserProfileRepository(BaseRepository[UserProfile]):
         Returns:
             Created UserProfile.
         """
-        now = utc_now()
+        from src.utils.datetime_utils import naive_utc_now
+
+        # user_profiles timestamp columns are naive `DateTime` (timestamp without
+        # time zone). Bind naive UTC so asyncpg/PostgreSQL accepts it.
+        now = naive_utc_now()
         profile = UserProfile(
             email=email,
             google_sub=google_sub,
@@ -1627,7 +1631,11 @@ class UserProfileRepository(BaseRepository[UserProfile]):
         profile = result.scalar_one_or_none()
 
         if profile:
-            profile.last_login_at = utc_now()
+            from src.utils.datetime_utils import naive_utc_now
+
+            # last_login_at is a naive `DateTime` column — bind naive UTC so
+            # asyncpg/PostgreSQL doesn't reject an offset-aware value.
+            profile.last_login_at = naive_utc_now()
             await self.session.commit()
             await self.session.refresh(profile)
 

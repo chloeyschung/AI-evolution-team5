@@ -17,6 +17,18 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+def naive_utc_now() -> datetime:
+    """Return current UTC time as a timezone-NAIVE datetime.
+
+    For columns declared as plain ``DateTime`` (``timestamp without time zone``
+    in PostgreSQL). asyncpg rejects a tz-aware value bound to such a column
+    ("can't subtract offset-naive and offset-aware datetimes"). A naive UTC
+    value binds correctly to both ``timestamp`` and ``timestamptz`` columns,
+    so this is the safe choice for those columns regardless of the DB type.
+    """
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
 def convert_to_utc(dt: datetime | None) -> datetime | None:
     """Convert datetime to UTC if naive or in different timezone.
 
