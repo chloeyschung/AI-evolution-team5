@@ -16,6 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.metadata_extractor import ContentMetadata
+from src.utils.datetime_utils import naive_utc_now, utc_now
 
 from .base_repository import BaseRepository
 from .models import (
@@ -34,8 +35,6 @@ from .models import (
     Theme,
     UserPreferences,
     UserProfile,
-    naive_utc_now,
-    utc_now,
 )
 
 
